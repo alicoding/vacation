@@ -1,0 +1,24 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+	1.	File Size Limit:
+	•	Ensure each file does not exceed 200 lines. If a file nears this limit, split it into smaller, logically separated modules.
+	2.	Modularization:
+	•	Organize code into independent, reusable modules where each module addresses a single responsibility.
+	3.	Clear, Explicit Instructions:
+	•	Read and understand the task instructions thoroughly before starting work.
+	•	Update the task status immediately after completing the task.
+	4.	Frequent Task Updates:
+	•	Review the instructions at the start and upon finishing each task to ensure alignment and capture any changes.
+	5.	Automated Testing & Linting:
+	•	Integrate continuous testing (e.g., Jest) and enforce code quality with ESLint and Prettier.
+	•	Ensure that no code is merged if linting or testing fails.
+	6.	Version Control:
+	•	Use a robust version control system (like Git) with clear, descriptive commit messages.
+	•	Regularly commit changes to help with tracking and rollback if needed.
+	7.	Code Reviews:
+	•	Participate in or facilitate code reviews to catch errors early and share knowledge within the team.
+	8.	Documentation:
+	•	Keep all documentation and inline comments up-to-date to maintain clarity about each module’s purpose and functionality.
