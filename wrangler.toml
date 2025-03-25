@@ -1,0 +1,26 @@
+name = "vacation-app"
+compatibility_date = "2025-03-25"
+
+[assets]
+directory = ".next/static"
+
+[build]
+command = "npm run build"
+publish = ".vercel/output/static"
+
+[build.environment]
+NODE_VERSION = "20"
+
+[site]
+bucket = ".vercel/output/static"
+
+[env.production]
+name = "vacation-app"
+workers_dev = true
+
+[env.production.build.environment]
+DATABASE_URL = "YOUR_PRODUCTION_DATABASE_URL"
+
+[env.development]
+name = "vacation-app-dev"
+workers_dev = true 
