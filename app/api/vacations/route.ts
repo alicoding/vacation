@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/authOptions';
 import { createVacationBooking } from '@/services/vacation/vacationService';
 import { prisma } from '@/lib/prisma'; // This is safe in API routes
 

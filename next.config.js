@@ -57,7 +57,9 @@ const nextConfig = {
   // Enable Turbopack for development
   experimental: {
     // Enable Turbopack
-    turbo: true,
+    turbo: {
+      enabled: true
+    }
   },
 };
 

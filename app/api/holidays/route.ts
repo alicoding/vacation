@@ -57,9 +57,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { authOptions } from '@/lib/auth/authOptions';
 import { prisma } from '@/lib/prisma';
-import { getHolidays } from '@/services/holiday/holidayService'; // Add missing import
+import { getHolidays } from '@/services/holiday/holidayService';
 
 /**
  * GET /api/holidays
@@ -218,18 +218,4 @@ export async function POST(request: NextRequest) {
       { status: 500 }
     );
   }
-}
-
-export async function fetchHolidays(request: Request) {
-  const { startDate, endDate, province } = await request.json();
-  
-  if (!startDate || !endDate || !province) {
-    return NextResponse.json(
-      { error: 'Start date, end date, and province are required' },
-      { status: 400 }
-    );
-  }
-  
-  const holidays = await getHolidays(new Date(startDate), new Date(endDate), province);
-  return NextResponse.json(holidays);
 }

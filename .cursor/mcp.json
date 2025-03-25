@@ -1,13 +1,17 @@
 {
   "schema_version": "v1",
   "name": "Vacation Tracker App",
-  "description": "MCP configuration for fixing remaining issues in the Vacation Tracker application",
+  "description": "MCP configuration for fixing remaining issues in the Vacation Tracker application and adding Google Calendar sync capability",
   "authentication": {
     "type": "oauth",
     "provider": "google",
     "configuration": {
       "callback_url": "${NEXTAUTH_URL}/api/auth/callback/google",
-      "scopes": ["profile", "email"],
+      "scopes": [
+        "profile",
+        "email",
+        "https://www.googleapis.com/auth/calendar"
+      ],
       "session_persistence": "database"
     }
   },
@@ -107,89 +111,9 @@
           "implementation_details": "Identify and fix the persistent date offset issue in the holiday calculation logic"
         }
       ]
-    },
-    {
-      "name": "duplicate_vacation_booking_issue",
-      "description": "Users can book the same vacation dates multiple times",
-      "priority": "high",
-      "tasks": [
-        {
-          "id": "prevent_duplicate_bookings",
-          "description": "Add validation to prevent booking the same dates twice",
-          "implementation_details": "Check existing bookings before creating new ones and prevent overlapping dates"
-        }
-      ]
-    },
-    {
-      "name": "half_day_date_schema_error",
-      "description": "Half-day bookings fail due to missing database schema for half_day_date",
-      "priority": "high",
-      "tasks": [
-        {
-          "id": "fix_half_day_schema",
-          "description": "Update database schema or service code to handle half-day date properly",
-          "implementation_details": "Fix the schema or remove the half_day_date field from the service code if not needed"
-        }
-      ]
     }
   ],
   "missing_features": [
-    {
-      "name": "google_one_tap_sign_in",
-      "description": "Implement Google One Tap sign-in for seamless authentication experience",
-      "priority": "high",
-      "tasks": [
-        {
-          "id": "add_google_identity_services",
-          "description": "Add Google Identity Services JavaScript library to the project",
-          "implementation_details": "Include Google Identity Services library and initialize it with the correct client ID"
-        },
-        {
-          "id": "implement_one_tap_flow",
-          "description": "Implement the One Tap sign-in flow",
-          "implementation_details": "Set up the One Tap prompt and handle credential responses without redirects"
-        },
-        {
-          "id": "integrate_with_nextauth",
-          "description": "Integrate One Tap authentication with NextAuth.js",
-          "implementation_details": "Modify NextAuth to work with Google One Tap credentials or use a compatible package like next-auth-one-tap"
-        },
-        {
-          "id": "add_fallback_authentication",
-          "description": "Add fallback to traditional sign-in when One Tap isn't available",
-          "implementation_details": "Handle cases where One Tap isn't displayed or is skipped by falling back to traditional OAuth flow"
-        },
-        {
-          "id": "update_ui_for_one_tap",
-          "description": "Update UI to accommodate One Tap prompt",
-          "implementation_details": "Ensure the login page layout works well with the One Tap modal and doesn't create visual conflicts"
-        }
-      ]
-    },
-    {
-      "name": "consistent_calendar_color_coding",
-      "description": "Calendar color coding is inconsistent between different views",
-      "priority": "medium",
-      "tasks": [
-        {
-          "id": "unify_calendar_colors",
-          "description": "Ensure consistent color coding across calendar views",
-          "implementation_details": "Create shared color constants and apply them consistently in both /dashboard/calendar and /dashboard/request views"
-        }
-      ]
-    },
-    {
-      "name": "holiday_display_improvements",
-      "description": "Improve upcoming holidays display",
-      "priority": "medium",
-      "tasks": [
-        {
-          "id": "categorize_holidays",
-          "description": "Better categorize different holiday types",
-          "implementation_details": "Add proper categorization for bank, federal, provincial holidays"
-        }
-      ]
-    },
     {
       "name": "enhanced_vacation_summary",
       "description": "Improve vacation summary with detailed time off information",
@@ -197,25 +121,13 @@
       "tasks": [
         {
           "id": "improve_vacation_summary_display",
-          "description": "Enhance vacation summary to show detailed time off including weekends and holidays",
+          "description": "Enhance vacation summary to show detailed time off including weekends/holidays",
           "implementation_details": "Update VacationSummary component to show total days off including weekends/holidays and detect adjacent days off (long weekends)"
         },
         {
           "id": "add_extended_time_off_message",
           "description": "Add informative message about extended time off when vacation connects to weekends or holidays",
           "implementation_details": "Calculate and display total consecutive days off including adjacent weekends and holidays"
-        }
-      ]
-    },
-    {
-      "name": "week_starts_preference",
-      "description": "Allow users to set calendar week start preference",
-      "priority": "medium",
-      "tasks": [
-        {
-          "id": "add_week_starts_preference",
-          "description": "Allow users to choose whether week starts on Sunday or Monday",
-          "implementation_details": "Add user preference setting and update calendar components to respect this setting"
         }
       ]
     },
@@ -230,36 +142,54 @@
           "implementation_details": "Update calendar to highlight holidays and allow them to be included in vacation selection, automatically calculating working days correctly"
         }
       ]
+    },
+    {
+      "name": "google_calendar_sync",
+      "description": "Integrate Google Calendar sync for vacation bookings with two-way updates, error handling, and user control",
+      "priority": "high",
+      "tasks": [
+        {
+          "id": "add_db_field_google_event_id",
+          "description": "Add a new field 'googleEventId' to the VacationBooking model for tracking Google Calendar event IDs",
+          "implementation_details": "Update the Prisma schema to include a field for storing the associated Google Calendar event ID; run migration."
+        },
+        {
+          "id": "update_oauth_scopes",
+          "description": "Update OAuth configuration to include Google Calendar scopes",
+          "implementation_details": "Add 'https://www.googleapis.com/auth/calendar' to the Google OAuth scopes in the authentication configuration and NextAuth settings."
+        },
+        {
+          "id": "implement_sync_on_create_update",
+          "description": "Implement API calls to create and update Google Calendar events on vacation booking creation and update",
+          "implementation_details": "On creation or update of a vacation booking, call the Google Calendar API to create or update the corresponding event; store/update the googleEventId accordingly; implement real-time sync."
+        },
+        {
+          "id": "implement_sync_on_delete",
+          "description": "Implement deletion of Google Calendar event when a vacation booking is deleted",
+          "implementation_details": "On deletion of a vacation booking, call the Google Calendar API to delete the associated event using googleEventId."
+        },
+        {
+          "id": "implement_retry_and_error_handling",
+          "description": "Implement retry mechanism for Google Calendar API calls and notify user if sync fails after several attempts",
+          "implementation_details": "Use a retry strategy for API calls (e.g., 3 retries) and display an error message or notification in the app if syncing fails, prompting manual intervention."
+        },
+        {
+          "id": "add_user_settings_for_sync",
+          "description": "Add user settings options for controlling calendar sync behavior",
+          "implementation_details": "Provide options for auto-sync, manual add, or disabling sync; update UI and backend to respect these preferences."
+        },
+        {
+          "id": "test_google_calendar_sync",
+          "description": "Write integration tests for Google Calendar sync functionality",
+          "implementation_details": "Ensure that create, update, and delete actions on vacation bookings correctly reflect in Google Calendar, and error handling works as expected."
+        }
+      ]
     }
   ],
   "implementation_details": {
-    "google_one_tap_implementation": {
-      "description": "Implement Google One Tap sign-in",
-      "implementation": "Added Google Identity Services, configured One Tap as a credentials provider, and integrated with NextAuth.js. Enhanced implementation to handle FedCM credential request errors and prevent concurrent authentication requests."
-    },
     "holiday_date_fix_permanent": {
       "description": "Permanently fix holiday date offset issue",
       "implementation": "Ensure all holiday dates are displayed correctly across the application"
-    },
-    "duplicate_booking_prevention": {
-      "description": "Prevent duplicate vacation bookings",
-      "implementation": "Add validation to check for existing bookings on the same dates before creating new ones"
-    },
-    "half_day_date_fix": {
-      "description": "Fix half-day date booking errors",
-      "implementation": "Update schema or code to correctly handle half-day date information"
-    },
-    "color_coding_consistency": {
-      "description": "Ensure consistent color coding",
-      "implementation": "Create shared color constants for different date types across all calendar views"
-    },
-    "vacation_summary_enhancement": {
-      "description": "Enhance vacation summary display",
-      "implementation": "Improve vacation summary to show detailed information about total time off including weekends/holidays, and detect adjacent days off"
-    },
-    "holiday_selection_in_calendar": {
-      "description": "Allow holiday selection in calendar",
-      "implementation": "Make holidays selectable in the calendar and automatically account for them in day calculations"
     },
     "date_display_fixes": {
       "description": "Fix date display issues",
@@ -276,6 +206,13 @@
           "default": "null",
           "description": "For multiple day bookings with a half-day, which specific day is the half-day",
           "status": "missing_from_db"
+        },
+        {
+          "field": "googleEventId",
+          "type": "String",
+          "default": null,
+          "description": "Stores the Google Calendar event ID for syncing vacation booking events",
+          "status": "pending"
         }
       ]
     },
@@ -291,46 +228,5 @@
         }
       ]
     }
-  ],
-  "task_status_tracking": {
-    "critical_issues": {
-      "holiday_date_offset_bug_persistent": {
-        "fix_holiday_date_calculation_properly": "in_progress"
-      },
-      "date_calculation_issues": {
-        "fix_weekend_calculation": "in_progress",
-        "fix_date_formatting": "in_progress",
-        "fix_holiday_dates_display": "in_progress"
-      }
-    },
-    "duplicate_vacation_booking_issue": {
-      "prevent_duplicate_bookings": "completed"
-    },
-    "half_day_date_schema_error": {
-      "fix_half_day_schema": "completed"
-    },
-    "google_one_tap_sign_in": {
-      "add_google_identity_services": "completed",
-      "implement_one_tap_flow": "completed",
-      "integrate_with_nextauth": "completed",
-      "add_fallback_authentication": "completed",
-      "update_ui_for_one_tap": "completed"
-    },
-    "consistent_calendar_color_coding": {
-      "unify_calendar_colors": "completed"
-    },
-    "holiday_display_improvements": {
-      "categorize_holidays": "completed"
-    },
-    "week_starts_preference": {
-      "add_week_starts_preference": "completed"
-    },
-    "enhanced_vacation_summary": {
-      "improve_vacation_summary_display": "in_progress",
-      "add_extended_time_off_message": "in_progress"
-    },
-    "improved_calendar_interaction": {
-      "allow_holiday_selection": "in_progress"
-    }
-  }
+  ]
 }

@@ -47,6 +47,8 @@ model User {
   province            String    @default("ON")
   employment_type     String    @default("standard")
   week_starts_on      String    @default("sunday") // Options: "sunday" or "monday"
+  calendar_sync_enabled Boolean  @default(false)
+  google_calendar_id   String?  // Store the ID of the synced Google Calendar
   accounts            Account[]
   sessions            Session[]
   vacationBookings    VacationBooking[]
@@ -70,6 +72,7 @@ model VacationBooking {
   created_at DateTime @default(now())
   is_half_day Boolean  @default(false)
   half_day_portion String? // "AM" or "PM"
+  googleEventId String? // Store the Google Calendar event ID
 }
 
 model Holiday {

@@ -1,7 +1,7 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { 
   Box, 
   Button, 
@@ -16,7 +16,7 @@ import GoogleIcon from '@mui/icons-material/Google';
 import { useSearchParams } from 'next/navigation';
 import GoogleOneTap from '@/features/auth/GoogleOneTap';
 
-export default function SignIn() {
+function SignInContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -186,5 +186,13 @@ export default function SignIn() {
         </Paper>
       </Container>
     </Box>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <SignInContent />
+    </Suspense>
   );
 } 

@@ -382,8 +382,8 @@ export default function VacationList({ vacations, holidays, province }: Vacation
                   <AccordionDetails sx={{ pt: 0 }}>
                     <Divider sx={{ mb: 2 }} />
                     <VacationSummary 
-                      startDate={startDate || null}
-                      endDate={endDate || null}
+                      startDate={startDate ? new Date(startDate) : new Date()}
+                      endDate={endDate ? new Date(endDate) : new Date()}
                       isHalfDay={vacation.isHalfDay}
                       holidays={holidays}
                     />
