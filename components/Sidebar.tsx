@@ -7,7 +7,7 @@ import { useSession } from 'next-auth/react';
 // Navigation items
 const navigation = [
   { name: 'Dashboard', href: '/dashboard' },
-  { name: 'Book Vacation', href: '/dashboard/book' },
+  { name: 'Request Vacation', href: '/dashboard/request' },
   { name: 'Calendar', href: '/dashboard/calendar' },
   { name: 'Settings', href: '/dashboard/settings' },
 ];

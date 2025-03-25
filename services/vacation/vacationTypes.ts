@@ -38,6 +38,8 @@ export interface VacationBooking {
   endDate: Date;
   note?: string | null;
   createdAt?: Date;
+  isHalfDay?: boolean;
+  halfDayPortion?: string | null;
 }
 
 export interface VacationWithDetails extends VacationBooking {
@@ -52,4 +54,11 @@ export type VacationBookingInput = {
   startDate: Date;
   endDate: Date;
   note: string | null;
+  isHalfDay?: boolean;
+  halfDayPortion?: string | null;
+  halfDayDate?: Date | null;
+  halfDayDates?: Array<{
+    date: Date;
+    portion: string;
+  }>;
 };

@@ -66,10 +66,19 @@ export async function fetchHolidays(): Promise<Holiday[]> {
     throw new Error('Failed to fetch holidays');
   }
   const data = await res.json();
-  return data.map((h: any) => ({
-    ...h,
-    date: new Date(h.date),
-  }));
+  return data.map((h: any) => {
+    // Fix timezone issues by using UTC date construction
+    const dateStr = h.date;
+    // Parse the ISO string to extract year, month, day with UTC handling
+    const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
+    // Create a date in UTC to prevent timezone offset
+    const fixedDate = new Date(Date.UTC(year, month - 1, day));
+    
+    return {
+      ...h,
+      date: fixedDate,
+    };
+  });
 }
 
 export async function syncHolidays(year: number): Promise<{ success: boolean; message: string }> {

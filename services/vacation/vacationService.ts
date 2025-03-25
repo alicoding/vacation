@@ -20,16 +20,68 @@ import {
  */
 export async function createVacationBooking(data: VacationBookingInput) {
   try {
-    return await prisma.vacationBooking.create({
+    // Check for existing bookings in the same date range
+    const existingBookings = await prisma.vacationBooking.findMany({
+      where: {
+        userId: data.userId,
+        OR: [
+          // Check for bookings that contain the start date
+          {
+            start_date: { lte: data.startDate },
+            end_date: { gte: data.startDate }
+          },
+          // Check for bookings that contain the end date
+          {
+            start_date: { lte: data.endDate },
+            end_date: { gte: data.endDate }
+          },
+          // Check for bookings that are contained within the new booking
+          {
+            start_date: { gte: data.startDate },
+            end_date: { lte: data.endDate }
+          }
+        ]
+      }
+    });
+
+    // If there are existing bookings in the date range, throw an error
+    if (existingBookings.length > 0) {
+      throw new ValidationError('You already have a vacation booking that overlaps with these dates.');
+    }
+
+    // Create the vacation booking
+    const booking = await prisma.vacationBooking.create({
       data: {
         userId: data.userId,
         start_date: data.startDate,
         end_date: data.endDate,
         note: data.note,
+        is_half_day: data.isHalfDay || false,
+        half_day_portion: data.halfDayPortion || null,
       },
     });
+    
+    // If we have multiple half-day dates, handle them separately
+    // In a real implementation, this would be stored in a separate table
+    // For now, we'll just log them
+    if (data.halfDayDates && data.halfDayDates.length > 0) {
+      console.log('Half-day dates:', data.halfDayDates);
+      // Here you would create records in a separate table like:
+      // await prisma.vacationHalfDays.createMany({
+      //   data: data.halfDayDates.map(halfDay => ({
+      //     vacationId: booking.id,
+      //     date: halfDay.date,
+      //     portion: halfDay.portion
+      //   }))
+      // });
+    }
+    
+    return booking;
   } catch (error) {
     console.error('Error creating vacation booking:', error);
+    if (error instanceof ValidationError) {
+      throw error;
+    }
     throw new DatabaseError(`Failed to create vacation booking: ${error instanceof Error ? error.message : String(error)}`);
   }
 }

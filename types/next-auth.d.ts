@@ -6,11 +6,15 @@ declare module "next-auth" {
       id: string;
       total_vacation_days: number;
       province: string;
+      employment_type: string;
+      week_starts_on: string;
     } & DefaultSession["user"];
   }
   
   interface User {
     total_vacation_days: number;
     province: string;
+    employment_type: string;
+    week_starts_on: string;
   }
 } 

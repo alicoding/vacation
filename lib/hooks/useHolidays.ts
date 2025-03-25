@@ -9,6 +9,7 @@ export interface Holiday {
   name: string;
   province: string | null;
   type: 'bank' | 'provincial';
+  relevantToEmploymentType?: boolean;
 }
 
 export interface UseHolidaysResult {
@@ -23,7 +24,8 @@ export interface UseHolidaysResult {
 export default function useHolidays(
   startDate: Date | string = new Date(new Date().getFullYear(), 0, 1),
   endDate: Date | string = new Date(new Date().getFullYear(), 11, 31),
-  province?: string
+  province?: string,
+  employmentType?: string
 ): UseHolidaysResult {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,9 @@ export default function useHolidays(
       if (province) {
         params.append('province', province);
       }
+      if (employmentType) {
+        params.append('employment_type', employmentType);
+      }
       
       // Fetch holidays from API
       const response = await fetch(`/api/holidays?${params.toString()}`);
@@ -69,7 +74,7 @@ export default function useHolidays(
   // Fetch holidays on component mount and when dependencies change
   useEffect(() => {
     fetchHolidays();
-  }, [formatDate(startDate), formatDate(endDate), province]);
+  }, [formatDate(startDate), formatDate(endDate), province, employmentType]);
   
   // Check if a date is a holiday
   const isHoliday = (dateString: string) => {

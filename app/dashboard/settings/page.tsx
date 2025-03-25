@@ -7,13 +7,19 @@ import UserSettings from '@/features/auth/UserSettings';
 import HolidaySyncCard from '@/components/dashboard/HolidaySyncCard';
 import { Typography, Container, Grid, Paper, Box } from '@mui/material';
 
-async function getUserProvince(userId: string) {
+async function getUserSettings(userId: string) {
   const user = await prisma.user.findUnique({
     where: { id: userId },
-    select: { province: true },
+    select: { 
+      province: true,
+      employment_type: true
+    },
   });
   
-  return user?.province || 'ON';
+  return {
+    province: user?.province || 'ON',
+    employmentType: user?.employment_type || 'standard'
+  };
 }
 
 export default async function SettingsPage() {
@@ -23,7 +29,7 @@ export default async function SettingsPage() {
     redirect('/auth/signin');
   }
   
-  const province = await getUserProvince(session.user.id);
+  const userSettings = await getUserSettings(session.user.id);
   
   return (
     <Container maxWidth="lg" sx={{ mt: 4 }}>
@@ -41,7 +47,10 @@ export default async function SettingsPage() {
         </Grid>
         <Grid item xs={12} md={6}>
           <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
-            <HolidaySyncCard userProvince={province} />
+            <HolidaySyncCard 
+              userProvince={userSettings.province} 
+              employmentType={userSettings.employmentType}
+            />
           </Paper>
         </Grid>
       </Grid>

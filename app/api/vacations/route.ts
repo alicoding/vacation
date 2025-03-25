@@ -53,6 +53,8 @@ export async function POST(request: NextRequest) {
       startDate: new Date(data.startDate),
       endDate: new Date(data.endDate),
       note: data.note || null,
+      isHalfDay: data.is_half_day || false,
+      halfDayPortion: data.half_day_portion || null,
     });
     
     // Format dates as ISO strings for consistent client/server rendering

@@ -2,12 +2,17 @@
 
 import React, { useState } from 'react';
 import { Button, CircularProgress, Alert, TextField, MenuItem } from '@mui/material';
+import HolidayOverviewCard from './HolidayOverviewCard';
 
 interface HolidaySyncCardProps {
   userProvince: string;
+  employmentType?: string;
 }
 
-const HolidaySyncCard: React.FC<HolidaySyncCardProps> = ({ userProvince }) => {
+const HolidaySyncCard: React.FC<HolidaySyncCardProps> = ({ 
+  userProvince,
+  employmentType = 'standard'
+}) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +103,13 @@ const HolidaySyncCard: React.FC<HolidaySyncCardProps> = ({ userProvince }) => {
           {error}
         </Alert>
       )}
+
+      <div className="mt-6">
+        <HolidayOverviewCard 
+          province={userProvince} 
+          employmentType={employmentType} 
+        />
+      </div>
     </div>
   );
 };

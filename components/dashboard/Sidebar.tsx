@@ -6,7 +6,7 @@ import { useSession } from 'next-auth/react';
 import Link from 'next/dist/client/app-dir/link';
 import { 
   Box, List, ListItem, ListItemIcon, ListItemText, ListItemButton, 
-  Typography, Divider, IconButton, Paper, Stack, Collapse, Drawer
+  Typography, Divider, IconButton, Paper, Stack, Collapse, Drawer, Chip
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChevronDoubleLeftIcon from '@heroicons/react/24/outline/ChevronDoubleLeftIcon';
@@ -16,6 +16,7 @@ import CalendarIcon from '@heroicons/react/24/outline/CalendarIcon';
 import CogIcon from '@heroicons/react/24/outline/CogIcon';
 import MiniCalendar from './MiniCalendar';
 import { Holiday, VacationBooking } from '@/types';
+import { DateTime } from 'luxon';
 
 // Custom type for extended session user with total_vacation_days
 interface ExtendedUser {
@@ -51,7 +52,8 @@ export default function Sidebar() {
   // Navigation links for the sidebar - properly typed
   const navLinks: NavLink[] = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Vacations', href: '/dashboard/vacations', icon: CalendarIcon },
+    { name: 'Request Vacation', href: '/dashboard/request', icon: CalendarIcon },
+    { name: 'Calendar', href: '/dashboard/calendar', icon: CalendarIcon },
     { name: 'Settings', href: '/dashboard/settings', icon: CogIcon },
   ];
 
@@ -109,10 +111,23 @@ export default function Sidebar() {
     fetchData();
   }, [user?.id, user?.total_vacation_days]);
 
+  // Fix: Parse holiday dates correctly using UTC
+  const parseHolidayDate = (dateString: string) => {
+    return DateTime.fromISO(dateString, { zone: 'utc' });
+  };
+
   // Get upcoming holidays (next 3)
   const upcomingHolidays = holidays
-    .filter(holiday => new Date(holiday.date) >= new Date())
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+    .filter(holiday => {
+      // Use Luxon to correctly handle dates in UTC
+      const holidayDate = parseHolidayDate(holiday.date);
+      const today = DateTime.now();
+      return holidayDate >= today;
+    })
+    .sort((a, b) => {
+      // Sort by date using Luxon
+      return parseHolidayDate(a.date).toMillis() - parseHolidayDate(b.date).toMillis();
+    })
     .slice(0, 3);
 
   // Create a wrapper component to handle HeroIcon with MUI props
@@ -238,25 +253,75 @@ export default function Sidebar() {
           </Typography>
           
           {upcomingHolidays.length > 0 ? (
-            <List dense disablePadding>
-              {upcomingHolidays.map(holiday => (
-                <ListItem key={holiday.id} sx={{ py: 0.5, px: 0 }}>
-                  <ListItemText 
-                    primary={holiday.name}
-                    secondary={
-                      <Typography variant="caption" color="text.secondary">
-                        {new Date(holiday.date).toLocaleDateString()}
-                      </Typography>
-                    }
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {upcomingHolidays.map((holiday) => (
+                <Box
+                  key={holiday.id}
+                  sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'flex-start',
+                    p: 1,
+                    borderRadius: 1,
+                    bgcolor: 'background.paper',
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    opacity: 1,
+                  }}
+                >
+                  <Box>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                      {holiday.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {parseHolidayDate(holiday.date).toFormat('M/d/yyyy')}
+                    </Typography>
+                  </Box>
+                  <Chip
+                    label={holiday.type === 'bank' ? 'Bank' : 'Prov'}
+                    color={holiday.type === 'bank' ? 'warning' : 'secondary'}
+                    size="small"
+                    variant="outlined"
+                    sx={{ height: 20, fontSize: '0.675rem' }}
                   />
-                </ListItem>
+                </Box>
               ))}
-            </List>
+            </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
               No upcoming holidays
             </Typography>
           )}
+          
+          {/* Add compact legend */}
+          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box 
+                sx={{ 
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: '50%', 
+                  bgcolor: 'warning.main' 
+                }} 
+              />
+              <Typography variant="caption" color="text.secondary">
+                Bank Holiday
+              </Typography>
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box 
+                sx={{ 
+                  width: 8, 
+                  height: 8, 
+                  borderRadius: '50%', 
+                  bgcolor: 'secondary.main' 
+                }} 
+              />
+              <Typography variant="caption" color="text.secondary">
+                Provincial
+              </Typography>
+            </Box>
+          </Box>
         </Box>
       )}
     </Paper>

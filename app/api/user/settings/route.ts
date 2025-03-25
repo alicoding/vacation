@@ -14,7 +14,7 @@ export async function PUT(request: NextRequest) {
   }
   
   try {
-    const { total_vacation_days, province } = await request.json();
+    const { total_vacation_days, province, employment_type, week_starts_on } = await request.json();
     
     // Validate input
     if (
@@ -40,19 +40,45 @@ export async function PUT(request: NextRequest) {
       );
     }
     
+    if (
+      !employment_type ||
+      typeof employment_type !== 'string' ||
+      !['standard', 'bank', 'federal'].includes(employment_type)
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid employment type' },
+        { status: 400 }
+      );
+    }
+    
+    if (
+      !week_starts_on ||
+      typeof week_starts_on !== 'string' ||
+      !['sunday', 'monday'].includes(week_starts_on)
+    ) {
+      return NextResponse.json(
+        { error: 'Invalid week start day' },
+        { status: 400 }
+      );
+    }
+    
     // Update user settings
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
       data: {
         total_vacation_days,
         province,
+        employment_type,
+        week_starts_on,
       },
     });
     
     return NextResponse.json(
       { 
         total_vacation_days: updatedUser.total_vacation_days,
-        province: updatedUser.province
+        province: updatedUser.province,
+        employment_type: updatedUser.employment_type,
+        week_starts_on: updatedUser.week_starts_on
       },
       { status: 200 }
     );

@@ -1,7 +1,7 @@
 'use client';
 
 import { signIn } from 'next-auth/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { 
   Box, 
   Button, 
@@ -9,20 +9,31 @@ import {
   Typography, 
   Paper,
   Alert,
-  CircularProgress
+  CircularProgress,
+  Divider
 } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useSearchParams } from 'next/navigation';
+import GoogleOneTap from '@/features/auth/GoogleOneTap';
 
 export default function SignIn() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
+  const [showFallback, setShowFallback] = useState(false);
   const searchParams = useSearchParams();
 
-  // Set mounted state to true on client-side
   useEffect(() => {
+    console.log("SignIn: Component mounted");
     setMounted(true);
+    
+    // After 5 seconds, show the fallback button if One Tap hasn't worked
+    const timer = setTimeout(() => {
+      console.log("SignIn: Showing fallback button after timeout");
+      setShowFallback(true);
+    }, 5000);
+    
+    return () => clearTimeout(timer);
   }, []);
 
   // Check for error from callback
@@ -31,6 +42,7 @@ export default function SignIn() {
     
     const errorType = searchParams?.get('error');
     if (errorType) {
+      console.log(`SignIn: Error detected in URL params: ${errorType}`);
       switch(errorType) {
         case 'OAuthSignin':
         case 'OAuthCallback':
@@ -38,21 +50,27 @@ export default function SignIn() {
         case 'EmailCreateAccount':
         case 'Callback':
           setError('There was a problem with the OAuth authentication. Please try again.');
+          setShowFallback(true);
           break;
         case 'OAuthAccountNotLinked':
           setError('This email is already associated with another account.');
+          setShowFallback(true);
           break;
         case 'EmailSignin':
           setError('The email signin link is invalid or has expired.');
+          setShowFallback(true);
           break;
         case 'CredentialsSignin':
           setError('The credentials you provided are invalid.');
+          setShowFallback(true);
           break;
         case 'SessionRequired':
           setError('Please sign in to access this page.');
+          setShowFallback(true);
           break;
         default:
           setError('An unexpected error occurred. Please try again.');
+          setShowFallback(true);
           break;
       }
     }
@@ -63,6 +81,7 @@ export default function SignIn() {
       setIsLoading(true);
       setError(null);
       
+      console.log("SignIn: Traditional Google sign-in initiated");
       // Use absolute URL for callbackUrl
       const callbackUrl = `${window.location.origin}/dashboard`;
       
@@ -78,10 +97,22 @@ export default function SignIn() {
     }
   };
 
+  const handleOneTapSuccess = useCallback(() => {
+    console.log("SignIn: One Tap authentication successful");
+  }, []);
+
+  const handleOneTapError = useCallback((errorMessage: string) => {
+    console.log(`SignIn: One Tap error: ${errorMessage}`);
+    setError(errorMessage);
+    setShowFallback(true);
+  }, []);
+
   // Return empty div until client-side hydration is complete
   if (!mounted) {
     return <Box sx={{ minHeight: '100vh' }} />;
   }
+
+  console.log("SignIn: Rendering sign-in page, showFallback:", showFallback);
 
   return (
     <Box 
@@ -121,22 +152,37 @@ export default function SignIn() {
             </Alert>
           )}
           
-          <Button
-            variant="outlined"
-            fullWidth
-            startIcon={isLoading ? <CircularProgress size={20} /> : <GoogleIcon />}
-            onClick={handleGoogleSignIn}
-            disabled={isLoading}
-            sx={{ 
-              py: 1.5, 
-              borderColor: 'divider',
-              '&:hover': {
-                bgcolor: 'action.hover',
-              }
-            }}
-          >
-            {isLoading ? 'Signing in...' : 'Sign in with Google'}
-          </Button>
+          {/* Google One Tap Integration (invisible) */}
+          <div id="google-one-tap-container" data-testid="google-one-tap-container">
+            <GoogleOneTap onSuccess={handleOneTapSuccess} onError={handleOneTapError} />
+          </div>
+          
+          {showFallback && (
+            <>
+              {showFallback && !error && (
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Automatic sign-in didn't work. Please use the button below.
+                </Typography>
+              )}
+              
+              <Button
+                variant="outlined"
+                fullWidth
+                startIcon={isLoading ? <CircularProgress size={20} /> : <GoogleIcon />}
+                onClick={handleGoogleSignIn}
+                disabled={isLoading}
+                sx={{ 
+                  py: 1.5, 
+                  borderColor: 'divider',
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                  }
+                }}
+              >
+                {isLoading ? 'Signing in...' : 'Sign in with Google'}
+              </Button>
+            </>
+          )}
         </Paper>
       </Container>
     </Box>

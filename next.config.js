@@ -53,6 +53,12 @@ const nextConfig = {
   
   // Allow cross-origin requests during development
   allowedDevOrigins: ['vacation.alicoding.com'],
+  
+  // Enable Turbopack for development
+  experimental: {
+    // Enable Turbopack
+    turbo: true,
+  },
 };
 
 module.exports = nextConfig;

@@ -1,4 +1,3 @@
-
 /**
  * @module HolidaysAPI
  */
@@ -82,14 +81,22 @@ export async function GET(request: NextRequest) {
     
     // Get the province from search params or the user's profile
     let province = searchParams.get('province');
+    let employmentType = searchParams.get('employment_type');
     
-    if (!province) {
-      // Get user's province from database if not specified
+    if (!province || !employmentType) {
+      // Get user's province and employment type from database if not specified
       const user = await prisma.user.findUnique({
-        where: { id: session.user.id },
-        select: { province: true }
+        where: { id: session.user.id }
       });
-      province = user?.province || 'ON';
+      
+      if (!province) {
+        province = user?.province || 'ON';
+      }
+      
+      if (!employmentType) {
+        // @ts-ignore - employment_type exists in the database schema
+        employmentType = user?.employment_type || 'standard';
+      }
     }
     
     // Get holiday type filter if provided
@@ -135,14 +142,43 @@ export async function GET(request: NextRequest) {
     });
 
     // Format dates consistently for client/server hydration
-    const formattedHolidays = Array.from(uniqueHolidays.values()).map(holiday => ({
-      ...holiday,
-      date: holiday.date.toISOString(),
-      // Add a display property to show if this is a bank or general holiday
-      displayType: holiday.type === 'bank' ? 'Bank Holiday' : 'General Holiday',
-      // Add a boolean flag to indicate if this holiday applies to the user
-      appliesTo: holiday.type === 'bank' || holiday.province === province
-    }));
+    const formattedHolidays = Array.from(uniqueHolidays.values()).map(holiday => {
+      // Determine if holiday applies based on employment type
+      let appliesTo = false;
+      
+      if (holiday.type === 'bank') {
+        // Bank holidays apply to bank staff and standard employees
+        appliesTo = employmentType === 'bank' || employmentType === 'standard';
+      } else if (holiday.type === 'provincial') {
+        // Provincial holidays apply to standard employees
+        appliesTo = employmentType === 'standard';
+      }
+      
+      // For federal employees, all federal holidays apply
+      if (employmentType === 'federal') {
+        // We're considering all holidays with province=null as federal holidays
+        appliesTo = holiday.province === null;
+      }
+      
+      // FIX: Use UTC version of the date to prevent timezone offset issues
+      const dateObj = holiday.date;
+      const utcDate = new Date(Date.UTC(
+        dateObj.getUTCFullYear(),
+        dateObj.getUTCMonth(),
+        dateObj.getUTCDate()
+      ));
+      
+      return {
+        ...holiday,
+        date: utcDate.toISOString(), // Use the UTC ISO string
+        // Add a display property to show if this is a bank or general holiday
+        displayType: holiday.type === 'bank' ? 'Bank Holiday' : 'General Holiday',
+        // Add a boolean flag to indicate if this holiday applies to the user
+        appliesTo,
+        // Add relevance indicator based on employment type
+        relevantToEmploymentType: appliesTo
+      };
+    });
 
     return NextResponse.json(formattedHolidays);
   } catch (error) {

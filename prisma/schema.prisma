@@ -45,6 +45,8 @@ model User {
   image               String?
   total_vacation_days Int       @default(14)
   province            String    @default("ON")
+  employment_type     String    @default("standard")
+  week_starts_on      String    @default("sunday") // Options: "sunday" or "monday"
   accounts            Account[]
   sessions            Session[]
   vacationBookings    VacationBooking[]
@@ -66,6 +68,8 @@ model VacationBooking {
   end_date   DateTime
   note       String?
   created_at DateTime @default(now())
+  is_half_day Boolean  @default(false)
+  half_day_portion String? // "AM" or "PM"
 }
 
 model Holiday {

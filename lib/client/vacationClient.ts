@@ -18,6 +18,10 @@ export async function createVacationBooking(data: VacationBookingInput): Promise
   
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    // If it's a 400 status, it's likely a validation error (overlapping bookings)
+    if (response.status === 400 && errorData.error) {
+      throw new Error(errorData.error);
+    }
     throw new Error(`Failed to create vacation booking: ${errorData.error || response.statusText}`);
   }
   

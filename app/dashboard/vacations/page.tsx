@@ -6,7 +6,7 @@ import VacationForm from '@/components/vacation/VacationForm';
 import VacationList from '@/components/vacation/VacationList';
 import { getVacationBookings } from '@/services/vacation/vacationService';
 import { getHolidays } from '@/services/holiday/holidayService';
-import { Container, Typography, Grid, Paper, Box } from '@mui/material';
+import { Container, Typography, Grid, Paper, Box, Divider } from '@mui/material';
 
 export default async function VacationsPage() {
   // Get user session
@@ -33,6 +33,9 @@ export default async function VacationsPage() {
         <Typography variant="h4" fontWeight="bold" gutterBottom>
           Vacations
         </Typography>
+        <Typography variant="subtitle1" color="text.secondary">
+          Book and manage your vacation days
+        </Typography>
       </Box>
       
       <Grid container spacing={4}>
@@ -42,6 +45,7 @@ export default async function VacationsPage() {
             <Typography variant="h6" fontWeight="medium" gutterBottom>
               Book New Vacation
             </Typography>
+            <Divider sx={{ mb: 3 }} />
             <VacationForm 
               userId={session.user.id} 
               province={province}
@@ -56,6 +60,7 @@ export default async function VacationsPage() {
             <Typography variant="h6" fontWeight="medium" gutterBottom>
               Your Vacations
             </Typography>
+            <Divider sx={{ mb: 3 }} />
             <VacationList 
               vacations={vacations} 
               holidays={holidays}

@@ -28,13 +28,12 @@ const CalendarDay = styled(Box)(({ theme }) => ({
 }));
 
 // Helper function to get array of dates in interval
-function eachDayOfInterval(start: Date, end: Date): Date[] {
-  const days: Date[] = [];
-  let current = DateTime.fromJSDate(start);
-  const endDate = DateTime.fromJSDate(end);
+function eachDayOfInterval(start: DateTime, end: DateTime): DateTime[] {
+  const days: DateTime[] = [];
+  let current = start;
   
-  while (current <= endDate) {
-    days.push(current.toJSDate());
+  while (current <= end) {
+    days.push(current);
     current = current.plus({ days: 1 });
   }
   
@@ -42,37 +41,53 @@ function eachDayOfInterval(start: Date, end: Date): Date[] {
 }
 
 export default function MiniCalendar({ holidays = [], vacations = [] }: MiniCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(new Date());
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [currentMonth, setCurrentMonth] = useState(DateTime.now());
+  const [selectedDate, setSelectedDate] = useState(DateTime.now());
   
-  // Convert holiday and vacation dates to Date objects for easier comparison
-  const holidayDates = holidays.map(h => new Date(h.date).toDateString());
-  const vacationDateRanges = vacations.map(v => ({
-    start: new Date(v.start_date),
-    end: new Date(v.end_date)
-  }));
+  // Parse holiday dates using Luxon DateTime with UTC
+  const holidayDates = holidays.map(h => {
+    // Create a DateTime from the holiday date string
+    return typeof h.date === 'string' 
+      ? DateTime.fromISO(h.date, { zone: 'utc' }) 
+      : DateTime.fromJSDate(h.date as Date, { zone: 'utc' });
+  });
+  
+  // Parse vacation date ranges using Luxon DateTime
+  const vacationDateRanges = vacations.map(v => {
+    const startDate = typeof v.start_date === 'string'
+      ? DateTime.fromISO(v.start_date, { zone: 'utc' })
+      : DateTime.fromJSDate(v.start_date as Date, { zone: 'utc' });
+      
+    const endDate = typeof v.end_date === 'string'
+      ? DateTime.fromISO(v.end_date, { zone: 'utc' })
+      : DateTime.fromJSDate(v.end_date as Date, { zone: 'utc' });
+      
+    return { start: startDate, end: endDate };
+  });
   
   // Check if a date is a holiday
-  const isHoliday = (date: Date) => {
-    return holidayDates.includes(date.toDateString());
+  const isHoliday = (date: DateTime): boolean => {
+    return holidayDates.some(holidayDate => 
+      date.hasSame(holidayDate, 'day')
+    );
   };
   
   // Check if a date is within a vacation
-  const isVacation = (date: Date) => {
+  const isVacation = (date: DateTime): boolean => {
     return vacationDateRanges.some(range => 
       date >= range.start && date <= range.end
     );
   };
   
   // Get all days for the current month view
-  const daysToDisplay = () => {
+  const daysToDisplay = (): DateTime[] => {
     // Get the first and last day of the month
-    const monthStart = DateTime.fromJSDate(currentMonth).startOf('month').toJSDate();
-    const monthEnd = DateTime.fromJSDate(currentMonth).endOf('month').toJSDate();
+    const monthStart = currentMonth.startOf('month');
+    const monthEnd = currentMonth.endOf('month');
     
     // Get the start of the first week and end of the last week
-    const calendarStart = DateTime.fromJSDate(monthStart).startOf('week').toJSDate();
-    const calendarEnd = DateTime.fromJSDate(monthEnd).endOf('week').toJSDate();
+    const calendarStart = monthStart.startOf('week');
+    const calendarEnd = monthEnd.endOf('week');
     
     // Get all days in this range
     return eachDayOfInterval(calendarStart, calendarEnd);
@@ -80,11 +95,11 @@ export default function MiniCalendar({ holidays = [], vacations = [] }: MiniCale
   
   // Navigation handlers
   const prevMonth = () => {
-    setCurrentMonth(DateTime.fromJSDate(currentMonth).minus({ months: 1 }).toJSDate());
+    setCurrentMonth(currentMonth.minus({ months: 1 }));
   };
   
   const nextMonth = () => {
-    setCurrentMonth(DateTime.fromJSDate(currentMonth).plus({ months: 1 }).toJSDate());
+    setCurrentMonth(currentMonth.plus({ months: 1 }));
   };
 
   return (
@@ -97,7 +112,7 @@ export default function MiniCalendar({ holidays = [], vacations = [] }: MiniCale
         />
         
         <Typography variant="subtitle2">
-          {DateTime.fromJSDate(currentMonth).toFormat('MMM yyyy')}
+          {currentMonth.toFormat('MMM yyyy')}
         </Typography>
         
         <ChevronRightIcon 
@@ -125,12 +140,12 @@ export default function MiniCalendar({ holidays = [], vacations = [] }: MiniCale
               onClick={() => setSelectedDate(day)}
               sx={{
                 margin: '0 auto',
-                color: !DateTime.fromJSDate(day).hasSame(DateTime.fromJSDate(currentMonth), 'month') 
+                color: !day.hasSame(currentMonth, 'month') 
                   ? 'text.disabled' 
-                  : DateTime.fromJSDate(day).hasSame(DateTime.fromJSDate(selectedDate), 'day')
+                  : day.hasSame(selectedDate, 'day')
                   ? 'common.white'
                   : 'text.primary',
-                backgroundColor: DateTime.fromJSDate(day).hasSame(DateTime.fromJSDate(selectedDate), 'day') 
+                backgroundColor: day.hasSame(selectedDate, 'day') 
                   ? 'primary.main' 
                   : 'transparent',
                 border: isHoliday(day) 
@@ -140,7 +155,7 @@ export default function MiniCalendar({ holidays = [], vacations = [] }: MiniCale
                   : 'none'
               }}
             >
-              {DateTime.fromJSDate(day).toFormat('d')}
+              {day.toFormat('d')}
             </CalendarDay>
           </Grid>
         ))}

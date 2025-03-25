@@ -16,6 +16,8 @@ export interface VacationBooking {
   startDate?: Date;  // For type compatibility with vacationTypes.ts
   endDate?: Date;    // For type compatibility with vacationTypes.ts
   createdAt?: Date;  // For type compatibility with vacationTypes.ts
+  is_half_day?: boolean;
+  half_day_portion?: 'AM' | 'PM' | null;
 }
 
 export interface User {
@@ -25,6 +27,7 @@ export interface User {
   image?: string | null;
   total_vacation_days?: number;
   province?: string;
+  employment_type?: string;
 }
 
 // Re-export types from next-auth.d.ts for convenience

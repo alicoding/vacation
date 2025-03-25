@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Card, CardContent, CardHeader, Typography, Box, 
   List, ListItem, ListItemText, Divider, Chip, IconButton,
@@ -16,6 +16,10 @@ interface EnhancedVacation extends VacationBooking {
   adjacentHolidays: Holiday[];
   totalDaysOff: number;
   workingDaysOff: number;
+  isHalfDay?: boolean;
+  halfDayPortion?: 'AM' | 'PM';
+  vacationType?: 'regular' | 'long-weekend' | 'holiday-adjacent';
+  extendedTimeOffMessage: string | null;
 }
 
 interface UpcomingVacationsCardProps {
@@ -100,28 +104,36 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
       // - Taking 1-2 days off
       // - That connect with a weekend (either before or after)
       let isLongWeekend = false;
-      if (totalDaysOff <= 2) {
-        const dayBeforeStart = DateTime.fromJSDate(startDate).minus({ days: 1 }).toJSDate();
-        const dayAfterEnd = DateTime.fromJSDate(endDate).plus({ days: 1 }).toJSDate();
-        
-        const isWeekendDay = (date: Date) => [6, 7].includes(DateTime.fromJSDate(date).weekday);
-        
-        if (isWeekendDay(dayBeforeStart) || isWeekendDay(dayAfterEnd)) {
-          isLongWeekend = true;
-        }
+      let adjacentWeekend = false;
+      let adjacentToHolidays = false;
+      let extendedTimeOffMessage = null;
+      
+      // Check if vacation connects to a weekend
+      const startDateTime = DateTime.fromJSDate(startDate);
+      const endDateTime = DateTime.fromJSDate(endDate);
+      const dayBeforeStart = startDateTime.minus({ days: 1 });
+      const dayAfterEnd = endDateTime.plus({ days: 1 });
+      
+      const isWeekendDay = (date: DateTime) => [6, 7].includes(date.weekday);
+      
+      // Check if vacation is adjacent to weekend
+      if (isWeekendDay(dayBeforeStart) || isWeekendDay(dayAfterEnd)) {
+        adjacentWeekend = true;
       }
       
       // Find adjacent holidays
       const adjacentHolidays = holidays.filter(holiday => {
-        const holidayDate = new Date(holiday.date);
+        const holidayDateTime = DateTime.fromISO(holiday.date);
         
-        // Check if holiday is 1 day before start or 1 day after end
-        const dayBeforeStart = DateTime.fromJSDate(startDate).minus({ days: 1 }).toJSDate();
-        const dayAfterEnd = DateTime.fromJSDate(endDate).plus({ days: 1 }).toJSDate();
-        
-        return DateTime.fromJSDate(holidayDate).hasSame(DateTime.fromJSDate(dayBeforeStart), 'day') || 
-               DateTime.fromJSDate(holidayDate).hasSame(DateTime.fromJSDate(dayAfterEnd), 'day');
+        // Check if holiday is directly before or after the vacation dates
+        return holidayDateTime.hasSame(dayBeforeStart, 'day') || 
+               holidayDateTime.hasSame(dayAfterEnd, 'day');
       });
+      
+      // Check if vacation is adjacent to holidays
+      if (adjacentHolidays.length > 0) {
+        adjacentToHolidays = true;
+      }
       
       // Calculate working days (excluding weekends and holidays)
       let workingDaysOff = 0;
@@ -141,12 +153,77 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
         current = current.plus({ days: 1 });
       }
       
+      // Create extended time off message if vacation connects to weekend or holiday
+      if (totalDaysOff <= 2 && (adjacentWeekend || adjacentToHolidays)) {
+        isLongWeekend = true;
+        
+        // Calculate the total consecutive days off (vacation + weekend + holidays)
+        let consecutiveDaysOff = totalDaysOff;
+        
+        // Add weekend days if adjacent
+        if (adjacentWeekend) {
+          if (isWeekendDay(dayBeforeStart)) {
+            // If the day before is Sunday (Luxon weekday 7), add 2 days (both Sat and Sun)
+            if (dayBeforeStart.weekday === 7) {
+              consecutiveDaysOff += 2;
+            }
+            // If the day before is Saturday (Luxon weekday 6), add 2 days (both Sat and Sun)
+            else if (dayBeforeStart.weekday === 6) {
+              consecutiveDaysOff += 2;
+            }
+          }
+          if (isWeekendDay(dayAfterEnd)) {
+            // If the day after is Saturday (Luxon weekday 6), add 2 days (both Sat and Sun)
+            if (dayAfterEnd.weekday === 6) {
+              consecutiveDaysOff += 2;
+            }
+            // If the day after is Sunday (Luxon weekday 7), add 1 day (just Sun)
+            else if (dayAfterEnd.weekday === 7) {
+              consecutiveDaysOff += 1;
+            }
+          }
+        }
+        
+        // Add holiday days if adjacent
+        if (adjacentToHolidays) {
+          consecutiveDaysOff += adjacentHolidays.length;
+        }
+        
+        // Create appropriate message
+        if (adjacentWeekend && adjacentToHolidays) {
+          extendedTimeOffMessage = `Extended break: ${consecutiveDaysOff} days off including weekends & holidays`;
+        } else if (adjacentWeekend) {
+          extendedTimeOffMessage = `Long weekend: ${consecutiveDaysOff} days off including weekend`;
+        } else if (adjacentToHolidays) {
+          extendedTimeOffMessage = `Extended break: ${consecutiveDaysOff} days off including holidays`;
+        }
+      } else if (totalDaysOff > 2) {
+        // For longer vacations, calculate total time away
+        extendedTimeOffMessage = `Total time off: ${totalDaysOff} days (${workingDaysOff} working days)`;
+      }
+      
+      // Determine vacation type for color coding
+      let vacationType: 'regular' | 'long-weekend' | 'holiday-adjacent' = 'regular';
+      if (isLongWeekend) {
+        vacationType = 'long-weekend';
+      } else if (adjacentHolidays.length > 0) {
+        vacationType = 'holiday-adjacent';
+      }
+      
+      // Include half-day information if available
+      const isHalfDay = vacation.is_half_day || false;
+      const halfDayPortion = vacation.half_day_portion as 'AM' | 'PM' | undefined;
+      
       return {
         ...vacation,
         isLongWeekend,
         adjacentHolidays,
         totalDaysOff,
-        workingDaysOff
+        workingDaysOff,
+        isHalfDay,
+        halfDayPortion,
+        vacationType,
+        extendedTimeOffMessage
       };
     });
     
@@ -155,37 +232,43 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
       .filter(vacation => new Date(vacation.end_date) >= new Date()) // Only show future or current vacations
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     
-    setEnhancedVacations(sortedVacations);
+    // Take at most 5 vacations to display on the dashboard
+    // This ensures we show multiple cards if they exist, but not too many
+    const limitedVacations = sortedVacations.slice(0, 5);
+    
+    setEnhancedVacations(limitedVacations);
   }, [vacations, holidays]);
 
   // Function to format a date range
-  const formatDateRange = (startDate: string, endDate: string) => {
+  const formatDateRange = (startDate: string | Date, endDate: string | Date) => {
     try {
-      const start = DateTime.fromISO(startDate);
-      const end = DateTime.fromISO(endDate);
+      // Convert to strings if they're Date objects
+      const startStr = typeof startDate === 'string' ? startDate : startDate.toISOString();
+      const endStr = typeof endDate === 'string' ? endDate : endDate.toISOString();
+      
+      const start = DateTime.fromISO(startStr);
+      const end = DateTime.fromISO(endStr);
       
       // Check if dates are valid before formatting
       if (!start.isValid || !end.isValid) {
+        console.warn('Invalid date detected:', { startDate, endDate, start, end });
         return 'Date range unavailable';
       }
       
       // If same day, return single date
-      if (startDate === endDate) {
+      if (start.hasSame(end, 'day')) {
         return start.toFormat('MMMM d, yyyy');
       }
       
       // If same month and year, return range with single month/year
-      if (
-        start.month === end.month &&
-        start.year === end.year
-      ) {
+      if (start.hasSame(end, 'month') && start.hasSame(end, 'year')) {
         return `${start.toFormat('MMMM d')} - ${end.toFormat('d, yyyy')}`;
       }
       
       // Otherwise, return full date range
       return `${start.toFormat('MMM d, yyyy')} - ${end.toFormat('MMM d, yyyy')}`;
     } catch (error) {
-      console.error('Error formatting date range:', error);
+      console.error('Error formatting date range:', error, { startDate, endDate });
       return 'Date range unavailable';
     }
   };
@@ -223,134 +306,96 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
           </Alert>
         )}
         
-        <List disablePadding>
+        <List disablePadding sx={{ maxHeight: '400px', overflow: 'auto' }}>
           {enhancedVacations.length > 0 ? (
             enhancedVacations.map((vacation) => (
-              <ListItem 
-                key={vacation.id}
-                alignItems="flex-start"
-                sx={{
-                  mb: 2,
-                  borderRadius: 1,
-                  flexDirection: 'column'
-                }}
-              >
-                <Box 
-                  sx={{ 
-                    width: '100%',
+              <React.Fragment key={vacation.id}>
+                <ListItem
+                  sx={{
+                    py: 2,
                     display: 'flex',
                     flexDirection: 'column',
-                    gap: 1
+                    alignItems: 'flex-start'
                   }}
                 >
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="subtitle1" fontWeight="medium">
-                      {formatDateRange(
-                        typeof vacation.start_date === 'string' ? vacation.start_date : vacation.start_date.toISOString(),
-                        typeof vacation.end_date === 'string' ? vacation.end_date : vacation.end_date.toISOString()
-                      )}
+                      {formatDateRange(vacation.start_date.toString(), vacation.end_date.toString())}
                     </Typography>
-                    
                     <Chip 
-                      size="small"
-                      label={`${vacation.workingDaysOff} working day${vacation.workingDaysOff !== 1 ? 's' : ''}`}
+                      size="small" 
+                      label={`${vacation.workingDaysOff} ${vacation.workingDaysOff === 1 ? 'day' : 'days'}`}
                       color="primary"
+                      variant="outlined"
                     />
                   </Box>
                   
-                  <Box display="flex" gap={2}>
-                      <Typography variant="body2" color="text.secondary">
-                      Start: {typeof vacation.start_date === 'string' 
-                        ? DateTime.fromISO(vacation.start_date).toLocaleString() 
-                        : DateTime.fromJSDate(vacation.start_date).toLocaleString()}
-                      </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                       End: {typeof vacation.end_date === 'string' 
-                        ? DateTime.fromISO(vacation.end_date).toLocaleString() 
-                        : DateTime.fromJSDate(vacation.end_date).toLocaleString()}
-                    </Typography>
-                  </Box>
-                  
                   {vacation.note && (
-                    <Typography variant="body2" color="text.secondary">
-                      Notes: {vacation.note}
-                    </Typography>
+                    <Box mb={1}>
+                      <Typography variant="body2" color="text.secondary">
+                        {vacation.note}
+                      </Typography>
+                    </Box>
+                  )}
+
+                  {vacation.isHalfDay && (
+                    <Box mb={1}>
+                      <Chip 
+                        size="small" 
+                        label={vacation.halfDayPortion ? `Half-day (${vacation.halfDayPortion})` : 'Half-day'}
+                        color="secondary" 
+                        variant="outlined"
+                      />
+                    </Box>
                   )}
                   
                   <Box 
                     sx={{ 
-                      mt: 1,
-                      p: 1.5, 
-                      bgcolor: 'background.default', 
-                      borderRadius: 1
+                      width: '100%', 
+                      display: 'flex', 
+                      flexWrap: 'wrap', 
+                      gap: 0.5,
+                      mt: 1
                     }}
                   >
-                    <Typography variant="body2" fontWeight="medium" gutterBottom>
-                      Summary:
-                    </Typography>
+                    {vacation.vacationType === 'long-weekend' && vacation.extendedTimeOffMessage && (
+                      <Chip
+                        size="small"
+                        label={vacation.extendedTimeOffMessage}
+                        color="success"
+                        variant="outlined"
+                        sx={{ fontStyle: 'normal' }}
+                      />
+                    )}
                     
-                    <Box display="flex" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        Total days off:
-                      </Typography>
-                      <Typography variant="body2">
-                        {vacation.totalDaysOff} days
-                      </Typography>
-                    </Box>
-                    
-                    <Box display="flex" justifyContent="space-between">
-                      <Typography variant="body2" color="text.secondary">
-                        Working days used:
-                      </Typography>
-                      <Typography variant="body2" fontWeight="medium" color="primary.main">
-                        {vacation.workingDaysOff} days
-                      </Typography>
-                    </Box>
-                    
-                    {(() => {
-                      const weekendDays = vacation.totalDaysOff - vacation.workingDaysOff;
-                      
-                      if (weekendDays > 0) {
-                        return (
-                          <Box display="flex" justifyContent="space-between">
-                            <Typography variant="body2" color="text.secondary">
-                              Including weekends/holidays:
-                            </Typography>
-                            <Typography variant="body2">
-                              {weekendDays} days
-                            </Typography>
-                          </Box>
-                        );
-                      }
-                      return null;
-                    })()}
+                    {vacation.vacationType !== 'long-weekend' && vacation.extendedTimeOffMessage && (
+                      <Chip
+                        size="small"
+                        label={vacation.extendedTimeOffMessage}
+                        color="info"
+                        variant="outlined"
+                        sx={{ fontStyle: 'normal' }}
+                      />
+                    )}
                     
                     {vacation.adjacentHolidays.length > 0 && (
-                      <Box mt={1}>
-                        <Typography variant="body2" color="text.secondary">
-                          Adjacent holidays: {vacation.adjacentHolidays.map(h => h.name).join(', ')}
-                        </Typography>
+                      <Box sx={{ width: '100%', mt: 0.5 }}>
+                        {vacation.adjacentHolidays.map((holiday, idx) => (
+                          <Chip
+                            key={idx}
+                            size="small"
+                            label={`${holiday.name} (${DateTime.fromISO(holiday.date, { zone: 'utc' }).toFormat('MMM d')})`}
+                            color="warning"
+                            variant="outlined"
+                            sx={{ mr: 0.5, mb: 0.5 }}
+                          />
+                        ))}
                       </Box>
                     )}
-                    
-                    {vacation.isLongWeekend && (
-                      <Alert severity="info" sx={{ mt: 1 }} icon={false}>
-                        <Typography variant="caption">
-                          This is a long weekend. Enjoy your extended break!
-                        </Typography>
-                      </Alert>
-                    )}
                   </Box>
-                  
-                  <Box display="flex" justifyContent="flex-end">
-                    <IconButton size="small" color="primary">
-                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-6 h-6">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                      </svg>
-                    </IconButton>
-                  </Box>
-                </Box>
-              </ListItem>
+                </ListItem>
+                <Divider />
+              </React.Fragment>
             ))
           ) : (
             <Box p={3} textAlign="center">

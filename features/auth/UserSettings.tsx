@@ -32,6 +32,17 @@ const CANADIAN_PROVINCES = [
   { value: 'YT', label: 'Yukon' },
 ];
 
+const EMPLOYMENT_TYPES = [
+  { value: 'standard', label: 'Standard Employee' },
+  { value: 'bank', label: 'Bank Staff' },
+  { value: 'federal', label: 'Federal Employee' },
+];
+
+const WEEK_START_OPTIONS = [
+  { value: 'sunday', label: 'Sunday' },
+  { value: 'monday', label: 'Monday' },
+];
+
 export default function UserSettings() {
   const { data: session, update } = useSession();
   const router = useRouter();
@@ -42,6 +53,12 @@ export default function UserSettings() {
   );
   const [province, setProvince] = useState<string>(
     session?.user?.province || 'ON'
+  );
+  const [employmentType, setEmploymentType] = useState<string>(
+    session?.user?.employment_type || 'standard'
+  );
+  const [weekStartsOn, setWeekStartsOn] = useState<string>(
+    session?.user?.week_starts_on || 'sunday'
   );
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -57,6 +74,8 @@ export default function UserSettings() {
         body: JSON.stringify({
           total_vacation_days: vacationDays,
           province,
+          employment_type: employmentType,
+          week_starts_on: weekStartsOn,
         }),
       });
       
@@ -71,6 +90,8 @@ export default function UserSettings() {
           ...session?.user,
           total_vacation_days: vacationDays,
           province,
+          employment_type: employmentType,
+          week_starts_on: weekStartsOn,
         },
       });
       
@@ -121,6 +142,50 @@ export default function UserSettings() {
             </Select>
             <FormHelperText>
               This determines which provincial holidays are displayed in your calendar.
+            </FormHelperText>
+          </FormControl>
+        </Box>
+        
+        <Box sx={{ mb: 3 }}>
+          <FormControl fullWidth margin="normal" size="small">
+            <InputLabel id="employment-type-label">Employment Type</InputLabel>
+            <Select
+              labelId="employment-type-label"
+              id="employment-type"
+              value={employmentType}
+              label="Employment Type"
+              onChange={(e) => setEmploymentType(e.target.value)}
+            >
+              {EMPLOYMENT_TYPES.map((type) => (
+                <MenuItem key={type.value} value={type.value}>
+                  {type.label}
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>
+              Your employment type affects which holidays are applicable to you.
+            </FormHelperText>
+          </FormControl>
+        </Box>
+        
+        <Box sx={{ mb: 3 }}>
+          <FormControl fullWidth margin="normal" size="small">
+            <InputLabel id="week-start-label">Week Starts On</InputLabel>
+            <Select
+              labelId="week-start-label"
+              id="week-start"
+              value={weekStartsOn}
+              label="Week Starts On"
+              onChange={(e) => setWeekStartsOn(e.target.value)}
+            >
+              {WEEK_START_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
+                </MenuItem>
+              ))}
+            </Select>
+            <FormHelperText>
+              Set which day your calendar week should start with.
             </FormHelperText>
           </FormControl>
         </Box>

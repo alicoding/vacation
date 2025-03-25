@@ -52,7 +52,7 @@ const PROVINCE_MAPPING: Record<string, string[]> = {
 // Removed duplicate isHoliday function
 
 /**
- * Get holidays for a specific province and date range
+ * Fetches and returns holidays from the database for a specific date range and province
  */
 export async function getHolidays(
   startDate: Date,
@@ -65,7 +65,7 @@ export async function getHolidays(
   province: string | null;
   type: 'bank' | 'provincial';
 }>> {
-  // First check if we have holidays for this period
+  // Find holidays in the database for the given date range and province
   const holidays = await prisma.holiday.findMany({
     where: {
       date: {
@@ -73,8 +73,8 @@ export async function getHolidays(
         lte: endDate,
       },
       OR: [
-        { province: null }, // National holiday
-        { province }, // Provincial holiday
+        { province: null }, // National holidays
+        { province: province }, // Province-specific holidays
       ],
     },
     orderBy: {
@@ -90,13 +90,21 @@ export async function getHolidays(
     return getHolidays(startDate, endDate, province);
   }
   
-  return holidays.map(holiday => ({
-    id: holiday.id,
-    date: holiday.date,
-    name: holiday.name,
-    province: holiday.province,
-    type: holiday.type as 'bank' | 'provincial',
-  }));
+  return holidays.map(holiday => {
+    // Create a new DateTime from the holiday date in UTC to avoid timezone issues
+    const luxonDate = DateTime.fromJSDate(holiday.date, { zone: 'utc' }).startOf('day');
+    
+    // Convert back to a JavaScript Date in UTC
+    const fixedDate = luxonDate.toJSDate();
+    
+    return {
+      id: holiday.id,
+      date: fixedDate, // Use the UTC-fixed date
+      name: holiday.name,
+      province: holiday.province,
+      type: holiday.type as 'bank' | 'provincial',
+    };
+  });
 }
 
 /**
@@ -148,8 +156,8 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
   const holidaysToInsert = nagerHolidays.flatMap((holiday): HolidayInsert[] => {
     const isBank = isBankHoliday(holiday);
     
-    // Ensure consistent date format by using DateTime from Luxon
-    const dt = DateTime.fromISO(holiday.date).startOf('day');
+    // Parse the ISO date string to a DateTime object in UTC
+    const dt = DateTime.fromISO(holiday.date, { zone: 'utc' }).startOf('day');
     
     // Check if date is valid before proceeding
     if (!dt.isValid) {
@@ -157,7 +165,8 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
       return [];
     }
     
-    const date = dt.toJSDate(); // Convert Luxon DateTime to JS Date
+    // Create a date directly from the Luxon DateTime
+    const date = dt.toJSDate();
     
     // For global holidays (apply to all provinces)
     if (holiday.global) {
@@ -219,8 +228,8 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
 // isWeekend function moved to holidayUtils.ts and imported at the top
 
 export async function isHoliday(date: Date, province: string) {
-  // Ensure we're comparing dates without time component
-  const dt = DateTime.fromJSDate(date).startOf('day');
+  // Create a DateTime object in UTC from the input date and get start of day
+  const dt = DateTime.fromJSDate(date, { zone: 'utc' }).startOf('day');
   const dateStr = dt.toISODate();
   
   if (!dateStr) {
@@ -231,11 +240,13 @@ export async function isHoliday(date: Date, province: string) {
     };
   }
   
+  // Create a date to query with using the Luxon DateTime
+  const queryDate = dt.toJSDate();
+  
   const holiday = await prisma.holiday.findFirst({
     where: {
       date: {
-        // Use UTC date with the time component zeroed out for comparison
-        equals: new Date(dateStr),
+        equals: queryDate,
       },
       OR: [
         { province: province },
