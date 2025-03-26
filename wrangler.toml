@@ -14,12 +14,15 @@ NODE_VERSION = "20"
 [site]
 bucket = ".vercel/output/static"
 
+[vars]
+# Replace with your actual production database URL
+DATABASE_URL = "postgresql://user:pass@host:5432/dbname?schema=public"
+
 [env.production]
 name = "vacation"
 workers_dev = true
 
 [env.production.build.environment]
-DATABASE_URL = "YOUR_PRODUCTION_DATABASE_URL"
 
 [env.development]
 name = "vacation-dev"
