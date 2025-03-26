@@ -1,4 +1,4 @@
-name = "vacation-app"
+name = "vacation"
 compatibility_date = "2025-03-25"
 
 [assets]
@@ -15,12 +15,12 @@ NODE_VERSION = "20"
 bucket = ".vercel/output/static"
 
 [env.production]
-name = "vacation-app"
+name = "vacation"
 workers_dev = true
 
 [env.production.build.environment]
 DATABASE_URL = "YOUR_PRODUCTION_DATABASE_URL"
 
 [env.development]
-name = "vacation-app-dev"
+name = "vacation-dev"
 workers_dev = true 
