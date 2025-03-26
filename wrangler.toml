@@ -1,9 +1,6 @@
 name = "vacation"
 compatibility_date = "2025-03-25"
 
-[assets]
-directory = ".next/static"
-
 [build]
 command = "npm run build"
 publish = ".vercel/output/static"
@@ -11,12 +8,6 @@ publish = ".vercel/output/static"
 [build.environment]
 NODE_VERSION = "20"
 
-[site]
-bucket = ".vercel/output/static"
-
-[vars]
-# Replace with your actual production database URL
-DATABASE_URL = "postgresql://user:pass@host:5432/dbname?schema=public"
 
 [env.production]
 name = "vacation"

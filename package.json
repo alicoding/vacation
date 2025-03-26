@@ -4,17 +4,17 @@
   "description": "## Project Overview Develop a fully responsive Vacation Tracker app using Next.js with TypeScript, deployable on Render.com's Free Tier. The app will track vacation days, automatically integrate holidays, and visually indicate extended weekends and adjacent holidays to help users maximize vacation planning.",
   "main": "index.js",
   "prisma": {
-    "binaryTargets": ["native", "edge"]
+    "binaryTargets": [
+      "native",
+      "edge"
+    ]
   },
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
-    "pages:build": "npx @cloudflare/next-on-pages",
-    "pages:deploy": "npm run build && npm run pages:build && wrangler pages deploy .vercel/output/static",
-    "pages:watch": "npx @cloudflare/next-on-pages --watch",
-    "pages:dev": "npx wrangler pages dev .vercel/output/static --compatibility-date=2024-03-25",
+    "deploy": "npm run build && npx @cloudflare/next-on-pages && wrangler deploy",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "test": "jest"
