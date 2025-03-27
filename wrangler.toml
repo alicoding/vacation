@@ -1,19 +1,34 @@
-name = "vacation"
-compatibility_date = "2025-03-25"
-type = "javascript"
+name = "vacation-app"
+compatibility_date = "2023-11-01"
+
+# Configure the Workers runtime
+workers_dev = true
+main = ".next/standalone/server.js"
+
+[assets]
+directory = ".next/static"
 
 [build]
 command = "npm run build"
 
+[build.upload]
+format = "service-worker"
+
 [build.environment]
 NODE_VERSION = "20"
 
+[site]
+bucket = ".next/static"
+
 [vars]
-DATABASE_URL = ""
-NEXTAUTH_SECRET = ""
-NEXTAUTH_URL = "https://vacation.alicoding.com"
-GOOGLE_CLIENT_ID = ""
-GOOGLE_CLIENT_SECRET = ""
+# Replace with your actual Supabase details
+NEXT_PUBLIC_SUPABASE_URL = "https://your-project.supabase.co"
+SUPABASE_SERVICE_ROLE_KEY = "your-supabase-service-role-key"
+# Auth configuration
+NEXTAUTH_URL = "https://your-app-url.com"
+NEXTAUTH_SECRET = "your-nextauth-secret"
+GOOGLE_CLIENT_ID = "your-google-client-id"
+GOOGLE_CLIENT_SECRET = "your-google-client-secret"
 
 [env.production]
 name = "vacation"

@@ -1,9 +1,12 @@
+export const runtime = 'edge';
+
 export interface Holiday {
   id: string;
-  name: string;
   date: string;
-  type: 'federal' | 'provincial' | 'bank';
-  province?: string | null;
+  name: string;
+  description?: string;
+  type: 'bank' | 'provincial';
+  province?: string;
 }
 
 export interface VacationBooking {
@@ -28,7 +31,5 @@ export interface User {
   total_vacation_days?: number;
   province?: string;
   employment_type?: string;
+  week_starts_on?: string;
 }
-
-// Re-export types from next-auth.d.ts for convenience
-export * from 'next-auth';

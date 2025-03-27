@@ -1,4 +1,4 @@
-
+export const runtime = 'edge';
 /**
  * @description This API endpoint handles the retrieval of holidays within a specified date range and province.
  * It expects a POST request with a JSON body containing the startDate, endDate, and province.
@@ -9,7 +9,7 @@
  * @throws {Error} - Throws an error if any of the required parameters (startDate, endDate, province) are missing,
  * or if there is an error during the holiday fetching process.
  */
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getHolidays } from '@/services/holiday/holidayService';
 
 export async function POST(request: Request) {

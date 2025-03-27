@@ -1,21 +1,21 @@
 import { useState } from 'react';
 import { Switch } from '@mui/material';
-import { useSession } from 'next-auth/react';
 import { Snackbar, Alert } from '@mui/material';
+import { useSession } from '@/lib/auth-helpers';
 
 interface GoogleCalendarSyncProps {
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
 }
 
-export function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendarSyncProps) {
+export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendarSyncProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [message, setMessage] = useState<{text: string; type: 'success' | 'error'} | null>(null);
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
 
   const handleSync = async () => {
     if (!session) {
-      setMessage({ text: "Please sign in to sync your calendar", type: 'error' });
+      setMessage({ text: 'Please sign in to sync your calendar', type: 'error' });
       return;
     }
 
@@ -33,10 +33,10 @@ export function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendarSyncProp
         throw new Error('Failed to sync calendar');
       }
 
-      setMessage({ text: enabled ? "Calendar sync enabled" : "Calendar sync disabled", type: 'success' });
+      setMessage({ text: enabled ? 'Calendar sync enabled' : 'Calendar sync disabled', type: 'success' });
       onToggle(enabled);
     } catch (error) {
-      setMessage({ text: "Failed to sync calendar. Please try again.", type: 'error' });
+      setMessage({ text: 'Failed to sync calendar. Please try again.', type: 'error' });
     } finally {
       setIsSyncing(false);
     }
@@ -70,4 +70,4 @@ export function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendarSyncProp
       </Snackbar>
     </div>
   );
-} 
+}

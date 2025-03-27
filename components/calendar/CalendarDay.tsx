@@ -46,8 +46,8 @@ const DayContainer = styled(Box, {
       ? theme.palette.primary.light + '33' 
       : isHoliday 
         ? (holidayType === 'bank' 
-            ? theme.palette.warning.light + '33'
-            : theme.palette.secondary.light + '22')
+          ? theme.palette.warning.light + '33'
+          : theme.palette.secondary.light + '22')
         : isWeekend 
           ? theme.palette.grey[50]
           : 'transparent',
@@ -144,12 +144,12 @@ export default function CalendarDay({
     if (vacation.is_half_day) {
       return `Half-day (${vacation.half_day_portion})`;
     }
-    return "Vacation";
+    return 'Vacation';
   };
   
   // Get holiday label with type
   const getHolidayLabel = () => {
-    if (!holiday) return "";
+    if (!holiday) return '';
     
     // Use more descriptive labels for holiday types
     const typeLabel = holiday.type === 'bank' 
@@ -184,7 +184,7 @@ export default function CalendarDay({
           <EventChip 
             size="small"
             label={holiday.name}
-            color={holiday.type === 'bank' ? "warning" : "secondary"}
+            color={holiday.type === 'bank' ? 'warning' : 'secondary'}
             variant="outlined"
           />
         </Tooltip>
@@ -197,9 +197,9 @@ export default function CalendarDay({
         >
           <EventChip
             size="small"
-            label={vacation.is_half_day ? `Half-day` : "Vacation"}
+            label={vacation.is_half_day ? 'Half-day' : 'Vacation'}
             color="success"
-            variant={vacation.is_half_day ? "outlined" : "filled"}
+            variant={vacation.is_half_day ? 'outlined' : 'filled'}
           />
         </Tooltip>
       ))}

@@ -1,7 +1,8 @@
 /**
  * Client-side functions for holiday-related operations
- * These make API calls to server endpoints instead of using Prisma directly
+ * These make API calls to server endpoints instead of using database clients directly
  */
+import { Holiday as GlobalHoliday } from '@/types';
 
 export interface HolidayInfo {
   isHoliday: boolean;
@@ -9,12 +10,14 @@ export interface HolidayInfo {
   type: string | null;
 }
 
+// Update this interface to match the global Holiday type
 export interface Holiday {
   id: string;
-  date: Date;
+  date: string; // Changed from Date to string to match types/index.ts
   name: string;
-  province: string | null;
+  province?: string | null;
   type: 'bank' | 'provincial';
+  description?: string;
 }
 
 export function isWeekend(date: Date): boolean {
@@ -70,3 +73,43 @@ export async function fetchHolidays(
     date: new Date(h.date),
   }));
 }
+
+interface GetHolidaysInRangeProps {
+  startDate: string;
+  endDate: string;
+  province?: string;
+}
+
+class HolidayClient {
+  /**
+   * Fetches holidays for a given date range
+   */
+  async getHolidaysInRange({ 
+    startDate, 
+    endDate, 
+    province 
+  }: GetHolidaysInRangeProps): Promise<GlobalHoliday[]> {
+    try {
+      const url = new URL('/api/holidays/range', window.location.origin);
+      url.searchParams.append('startDate', startDate);
+      url.searchParams.append('endDate', endDate);
+      if (province) {
+        url.searchParams.append('province', province);
+      }
+
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch holidays');
+      }
+      
+      return await response.json();
+    } catch (error: any) {
+      console.error('Error fetching holidays:', error);
+      return [];
+    }
+  }
+}
+
+// Export a singleton instance
+export const holidayClient = new HolidayClient();

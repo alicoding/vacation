@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/lib/auth-helpers'; // Updated import
 import { Container, Box } from '@mui/material';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
@@ -9,7 +9,7 @@ import FullCalendar from '@/components/calendar/FullCalendar';
 import CalendarLegend from '@/components/calendar/CalendarLegend';
 
 export default function CalendarPage() {
-  const { data: session } = useSession();
+  const { data: session } = useSession(); // Using our Supabase compatible hook
   const [currentDate, setCurrentDate] = useState(DateTime.local());
   const [vacations, setVacations] = useState<VacationBooking[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);

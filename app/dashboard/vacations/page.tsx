@@ -1,74 +1,42 @@
 import React from 'react';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/authOptions';
-import { redirect } from 'next/navigation';
-import VacationForm from '@/components/vacation/VacationForm';
-import VacationList from '@/components/vacation/VacationList';
-import { getVacationBookings } from '@/services/vacation/vacationService';
-import { getHolidays } from '@/services/holiday/holidayService';
-import { Container, Typography, Grid, Paper, Box, Divider } from '@mui/material';
+import { getServerSession } from '@/lib/auth-helpers';
+import { Box, Container, Typography, Button } from '@mui/material';
+import VacationTable from '@/components/vacations/VacationTable';
+import AddIcon from '@mui/icons-material/Add';
+import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
 
 export default async function VacationsPage() {
-  // Get user session
-  const session = await getServerSession(authOptions);
+  // Middleware ensures we have a session, so we don't need the redirect check
+  const session = await getServerSession();
   
-  if (!session || !session.user) {
-    redirect('/auth/signin');
-  }
-  
-  // Get user's vacation bookings
-  const vacations = await getVacationBookings(session.user.id);
-  
-  // Get holidays for the current year for the user's province
-  const currentYear = new Date().getFullYear();
-  const startOfYear = new Date(currentYear, 0, 1);
-  const endOfYear = new Date(currentYear, 11, 31);
-  
-  const province = session.user.province || 'ON';
-  const holidays = await getHolidays(startOfYear, endOfYear, province);
+  // Fetch vacations
+  const { data: vacations } = await supabase
+    .from('vacations')
+    .select('*')
+    .eq('user_id', session!.user.id)
+    .order('start_date', { ascending: false });
   
   return (
-    <Container maxWidth="xl">
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" fontWeight="bold" gutterBottom>
-          Vacations
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary">
-          Book and manage your vacation days
-        </Typography>
-      </Box>
-      
-      <Grid container spacing={4}>
-        {/* Vacation Form */}
-        <Grid item xs={12} lg={4}>
-          <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h6" fontWeight="medium" gutterBottom>
-              Book New Vacation
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            <VacationForm 
-              userId={session.user.id} 
-              province={province}
-              holidays={holidays}
-            />
-          </Paper>
-        </Grid>
+    <Container maxWidth="lg">
+      <Box sx={{ py: 4 }}>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+          <Typography variant="h4" component="h1">
+            Your Vacations
+          </Typography>
+          
+          <Button
+            component={Link}
+            href="/dashboard/request"
+            variant="contained"
+            startIcon={<AddIcon />}
+          >
+            Request Vacation
+          </Button>
+        </Box>
         
-        {/* Vacation List */}
-        <Grid item xs={12} lg={8}>
-          <Paper elevation={2} sx={{ p: 3, height: '100%' }}>
-            <Typography variant="h6" fontWeight="medium" gutterBottom>
-              Your Vacations
-            </Typography>
-            <Divider sx={{ mb: 3 }} />
-            <VacationList 
-              vacations={vacations} 
-              holidays={holidays}
-              province={province}
-            />
-          </Paper>
-        </Grid>
-      </Grid>
+        <VacationTable vacations={vacations || []} />
+      </Box>
     </Container>
   );
-} 
+}

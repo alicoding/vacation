@@ -1,3 +1,9 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { createApiClient } from '@/utils/supabase-api';
+import { getHolidays } from '@/services/holiday/holidayService';
+
+export const runtime = 'edge';
+
 /**
  * @module HolidaysAPI
  */
@@ -55,138 +61,80 @@
  * // Fetch holidays between 2024-01-01 and 2024-12-31 in Alberta:
  * // POST /api/holidays with body { startDate: '2024-01-01', endDate: '2024-12-31', province: 'AB' }
  */
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/authOptions';
-import { prisma } from '@/lib/prisma';
-import { getHolidays } from '@/services/holiday/holidayService';
 
 /**
  * GET /api/holidays
- * Fetch holiday information for a given date and province
+ * Returns a list of holidays filtered by province and year
  */
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    const supabase = await createApiClient();
+    
+    // Use getUser() for better security
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    // Get query parameters
-    const { searchParams } = new URL(request.url);
-    const year = searchParams.get('year') 
-      ? parseInt(searchParams.get('year')!) 
-      : new Date().getFullYear();
+    // Get the year from the query parameters, default to current year
+    const url = new URL(request.url);
+    const yearParam = url.searchParams.get('year');
+    const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
+
+    // Get user's province from user metadata instead of the users table
+    const userProvince = user.user_metadata?.province || 'ON'; // Default to Ontario if not set
     
-    // Get the province from search params or the user's profile
-    let province = searchParams.get('province');
-    let employmentType = searchParams.get('employment_type');
-    
-    if (!province || !employmentType) {
-      // Get user's province and employment type from database if not specified
-      const user = await prisma.user.findUnique({
-        where: { id: session.user.id }
-      });
+    try {
+      // Attempt to query using the year column first
+      let holidaysQuery = supabase
+        .from('holidays')
+        .select('*')
+        .eq('year', year);
       
-      if (!province) {
-        province = user?.province || 'ON';
+      if (userProvince !== 'ALL') {
+        holidaysQuery = holidaysQuery.or(`province.eq.${userProvince},province.is.null`);
       }
       
-      if (!employmentType) {
-        // @ts-ignore - employment_type exists in the database schema
-        employmentType = user?.employment_type || 'standard';
+      let { data: holidays, error } = await holidaysQuery;
+      
+      // If we get a column error, try with date range instead
+      if (error && error.code === '42703') { // Column doesn't exist error
+        console.warn('Column "year" not found in holidays table, using date range filter instead');
+        
+        const startDate = `${year}-01-01`;
+        const endDate = `${year}-12-31`;
+        
+        holidaysQuery = supabase
+          .from('holidays')
+          .select('*')
+          .gte('date', startDate)
+          .lte('date', endDate);
+          
+        if (userProvince !== 'ALL') {
+          holidaysQuery = holidaysQuery.or(`province.eq.${userProvince},province.is.null`);
+        }
+        
+        const result = await holidaysQuery;
+        holidays = result.data;
+        error = result.error;
       }
+      
+      if (error) {
+        // If we still have an error, just return an empty array
+        console.error('Error fetching holidays:', error);
+        return NextResponse.json([]);
+      }
+      
+      return NextResponse.json(holidays || []);
+    } catch (dbError: any) {
+      console.error('Database error fetching holidays:', dbError);
+      // Return empty array to prevent frontend from breaking
+      return NextResponse.json([]);
     }
-    
-    // Get holiday type filter if provided
-    const holidayType = searchParams.get('type');
-
-    // Fetch all holidays for the specified year and province
-    const startOfYear = new Date(Date.UTC(year, 0, 1));
-    const endOfYear = new Date(Date.UTC(year, 11, 31, 23, 59, 59, 999));
-    
-    const whereClause: any = {
-      date: {
-        gte: startOfYear,
-        lte: endOfYear,
-      },
-      OR: [
-        { province: null }, // National holidays
-        { province }, // Province-specific holidays
-      ]
-    };
-    
-    // Apply holiday type filter if specified
-    if (holidayType) {
-      whereClause.type = holidayType;
-    }
-    
-    const holidays = await prisma.holiday.findMany({
-      where: whereClause,
-      orderBy: { date: 'asc' },
-    });
-
-    // Create a map to identify and remove duplicates (same date and name)
-    const uniqueHolidays = new Map();
-    
-    holidays.forEach(holiday => {
-      const dateStr = holiday.date.toISOString().split('T')[0];
-      const key = `${dateStr}-${holiday.name}`;
-      
-      // For duplicates, prefer province-specific over national
-      if (!uniqueHolidays.has(key) || 
-          (holiday.province && !uniqueHolidays.get(key).province)) {
-        uniqueHolidays.set(key, holiday);
-      }
-    });
-
-    // Format dates consistently for client/server hydration
-    const formattedHolidays = Array.from(uniqueHolidays.values()).map(holiday => {
-      // Determine if holiday applies based on employment type
-      let appliesTo = false;
-      
-      if (holiday.type === 'bank') {
-        // Bank holidays apply to bank staff and standard employees
-        appliesTo = employmentType === 'bank' || employmentType === 'standard';
-      } else if (holiday.type === 'provincial') {
-        // Provincial holidays apply to standard employees
-        appliesTo = employmentType === 'standard';
-      }
-      
-      // For federal employees, all federal holidays apply
-      if (employmentType === 'federal') {
-        // We're considering all holidays with province=null as federal holidays
-        appliesTo = holiday.province === null;
-      }
-      
-      // FIX: Use UTC version of the date to prevent timezone offset issues
-      const dateObj = holiday.date;
-      const utcDate = new Date(Date.UTC(
-        dateObj.getUTCFullYear(),
-        dateObj.getUTCMonth(),
-        dateObj.getUTCDate()
-      ));
-      
-      return {
-        ...holiday,
-        date: utcDate.toISOString(), // Use the UTC ISO string
-        // Add a display property to show if this is a bank or general holiday
-        displayType: holiday.type === 'bank' ? 'Bank Holiday' : 'General Holiday',
-        // Add a boolean flag to indicate if this holiday applies to the user
-        appliesTo,
-        // Add relevance indicator based on employment type
-        relevantToEmploymentType: appliesTo
-      };
-    });
-
-    return NextResponse.json(formattedHolidays);
   } catch (error) {
     console.error('Error fetching holidays:', error);
-    return NextResponse.json(
-      { error: 'Failed to fetch holidays', details: String(error) },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: 'Failed to fetch holidays' }, { status: 500 });
   }
 }
 
@@ -196,16 +144,17 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-
-    if (!session?.user?.id) {
+    const supabase = await createApiClient();
+    
+    // Use getUser() for better security
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // Get year from request body
-    const data = await request.json();
-    const year = data.year || new Date().getFullYear();
-    
+    const { year } = await request.json();
     // In a real implementation, you would sync holidays from an external API
     return NextResponse.json({ 
       success: true, 

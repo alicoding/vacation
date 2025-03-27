@@ -149,11 +149,6 @@
       "priority": "high",
       "tasks": [
         {
-          "id": "add_db_field_google_event_id",
-          "description": "Add a new field 'googleEventId' to the VacationBooking model for tracking Google Calendar event IDs",
-          "implementation_details": "Update the Prisma schema to include a field for storing the associated Google Calendar event ID; run migration."
-        },
-        {
           "id": "update_oauth_scopes",
           "description": "Update OAuth configuration to include Google Calendar scopes",
           "implementation_details": "Add 'https://www.googleapis.com/auth/calendar' to the Google OAuth scopes in the authentication configuration and NextAuth settings."

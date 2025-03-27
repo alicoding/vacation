@@ -1,17 +1,38 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/authOptions';
-import { redirect } from 'next/navigation';
+import { Box, Container, Typography, Button } from '@mui/material';
+import Link from 'next/link';
 
-export default async function Home() {
-  const session = await getServerSession(authOptions);
-  
-  // Redirect to dashboard if logged in, or signin if not
-  if (session) {
-    redirect('/dashboard');
-  } else {
-    redirect('/auth/signin');
-  }
-  
-  // This won't be rendered, but included for completeness
-  return null;
-} 
+// Root page - middleware will handle redirects automatically
+export default function Home() {
+  return (
+    <Container maxWidth="md">
+      <Box 
+        sx={{ 
+          mt: 10,
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          textAlign: 'center'
+        }}
+      >
+        <Typography variant="h2" component="h1" gutterBottom>
+          Vacation Tracker
+        </Typography>
+        
+        <Typography variant="h5" color="text.secondary" component="p">
+          Track your vacation days, view holidays, and plan your time off efficiently.
+        </Typography>
+        
+        <Box sx={{ mt: 4 }}>
+          <Button 
+            component={Link} 
+            href="/auth/signin"
+            variant="contained" 
+            size="large"
+          >
+            Get Started
+          </Button>
+        </Box>
+      </Box>
+    </Container>
+  );
+}

@@ -1,32 +1,32 @@
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-
 // Custom error classes for better error handling
 export class VacationServiceError extends Error {
-  constructor(message: string) {
+  code: string;
+  
+  constructor(message: string, code: string = 'UNKNOWN_ERROR') {
     super(message);
     this.name = 'VacationServiceError';
+    this.code = code;
   }
 }
 
 export class DatabaseError extends VacationServiceError {
-  public readonly code?: string;
-  constructor(message: string, prismaError?: PrismaClientKnownRequestError) {
-    super(message);
+  constructor(message: string, originalError?: any) {
+    super(message, 'DATABASE_ERROR');
     this.name = 'DatabaseError';
-    this.code = prismaError?.code;
+    this.cause = originalError;
   }
 }
 
 export class ValidationError extends VacationServiceError {
   constructor(message: string) {
-    super(message);
+    super(message, 'VALIDATION_ERROR');
     this.name = 'ValidationError';
   }
 }
 
 export class NotFoundError extends VacationServiceError {
   constructor(message: string) {
-    super(message);
+    super(message, 'NOT_FOUND');
     this.name = 'NotFoundError';
   }
 }

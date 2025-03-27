@@ -1,7 +1,8 @@
 'use client';
 
+import React from 'react';
 import { useState } from 'react';
-import { useSession, signOut } from 'next-auth/react';
+import { useSession, signOut } from '@/lib/auth-helpers';
 import Link from 'next/dist/client/app-dir/link';
 import Image from 'next/image';
 import { 
@@ -11,7 +12,7 @@ import {
 import { User } from '@/types';
 
 export default function Header() {
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
   
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
@@ -20,6 +21,10 @@ export default function Header() {
   
   const handleCloseMenu = () => {
     setAnchorEl(null);
+  };
+
+  const handleSignOut = async () => {
+    await signOut();
   };
 
   // Get typed user
@@ -71,7 +76,7 @@ export default function Header() {
                       Profile
                     </Link>
                   </MenuItem>
-                  <MenuItem onClick={() => signOut({ callbackUrl: '/auth/signin' })}>
+                  <MenuItem onClick={handleSignOut}>
                     Sign out
                   </MenuItem>
                 </Menu>

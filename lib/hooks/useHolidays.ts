@@ -1,16 +1,12 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from 'react';
 import { DateTime } from 'luxon';
+import { Holiday } from '@/types';
+import { holidayClient } from '@/lib/client/holidayClient';
 
-export interface Holiday {
-  id: string;
-  date: string;
-  name: string;
-  province: string | null;
-  type: 'bank' | 'provincial';
-  relevantToEmploymentType?: boolean;
-}
+// Re-export the Holiday type for components that import from this file
+export type { Holiday };
 
 export interface UseHolidaysResult {
   holidays: Holiday[];
@@ -21,65 +17,50 @@ export interface UseHolidaysResult {
   getHoliday: (dateString: string) => Holiday | undefined;
 }
 
-export default function useHolidays(
-  startDate: Date | string = new Date(new Date().getFullYear(), 0, 1),
-  endDate: Date | string = new Date(new Date().getFullYear(), 11, 31),
-  province?: string,
-  employmentType?: string
-): UseHolidaysResult {
+export function useHolidays(year: number, province?: string): UseHolidaysResult {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  
-  const formatDate = (date: Date | string): string => {
-    if (typeof date === 'string') {
-      return date.includes('T') ? date.split('T')[0] : date;
-    }
-    return DateTime.fromJSDate(date).toFormat('yyyy-MM-dd');
-  };
-  
+
   const fetchHolidays = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      // Build query parameters
-      const params = new URLSearchParams();
-      params.append('startDate', formatDate(startDate));
-      params.append('endDate', formatDate(endDate));
-      if (province) {
-        params.append('province', province);
-      }
-      if (employmentType) {
-        params.append('employment_type', employmentType);
+      // Use the start of the year and end of the year for range
+      const startDate = DateTime.fromObject({ year }).startOf('year').toISODate();
+      const endDate = DateTime.fromObject({ year }).endOf('year').toISODate();
+      
+      if (!startDate || !endDate) {
+        throw new Error('Invalid date range');
       }
       
-      // Fetch holidays from API
-      const response = await fetch(`/api/holidays?${params.toString()}`);
+      // Fetch holidays for the date range
+      const response = await holidayClient.getHolidaysInRange({
+        startDate,
+        endDate,
+        province
+      });
       
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to fetch holidays');
-      }
-      
-      const data = await response.json();
-      setHolidays(data);
+      setHolidays(response);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+      console.error('Error fetching holidays:', err);
+      setError('Failed to load holidays. Please try again later.');
     } finally {
       setLoading(false);
     }
   };
-  
-  // Fetch holidays on component mount and when dependencies change
+
   useEffect(() => {
     fetchHolidays();
-  }, [formatDate(startDate), formatDate(endDate), province, employmentType]);
-  
+    // We intentionally omit fetchHolidays from deps because it would cause an infinite loop
+    // The function only depends on year and province which are already included
+  }, [year, province]);
+
   // Check if a date is a holiday
   const isHoliday = (dateString: string) => {
-    const normalizedDate = formatDate(dateString);
-    const holiday = holidays.find(h => formatDate(h.date) === normalizedDate);
+    const normalizedDate = DateTime.fromISO(dateString).toISODate();
+    const holiday = holidays.find(h => DateTime.fromISO(h.date).toISODate() === normalizedDate);
     
     if (!holiday) {
       return { isHoliday: false };
@@ -94,10 +75,10 @@ export default function useHolidays(
   
   // Get holiday information for a specific date
   const getHoliday = (dateString: string) => {
-    const normalizedDate = formatDate(dateString);
-    return holidays.find(h => formatDate(h.date) === normalizedDate);
+    const normalizedDate = DateTime.fromISO(dateString).toISODate();
+    return holidays.find(h => DateTime.fromISO(h.date).toISODate() === normalizedDate);
   };
-  
+
   return {
     holidays,
     loading,
@@ -107,3 +88,6 @@ export default function useHolidays(
     getHoliday,
   };
 }
+
+// Default export of the hook to fix the import issue
+export default useHolidays;

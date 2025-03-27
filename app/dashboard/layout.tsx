@@ -1,21 +1,14 @@
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/authOptions';
-import { redirect } from 'next/navigation';
 import Header from '@/components/Header';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { Box, Container, Grid, useMediaQuery, useTheme } from '@mui/material';
+import { ReactNode } from 'react';
 
-export default async function DashboardLayout({
+// Middleware will ensure users are authenticated before they can access this layout
+export default function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-
-  if (!session) {
-    redirect('/auth/signin');
-  }
-
   return (
     <Box sx={{ 
       minHeight: '100vh', 

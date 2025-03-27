@@ -33,7 +33,7 @@ This document describes all environment variables required for the Vacation Trac
 ## Database Variables
 
 ### DATABASE_URL
-- **Description**: PostgreSQL connection string for Prisma ORM to connect to the database.
+- **Description**: PostgreSQL connection string for supabase ORM to connect to the database.
 - **Required**: Yes
 - **Format**: `postgresql://USERNAME:PASSWORD@HOST:PORT/DATABASE?schema=SCHEMA`
 - **Example**: `postgresql://postgres:postgres@localhost:5432/vacation_tracker?schema=public`

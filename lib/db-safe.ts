@@ -1,24 +1,25 @@
 /**
- * This file provides a safe way to access Prisma client in both Pages and App router
- * It dynamically imports the Prisma client only on the server side
+ * This file provides a safe way to access Supabase client in both Pages and App router
+ * It dynamically imports the Supabase client only on the server side
  */
 
-export type { PrismaClient } from '@prisma/client'
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@/types/supabase';
 
 // This approach prevents client-side imports from failing
-export async function getPrismaClient() {
+export async function getSupabaseClient(): Promise<SupabaseClient<Database>> {
   // Check if we're on the server
   if (typeof window !== 'undefined') {
-    throw new Error('Cannot use Prisma client on the browser')
+    throw new Error('Cannot use Supabase client directly in the browser');
   }
   
   // Dynamic import only happens on the server
-  const { prisma } = await import('./prisma')
-  return prisma
+  const { supabase } = await import('./supabase');
+  return supabase;
 }
 
-// Helper for server components/actions to safely get the Prisma client
-export async function withPrisma<T>(fn: (prisma: any) => Promise<T>): Promise<T> {
-  const prisma = await getPrismaClient()
-  return fn(prisma)
+// Helper for server components/actions to safely get the Supabase client
+export async function withSupabase<T>(fn: (supabase: SupabaseClient<Database>) => Promise<T>): Promise<T> {
+  const supabase = await getSupabaseClient();
+  return fn(supabase);
 }

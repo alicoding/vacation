@@ -1,42 +1,77 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth/authOptions';
-import { prisma } from '@/lib/prisma';
+export const runtime = 'edge';
 
+import { NextRequest, NextResponse } from 'next/server';
+import { createDirectClient } from '@/utils/supabase';
+
+// DELETE handler for deleting a vacation booking
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
+  { params }: { params: { id: string } }
 ) {
-  const { id } = await params;
-  try {
-    const session = await getServerSession(authOptions);
-    const searchParams = request.nextUrl.searchParams;
+  // Get the session directly from Supabase
+  const supabase = createDirectClient();
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  }
 
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+  const { id } = params;
+  
+  try {
+    // Check if vacation belongs to the user
+    const { data: vacation, error: fetchError } = await supabase
+      .from('vacations')
+      .select('*')
+      .eq('id', id)
+      .eq('user_id', session.user.id)
+      .single();
+    
+    if (fetchError || !vacation) {
+      return NextResponse.json(
+        { error: 'Vacation booking not found or not authorized' },
+        { status: 404 }
+      );
     }
-        
-    const booking = await prisma.vacationBooking.findUnique({
-      where: { id },
-    });
     
-    if (!booking) {
-      return NextResponse.json({ error: 'Vacation booking not found' }, { status: 404 });
+    // Delete the vacation booking
+    const { error: deleteError } = await supabase
+      .from('vacations')
+      .delete()
+      .eq('id', id);
+    
+    if (deleteError) {
+      throw deleteError;
     }
     
-    if (booking.userId !== session.user.id) {
-      return NextResponse.json({ error: 'You can only delete your own vacation bookings' }, { status: 403 });
+    // If the vacation had a Google Calendar event, delete it
+    if (vacation.google_event_id) {
+      // Fetch the user's Google token
+      const { data: tokenData } = await supabase
+        .from('google_tokens')
+        .select('access_token')
+        .eq('user_id', session.user.id)
+        .single();
+      
+      if (tokenData?.access_token) {
+        // Delete the Google Calendar event
+        await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/primary/events/${vacation.google_event_id}`,
+          {
+            method: 'DELETE',
+            headers: {
+              Authorization: `Bearer ${tokenData.access_token}`,
+            },
+          }
+        );
+      }
     }
     
-    await prisma.vacationBooking.delete({
-      where: { id },
-    });
-    
-    return NextResponse.json({ success: true });
+    return NextResponse.json({ message: 'Vacation booking deleted successfully' });
   } catch (error) {
     console.error('Error deleting vacation booking:', error);
     return NextResponse.json(
-      { error: 'Failed to delete vacation booking', details: String(error) },
+      { error: 'Failed to delete vacation booking' },
       { status: 500 }
     );
   }

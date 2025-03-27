@@ -1,6 +1,6 @@
 # Database Schema Documentation
 
-This document outlines the database schema for the Vacation Tracker application. The application uses PostgreSQL with Prisma as the ORM.
+This document outlines the database schema for the Vacation Tracker application. The application uses Supabase.
 
 ## Models
 
@@ -10,7 +10,7 @@ Represents a user of the application.
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| id | String | Primary key, auto-generated UUID | cuid() |
+| id | String | Primary key, auto-generated UUID | `uuid_generate_v4()` |
 | name | String | User's display name | null (optional) |
 | email | String | User's email address, unique | null (optional) |
 | emailVerified | DateTime | Timestamp when email was verified | null (optional) |
@@ -59,12 +59,12 @@ Represents a vacation booking made by a user.
 
 | Field | Type | Description | Default |
 |-------|------|-------------|---------|
-| id | String | Primary key, auto-generated UUID | cuid() |
+| id | String | Primary key, auto-generated UUID | `uuid_generate_v4()` |
 | userId | String | Foreign key to User | |
 | start_date | DateTime | Vacation start date | |
 | end_date | DateTime | Vacation end date | |
 | note | String | Optional note about the vacation | null (optional) |
-| created_at | DateTime | When the booking was created | now() |
+| created_at | DateTime | When the booking was created | `now()` |
 
 ### Holiday
 
@@ -98,22 +98,4 @@ Used for email verification.
 
 ## Database Configuration
 
-The database connection is configured via the `DATABASE_URL` environment variable, which should follow this format:
-
-```
-postgresql://username:password@host:port/database_name?schema=public
-```
-
-## Migrations
-
-Database migrations are managed via Prisma. To apply migrations after schema changes:
-
-```
-npx prisma migrate dev
-```
-
-For production deployments:
-
-```
-npx prisma migrate deploy
-``` 
+The database connection is configured via the Supabase dashboard.

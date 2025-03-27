@@ -1,7 +1,7 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
 import { DateTime } from 'luxon';
+import { supabase } from '@/lib/supabase';
 import { isWeekend } from './holidayUtils';
 
 export interface HolidayInfo {
@@ -66,33 +66,24 @@ export async function getHolidays(
   type: 'bank' | 'provincial';
 }>> {
   // Find holidays in the database for the given date range and province
-  const holidays = await prisma.holiday.findMany({
-    where: {
-      date: {
-        gte: startDate,
-        lte: endDate,
-      },
-      OR: [
-        { province: null }, // National holidays
-        { province: province }, // Province-specific holidays
-      ],
-    },
-    orderBy: {
-      date: 'asc',
-    },
-  });
+  const holidays = await supabase
+    .from('holidays')
+    .select('*')
+    .gte('date', DateTime.fromJSDate(startDate).toISODate())
+    .lte('date', DateTime.fromJSDate(endDate).toISODate())
+    .or(`province.is.null,province.eq.${province}`);
   
   // If we have no holidays in the database for this period, fetch them
-  if (holidays.length === 0) {
+  if (holidays.data && holidays.data.length === 0) {
     await syncHolidaysForYear(DateTime.fromJSDate(startDate).year);
     
     // Try again after syncing
     return getHolidays(startDate, endDate, province);
   }
   
-  return holidays.map(holiday => {
+  return (holidays.data || []).map(holiday => {
     // Create a new DateTime from the holiday date in UTC to avoid timezone issues
-    const luxonDate = DateTime.fromJSDate(holiday.date, { zone: 'utc' }).startOf('day');
+    const luxonDate = DateTime.fromJSDate(new Date(holiday.date), { zone: 'utc' }).startOf('day');
     
     // Convert back to a JavaScript Date in UTC
     const fixedDate = luxonDate.toJSDate();
@@ -202,21 +193,17 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
   const startOfYear = new Date(year, 0, 1);
   const endOfYear = new Date(year, 11, 31, 23, 59, 59);
   
-  await prisma.holiday.deleteMany({
-    where: {
-      date: {
-        gte: startOfYear,
-        lte: endOfYear,
-      },
-    },
-  });
+  await supabase
+    .from('holidays')
+    .delete()
+    .gte('date', DateTime.fromJSDate(startOfYear).toISODate())
+    .lte('date', DateTime.fromJSDate(endOfYear).toISODate());
   
   // Insert the new holidays
   if (holidaysToInsert.length > 0) {
-    await prisma.holiday.createMany({
-      data: holidaysToInsert,
-      skipDuplicates: true,
-    });
+    await supabase
+      .from('holidays')
+      .insert(holidaysToInsert);
   }
 }
 
@@ -227,40 +214,190 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
 
 // isWeekend function moved to holidayUtils.ts and imported at the top
 
-export async function isHoliday(date: Date, province: string) {
-  // Create a DateTime object in UTC from the input date and get start of day
-  const dt = DateTime.fromJSDate(date, { zone: 'utc' }).startOf('day');
-  const dateStr = dt.toISODate();
-  
-  if (!dateStr) {
-    return {
-      isHoliday: false,
-      name: null,
-      type: null
-    };
+export async function isHoliday(
+  date: Date,
+  province: string
+): Promise<{ isHoliday: boolean; name: string | null }> {
+  try {
+    const dateStr = DateTime.fromJSDate(date).toISODate();
+    
+    const { data, error } = await supabase
+      .from('holidays')
+      .select('*')
+      .eq('date', dateStr)
+      .or(`province.is.null,province.eq.${province}`);
+    
+    if (error) {
+      console.error('Error checking holiday:', error);
+      return { isHoliday: false, name: null };
+    }
+    
+    if (data && data.length > 0) {
+      return { isHoliday: true, name: data[0].name };
+    }
+    
+    return { isHoliday: false, name: null };
+  } catch (error) {
+    console.error('Error checking holiday:', error);
+    return { isHoliday: false, name: null };
   }
-  
-  // Create a date to query with using the Luxon DateTime
-  const queryDate = dt.toJSDate();
-  
-  const holiday = await prisma.holiday.findFirst({
-    where: {
-      date: {
-        equals: queryDate,
-      },
-      OR: [
-        { province: province },
-        { province: null } // National holidays
-      ]
-    },
-  });
-  
-  return {
-    isHoliday: !!holiday,
-    name: holiday?.name || null,
-    type: holiday?.type || null
-  };
 }
 
 // Helper function to fetch holidays from API
 // Removed duplicate fetchHolidaysFromAPI function
+
+interface Holiday {
+  id: string;
+  date: string | Date;
+  name: string;
+  province: string | null;
+  type: string;
+}
+
+/**
+ * Get holidays between start and end dates for a specific province
+ */
+export async function getHolidaysInRange(
+  startDate: Date,
+  endDate: Date,
+  province: string
+): Promise<Holiday[]> {
+  try {
+    const startDateStr = DateTime.fromJSDate(startDate).toISODate();
+    const endDateStr = DateTime.fromJSDate(endDate).toISODate();
+    
+    const { data, error } = await supabase
+      .from('holidays')
+      .select('*')
+      .gte('date', startDateStr)
+      .lte('date', endDateStr)
+      .or(`province.is.null,province.eq.${province}`);
+    
+    if (error) {
+      console.error('Error fetching holidays:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching holidays:', error);
+    return [];
+  }
+}
+
+/**
+ * Get all holidays for a specific year and province
+ */
+export async function getHolidaysByYear(
+  year: number,
+  province: string
+): Promise<Holiday[]> {
+  try {
+    const startDate = DateTime.local(year, 1, 1).toISODate();
+    const endDate = DateTime.local(year, 12, 31).toISODate();
+    
+    const { data, error } = await supabase
+      .from('holidays')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .or(`province.is.null,province.eq.${province}`);
+    
+    if (error) {
+      console.error('Error fetching holidays:', error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching holidays:', error);
+    return [];
+  }
+}
+
+/**
+ * Import holidays for a specific year and province
+ */
+export async function importHolidays(
+  holidays: Omit<Holiday, 'id'>[],
+  year: number,
+  province: string
+): Promise<void> {
+  try {
+    // First, delete existing holidays for this year and province
+    const startDate = DateTime.local(year, 1, 1).toISODate();
+    const endDate = DateTime.local(year, 12, 31).toISODate();
+    
+    // Delete national holidays for this year
+    const { error: deleteNationalError } = await supabase
+      .from('holidays')
+      .delete()
+      .is('province', null)
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    if (deleteNationalError) {
+      console.error('Error deleting national holidays:', deleteNationalError);
+    }
+    
+    // Delete provincial holidays for this year
+    const { error: deleteProvincialError } = await supabase
+      .from('holidays')
+      .delete()
+      .eq('province', province)
+      .gte('date', startDate)
+      .lte('date', endDate);
+    
+    if (deleteProvincialError) {
+      console.error('Error deleting provincial holidays:', deleteProvincialError);
+    }
+    
+    // Insert new holidays
+    if (holidays.length > 0) {
+      const { error: insertError } = await supabase
+        .from('holidays')
+        .insert(holidays);
+      
+      if (insertError) {
+        console.error('Error inserting holidays:', insertError);
+        throw new Error(`Failed to import holidays: ${insertError.message}`);
+      }
+    }
+  } catch (error) {
+    console.error('Error importing holidays:', error);
+    throw new Error('Failed to import holidays');
+  }
+}
+
+/**
+ * Check if a holiday already exists in the database
+ */
+export async function holidayExists(
+  date: Date,
+  name: string,
+  province: string | null
+): Promise<boolean> {
+  try {
+    const dateStr = DateTime.fromJSDate(date).toISODate();
+    
+    const { data, error } = await supabase
+      .from('holidays')
+      .select('id')
+      .eq('date', dateStr)
+      .eq('name', name);
+    
+    if (province) {
+      const query = supabase.from('holidays').select('id').eq('province', province);
+    }
+    
+    if (error) {
+      console.error('Error checking holiday exists:', error);
+      return false;
+    }
+    
+    return data && data.length > 0;
+  } catch (error) {
+    console.error('Error checking holiday exists:', error);
+    return false;
+  }
+}

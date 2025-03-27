@@ -317,11 +317,11 @@ export default function VacationForm({ userId, province, holidays, existingVacat
       // Prepare half-day dates for submission
       const halfDayDates = data.isHalfDay 
         ? Object.entries(data.halfDayDates)
-            .filter(([_, settings]) => settings.isHalfDay)
-            .map(([dateStr, settings]) => ({
-              date: DateTime.fromISO(dateStr).toJSDate(),
-              portion: settings.portion
-            }))
+          .filter(([_, settings]) => settings.isHalfDay)
+          .map(([dateStr, settings]) => ({
+            date: DateTime.fromISO(dateStr).toJSDate(),
+            portion: settings.portion
+          }))
         : [];
       
       await createVacationBooking({
@@ -518,8 +518,8 @@ export default function VacationForm({ userId, province, holidays, existingVacat
                         control={
                           <input
                             type="radio"
-                            checked={daySettings.portion === "AM"}
-                            onChange={() => setHalfDayPortion(dateKey, "AM")}
+                            checked={daySettings.portion === 'AM'}
+                            onChange={() => setHalfDayPortion(dateKey, 'AM')}
                           />
                         }
                         label="Morning (AM)"
@@ -528,8 +528,8 @@ export default function VacationForm({ userId, province, holidays, existingVacat
                         control={
                           <input
                             type="radio"
-                            checked={daySettings.portion === "PM"}
-                            onChange={() => setHalfDayPortion(dateKey, "PM")}
+                            checked={daySettings.portion === 'PM'}
+                            onChange={() => setHalfDayPortion(dateKey, 'PM')}
                           />
                         }
                         label="Afternoon (PM)"
@@ -558,7 +558,7 @@ export default function VacationForm({ userId, province, holidays, existingVacat
                         type="radio"
                         {...field}
                         value="AM"
-                        checked={field.value === "AM"}
+                        checked={field.value === 'AM'}
                       />
                     }
                     label="Morning (AM)"
@@ -569,7 +569,7 @@ export default function VacationForm({ userId, province, holidays, existingVacat
                         type="radio"
                         {...field}
                         value="PM"
-                        checked={field.value === "PM"}
+                        checked={field.value === 'PM'}
                       />
                     }
                     label="Afternoon (PM)"

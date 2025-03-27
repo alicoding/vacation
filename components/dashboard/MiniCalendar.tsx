@@ -143,16 +143,16 @@ export default function MiniCalendar({ holidays = [], vacations = [] }: MiniCale
                 color: !day.hasSame(currentMonth, 'month') 
                   ? 'text.disabled' 
                   : day.hasSame(selectedDate, 'day')
-                  ? 'common.white'
-                  : 'text.primary',
+                    ? 'common.white'
+                    : 'text.primary',
                 backgroundColor: day.hasSame(selectedDate, 'day') 
                   ? 'primary.main' 
                   : 'transparent',
                 border: isHoliday(day) 
                   ? '1px solid red' 
                   : isVacation(day)
-                  ? '1px solid green'
-                  : 'none'
+                    ? '1px solid green'
+                    : 'none'
               }}
             >
               {day.toFormat('d')}

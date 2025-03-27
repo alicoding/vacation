@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/lib/auth-helpers';
 import Link from 'next/dist/client/app-dir/link';
 import { 
   Box, List, ListItem, ListItemIcon, ListItemText, ListItemButton, 
@@ -37,8 +37,8 @@ interface NavLink {
   }>;
 }
 
-export default function Sidebar() {
-  const { data: session } = useSession();
+export default function DashboardSidebar() {
+  const { data: session, status } = useSession();
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [holidays, setHolidays] = useState<Holiday[]>([]);

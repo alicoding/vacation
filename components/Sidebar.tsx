@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/lib/auth-helpers';
 
 // Navigation items
 const navigation = [
@@ -14,7 +14,7 @@ const navigation = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   
   if (!session) {
     return null;
@@ -52,14 +52,14 @@ export default function Sidebar() {
         <div className="mt-2 flex justify-between">
           <span className="text-sm font-medium text-gray-500">Total Days:</span>
           <span className="text-sm font-semibold text-gray-900">
-            {session.user.total_vacation_days}
+            {(session.user as any).total_vacation_days || 0}
           </span>
         </div>
         <div className="mt-1 flex justify-between">
           <span className="text-sm font-medium text-gray-500">Available:</span>
           <span className="text-sm font-semibold text-vacation-booked">
             {/* This will be calculated dynamically */}
-            {session.user.total_vacation_days} days
+            {(session.user as any).total_vacation_days || 0} days
           </span>
         </div>
         <div className="mt-1 flex justify-between">
@@ -74,4 +74,4 @@ export default function Sidebar() {
       {/* Mini Calendar will be added by another agent */}
     </aside>
   );
-} 
+}

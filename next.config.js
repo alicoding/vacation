@@ -1,5 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Set runtime configuration
+  experimental: {
+    // These are the supported experimental options
+    serverActions: {
+      bodySizeLimit: '2mb',
+    },
+    turbo: {
+      enabled: true
+    },
+  },
+  
+  // Add specific configuration for Cloudflare Pages
+  transpilePackages: ['@cloudflare/next-on-pages'],
+  
+  // Other Next.js configurations
   reactStrictMode: true,
   
   webpack: (config, { isServer }) => {
@@ -54,13 +69,8 @@ const nextConfig = {
   // Allow cross-origin requests during development
   allowedDevOrigins: ['vacation.alicoding.com'],
   
-  // Enable Turbopack for development
-  experimental: {
-    // Enable Turbopack
-    turbo: {
-      enabled: true
-    }
-  },
+  // This is important for Cloudflare deployment
+  output: 'standalone',
 };
 
-module.exports = nextConfig;
+export default nextConfig;

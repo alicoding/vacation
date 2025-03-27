@@ -1,328 +1,331 @@
 'use server';
 
-import { prisma } from '@/lib/prisma';
-import { isHoliday } from '@/services/holiday/holidayService';
-import { isWeekend } from '@/lib/client/holidayClient';
-import { DateTime, Interval } from 'luxon';
-import { PrismaClientKnownRequestError } from '@prisma/client/runtime/library';
-import {
-  VacationServiceError,
-  DatabaseError,
-  ValidationError,
-  NotFoundError,
-  VacationBookingInput,
-  VacationBooking,
-  VacationWithDetails
-} from './vacationTypes';
+import { DateTime } from 'luxon';
+import { supabase } from '@/lib/supabase';
+import { VacationBooking, VacationServiceError } from './vacationTypes';
+import { getHolidaysInRange } from '../holiday/holidayService';
+import { PostgrestError } from '@supabase/supabase-js';
 
 /**
- * Server-only service for handling vacation operations
+ * Check if dates are overlapping with existing bookings
  */
-export async function createVacationBooking(data: VacationBookingInput) {
+export async function checkOverlappingBookings(
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  excludeId?: string
+): Promise<boolean> {
   try {
-    // Check for existing bookings in the same date range
-    const existingBookings = await prisma.vacationBooking.findMany({
-      where: {
-        userId: data.userId,
-        OR: [
-          // Check for bookings that contain the start date
-          {
-            start_date: { lte: data.startDate },
-            end_date: { gte: data.startDate }
-          },
-          // Check for bookings that contain the end date
-          {
-            start_date: { lte: data.endDate },
-            end_date: { gte: data.endDate }
-          },
-          // Check for bookings that are contained within the new booking
-          {
-            start_date: { gte: data.startDate },
-            end_date: { lte: data.endDate }
-          }
-        ]
-      }
-    });
-
-    // If there are existing bookings in the date range, throw an error
-    if (existingBookings.length > 0) {
-      throw new ValidationError('You already have a vacation booking that overlaps with these dates.');
-    }
-
-    // Create the vacation booking
-    const booking = await prisma.vacationBooking.create({
-      data: {
-        userId: data.userId,
-        start_date: data.startDate,
-        end_date: data.endDate,
-        note: data.note,
-        is_half_day: data.isHalfDay || false,
-        half_day_portion: data.halfDayPortion || null,
-      },
-    });
+    let query = supabase
+      .from('vacation_bookings')
+      .select('*')
+      .eq('userId', userId)
+      // Find bookings that overlap with the new date range
+      .or(`start_date.lte.${endDate.toISOString()},end_date.gte.${startDate.toISOString()}`);
     
-    // If we have multiple half-day dates, handle them separately
-    // In a real implementation, this would be stored in a separate table
-    // For now, we'll just log them
-    if (data.halfDayDates && data.halfDayDates.length > 0) {
-      console.log('Half-day dates:', data.halfDayDates);
-      // Here you would create records in a separate table like:
-      // await prisma.vacationHalfDays.createMany({
-      //   data: data.halfDayDates.map(halfDay => ({
-      //     vacationId: booking.id,
-      //     date: halfDay.date,
-      //     portion: halfDay.portion
-      //   }))
-      // });
+    // Exclude the current booking if updating
+    if (excludeId) {
+      query = query.neq('id', excludeId);
+    }
+    
+    const { data: existingBookings, error } = await query;
+    
+    if (error) {
+      throw new VacationServiceError(error.message, 'DATABASE_ERROR');
+    }
+    
+    return existingBookings && existingBookings.length > 0;
+  } catch (error) {
+    console.error('Error checking overlapping bookings:', error);
+    throw new VacationServiceError(
+      'Failed to check overlapping bookings',
+      'DATABASE_ERROR'
+    );
+  }
+}
+
+/**
+ * Create a new vacation booking
+ */
+export async function createVacationBooking(
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  note?: string,
+  isHalfDay: boolean = false,
+  halfDayPortion?: string
+): Promise<VacationBooking> {
+  try {
+    // Check for overlapping bookings
+    const hasOverlap = await checkOverlappingBookings(userId, startDate, endDate);
+    
+    if (hasOverlap) {
+      throw new VacationServiceError(
+        'This vacation overlaps with an existing booking',
+        'OVERLAPPING_BOOKING'
+      );
+    }
+    
+    // Create the booking
+    const { data: booking, error } = await supabase
+      .from('vacation_bookings')
+      .insert({
+        userId,
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        note,
+        is_half_day: isHalfDay,
+        half_day_portion: halfDayPortion,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      throw new VacationServiceError(error.message, 'DATABASE_ERROR');
     }
     
     return booking;
   } catch (error) {
     console.error('Error creating vacation booking:', error);
-    if (error instanceof ValidationError) {
+    if (error instanceof VacationServiceError) {
       throw error;
     }
-    throw new DatabaseError(`Failed to create vacation booking: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
-
-export async function getVacationBookings(userId: string) {
-  return prisma.vacationBooking.findMany({
-    where: { userId },
-    orderBy: { start_date: 'asc' },
-  });
-}
-
-export async function deleteVacationBooking(id: string, userId: string) {
-  return prisma.vacationBooking.deleteMany({
-    where: {
-      id,
-      userId, // For security, only allow deleting own bookings
-    },
-  });
-}
-
-/**
- * Get upcoming vacation bookings for a user with additional details
- */
-export async function getUpcomingVacations(
-  userId: string,
-  province: string,
-  limit: number = 5
-): Promise<VacationWithDetails[]> {
-  try {
-    if (!userId) {
-      throw new ValidationError('User ID is required');
-    }
-    if (!province) {
-      throw new ValidationError('Province is required');
-    }
-    const bookings = await prisma.vacationBooking.findMany({
-      where: {
-        userId,
-        start_date: {
-          gte: new Date(),
-        },
-      },
-      orderBy: {
-        start_date: 'asc',
-      },
-      take: limit,
-    });
-
-    const vacationsWithDetails = await Promise.all(
-      bookings.map(async (booking) => {
-        const startDate = booking.start_date;
-        const endDate = booking.end_date;
-        
-        // Convert to Luxon DateTime for easier handling
-        const startDateTime = DateTime.fromJSDate(startDate);
-        const endDateTime = DateTime.fromJSDate(endDate);
-        
-        // Get all days in the range
-        const interval = Interval.fromDateTimes(startDateTime, endDateTime.plus({ days: 1 }));
-        const days = Array.from(interval.splitBy({ days: 1 })).map(i => i.start!);
-        
-        // Count working days (excluding weekends and holidays)
-        let workingDaysOff = 0;
-        const adjacentHolidays: string[] = [];
-        
-        for (const day of days) {
-          const jsDay = day.toJSDate();
-          if (!isWeekend(jsDay)) {
-            const holidayInfo = await isHoliday(jsDay, province);
-            if (holidayInfo.isHoliday) {
-              adjacentHolidays.push(holidayInfo.name || 'Holiday');
-            } else {
-              workingDaysOff++;
-            }
-          }
-        }
-        
-        // Calculate total days off
-        const totalDaysOff = days.length;
-        
-        // Check if this is a long weekend (1-2 days connected to a weekend)
-        const dayBefore = startDateTime.minus({ days: 1 }).toJSDate();
-        const dayAfter = endDateTime.plus({ days: 1 }).toJSDate();
-        const isLongWeekend =
-          totalDaysOff <= 2 &&
-          (isWeekend(dayBefore) || isWeekend(dayAfter));
-        
-        return {
-          id: booking.id,
-          userId: booking.userId,
-          startDate: booking.start_date,
-          endDate: booking.end_date,
-          note: booking.note,
-          createdAt: booking.created_at,
-          isLongWeekend,
-          adjacentHolidays,
-          totalDaysOff,
-          workingDaysOff,
-        };
-      })
+    throw new VacationServiceError(
+      'Failed to create vacation booking',
+      'DATABASE_ERROR'
     );
-    return vacationsWithDetails;
-  } catch (error: unknown) {
-    if (error instanceof PrismaClientKnownRequestError) {
-      throw new DatabaseError(`Database error while fetching upcoming vacations: ${error.message}`, error);
-    } else if (error instanceof VacationServiceError) {
-      throw error;
-    } else {
-      throw new VacationServiceError(`Failed to get upcoming vacations: ${error instanceof Error ? error.message : String(error)}`);
-    }
   }
 }
 
 /**
- * Update a vacation booking
+ * Get all vacation bookings for a user
+ */
+export async function getVacationBookings(userId: string): Promise<VacationBooking[]> {
+  try {
+    const { data: bookings, error } = await supabase
+      .from('vacation_bookings')
+      .select('*')
+      .eq('userId', userId)
+      .order('start_date', { ascending: false });
+    
+    if (error) {
+      throw new VacationServiceError(error.message, 'DATABASE_ERROR');
+    }
+    
+    return bookings || [];
+  } catch (error) {
+    console.error('Error fetching vacation bookings:', error);
+    throw new VacationServiceError(
+      'Failed to fetch vacation bookings',
+      'DATABASE_ERROR'
+    );
+  }
+}
+
+/**
+ * Delete a vacation booking by ID
+ */
+export async function deleteVacationBooking(
+  id: string,
+  userId: string
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('vacation_bookings')
+      .delete()
+      .eq('id', id)
+      .eq('userId', userId);
+    
+    if (error) {
+      throw new VacationServiceError(error.message, 'DATABASE_ERROR');
+    }
+  } catch (error) {
+    console.error('Error deleting vacation booking:', error);
+    throw new VacationServiceError(
+      'Failed to delete vacation booking',
+      'DATABASE_ERROR'
+    );
+  }
+}
+
+/**
+ * Calculate business days (working days) between two dates, excluding weekends and holidays
+ */
+export async function calculateBusinessDays(
+  startDate: Date,
+  endDate: Date,
+  province: string,
+  isHalfDay: boolean = false
+): Promise<number> {
+  try {
+    const start = DateTime.fromJSDate(startDate).startOf('day');
+    const end = DateTime.fromJSDate(endDate).startOf('day');
+    
+    // Get holidays in the range
+    const holidays = await getHolidaysInRange(
+      start.toJSDate(),
+      end.toJSDate(),
+      province
+    );
+    
+    const holidayDates = holidays.map(h => 
+      DateTime.fromJSDate(new Date(h.date)).toISODate()
+    );
+    
+    let count = 0;
+    let current = start;
+    
+    while (current <= end) {
+      // Skip weekends (6 = Saturday, 7 = Sunday)
+      if (current.weekday < 6) {
+        // Skip holidays
+        if (!holidayDates.includes(current.toISODate())) {
+          count++;
+        }
+      }
+      
+      current = current.plus({ days: 1 });
+    }
+    
+    // Adjust for half-day if needed
+    return isHalfDay ? count - 0.5 : count;
+  } catch (error) {
+    console.error('Error calculating business days:', error);
+    throw new VacationServiceError(
+      'Failed to calculate business days',
+      'CALCULATION_ERROR'
+    );
+  }
+}
+
+/**
+ * Update an existing vacation booking
  */
 export async function updateVacationBooking(
   id: string,
-  booking: Partial<VacationBooking>
+  userId: string,
+  startDate: Date,
+  endDate: Date,
+  note?: string,
+  isHalfDay: boolean = false,
+  halfDayPortion?: string
 ): Promise<VacationBooking> {
   try {
-    if (!id) {
-      throw new ValidationError('Vacation booking ID is required');
+    // Find the existing booking
+    const { data: existingBooking, error: findError } = await supabase
+      .from('vacation_bookings')
+      .select('*')
+      .eq('id', id)
+      .eq('userId', userId)
+      .single();
+    
+    if (findError || !existingBooking) {
+      throw new VacationServiceError(
+        'Vacation booking not found',
+        'NOT_FOUND'
+      );
     }
-    // Check if booking exists
-    const existingBooking = await prisma.vacationBooking.findUnique({
-      where: { id },
-    });
-    if (!existingBooking) {
-      throw new NotFoundError(`Vacation booking with ID ${id} not found`);
+    
+    // Check for overlapping bookings (excluding this booking)
+    const hasOverlap = await checkOverlappingBookings(userId, startDate, endDate, id);
+    
+    if (hasOverlap) {
+      throw new VacationServiceError(
+        'This vacation overlaps with an existing booking',
+        'OVERLAPPING_BOOKING'
+      );
     }
-    // Validate dates if provided
-    if (booking.startDate && booking.endDate && booking.startDate > booking.endDate) {
-      throw new ValidationError('Start date must be before end date');
+    
+    // Update the booking
+    const { data: updatedBooking, error: updateError } = await supabase
+      .from('vacation_bookings')
+      .update({
+        start_date: startDate.toISOString(),
+        end_date: endDate.toISOString(),
+        note,
+        is_half_day: isHalfDay,
+        half_day_portion: halfDayPortion
+      })
+      .eq('id', id)
+      .eq('userId', userId)
+      .select()
+      .single();
+    
+    if (updateError) {
+      throw new VacationServiceError(updateError.message, 'DATABASE_ERROR');
     }
-    const updatedBooking = await prisma.vacationBooking.update({
-      where: { id },
-      data: {
-        // Prisma v6: Column names should match schema exactly
-        start_date: booking.startDate,
-        end_date: booking.endDate,
-        note: booking.note,
-      },
-    });
-
-    return {
-      id: updatedBooking.id,
-      userId: updatedBooking.userId,
-      startDate: updatedBooking.start_date,
-      endDate: updatedBooking.end_date,
-      note: updatedBooking.note,
-      createdAt: updatedBooking.created_at,
-    };
-  } catch (error: unknown) {
-    if (error instanceof PrismaClientKnownRequestError) {
-      if (error.code === 'P2025') {
-        throw new NotFoundError(`Vacation booking with ID ${id} not found`);
-      }
-      throw new DatabaseError(`Database error while updating booking: ${error.message}`, error);
-    } else if (error instanceof VacationServiceError) {
+    
+    return updatedBooking;
+  } catch (error) {
+    console.error('Error updating vacation booking:', error);
+    if (error instanceof VacationServiceError) {
       throw error;
-    } else {
-      throw new VacationServiceError(`Failed to update vacation booking: ${error instanceof Error ? error.message : String(error)}`);
     }
+    throw new VacationServiceError(
+      'Failed to update vacation booking',
+      'DATABASE_ERROR'
+    );
   }
 }
 
 /**
- * Get vacation balance for a user
+ * Get total vacation days used for a user in a specified year
  */
-export async function getVacationBalance(userId: string, province: string): Promise<{
-  total: number;
-  used: number;
-  remaining: number;
-}> {
+export async function getVacationDaysUsed(
+  userId: string,
+  year: number
+): Promise<number> {
   try {
-    if (!userId) {
-      throw new ValidationError('User ID is required');
+    // Get user to check province
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('province')
+      .eq('id', userId)
+      .single();
+    
+    if (userError || !user) {
+      throw new VacationServiceError('User not found', 'NOT_FOUND');
     }
-
-    // Get user's total vacation days
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { total_vacation_days: true },
-    });
-
-    if (!user) {
-      throw new NotFoundError(`User with ID ${userId} not found`);
+    
+    // Get all vacation bookings for the year
+    const startOfYear = new Date(year, 0, 1).toISOString();
+    const endOfYear = new Date(year, 11, 31).toISOString();
+    
+    const { data: vacations, error } = await supabase
+      .from('vacation_bookings')
+      .select('*')
+      .eq('userId', userId)
+      .gte('start_date', startOfYear)
+      .lte('end_date', endOfYear);
+    
+    if (error) {
+      throw new VacationServiceError(error.message, 'DATABASE_ERROR');
     }
-    const totalDays = user.total_vacation_days || 0;
-
-    // Get all vacations for the current year
-    const currentYear = DateTime.now().year;
-    const startOfYear = DateTime.local(currentYear, 1, 1).startOf('day').toJSDate();
-    const endOfYear = DateTime.local(currentYear, 12, 31).endOf('day').toJSDate();
-
-    const vacations = await prisma.vacationBooking.findMany({
-      where: {
-        userId,
-        start_date: {
-          gte: startOfYear,
-          lte: endOfYear,
-        },
-      },
-    });
-
-    // Calculate used days (excluding weekends and holidays)
-    let usedDays = 0;
-
-    for (const vacation of vacations) {
-      const startDateTime = DateTime.fromJSDate(vacation.start_date);
-      const endDateTime = DateTime.fromJSDate(vacation.end_date);
+    
+    // Calculate total business days for each booking
+    let totalDays = 0;
+    
+    for (const vacation of vacations || []) {
+      const businessDays = await calculateBusinessDays(
+        new Date(vacation.start_date),
+        new Date(vacation.end_date),
+        user.province,
+        vacation.is_half_day
+      );
       
-      const interval = Interval.fromDateTimes(startDateTime, endDateTime.plus({ days: 1 }));
-      const days = Array.from(interval.splitBy({ days: 1 })).map(i => i.start!);
-      
-      for (const day of days) {
-        const jsDay = day.toJSDate();
-        if (!isWeekend(jsDay)) {
-          const holidayInfo = await isHoliday(jsDay, province);
-          if (!holidayInfo.isHoliday) {
-            usedDays++;
-          }
-        }
-      }
+      totalDays += businessDays;
     }
-
-    // Calculate remaining days
-    const remainingDays = Math.max(0, totalDays - usedDays);
-    return {
-      total: totalDays,
-      used: usedDays,
-      remaining: remainingDays,
-    };
-  } catch (error: unknown) {
-    if (error instanceof PrismaClientKnownRequestError) {
-      throw new DatabaseError(`Database error while calculating vacation balance: ${error.message}`, error);
-    } else if (error instanceof VacationServiceError) {
+    
+    return totalDays;
+  } catch (error) {
+    console.error('Error getting vacation days used:', error);
+    if (error instanceof VacationServiceError) {
       throw error;
-    } else {
-      throw new VacationServiceError(`Failed to get vacation balance: ${error instanceof Error ? error.message : String(error)}`);
     }
+    throw new VacationServiceError(
+      'Failed to get vacation days used',
+      'DATABASE_ERROR'
+    );
   }
 }

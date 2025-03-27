@@ -1,198 +1,89 @@
 'use client';
 
-import { signIn } from 'next-auth/react';
-import { useState, useEffect, useCallback, Suspense } from 'react';
-import { 
-  Box, 
-  Button, 
-  Container, 
-  Typography, 
-  Paper,
-  Alert,
-  CircularProgress,
-  Divider
-} from '@mui/material';
+import { useState, useEffect } from 'react';
+import { Box, Container, Typography, Button, Paper, CircularProgress, Alert } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
-import { useSearchParams } from 'next/navigation';
-import GoogleOneTap from '@/features/auth/GoogleOneTap';
+import { useAuth } from '@/components/auth/AuthProvider';
+import { useRouter, useSearchParams } from 'next/navigation';
 
-function SignInContent() {
-  const [isLoading, setIsLoading] = useState(false);
+export default function SignIn() {
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [mounted, setMounted] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
+  const router = useRouter();
   const searchParams = useSearchParams();
-
+  const { signInWithGoogle, session } = useAuth();
+  
+  // Get the callback URL from the query parameters
+  const callbackUrl = searchParams?.get('callbackUrl') || '/dashboard';
+  
+  // Check for error parameters
   useEffect(() => {
-    console.log("SignIn: Component mounted");
-    setMounted(true);
-    
-    // After 5 seconds, show the fallback button if One Tap hasn't worked
-    const timer = setTimeout(() => {
-      console.log("SignIn: Showing fallback button after timeout");
-      setShowFallback(true);
-    }, 5000);
-    
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Check for error from callback
-  useEffect(() => {
-    if (!mounted) return;
-    
-    const errorType = searchParams?.get('error');
-    if (errorType) {
-      console.log(`SignIn: Error detected in URL params: ${errorType}`);
-      switch(errorType) {
-        case 'OAuthSignin':
-        case 'OAuthCallback':
-        case 'OAuthCreateAccount':
-        case 'EmailCreateAccount':
-        case 'Callback':
-          setError('There was a problem with the OAuth authentication. Please try again.');
-          setShowFallback(true);
-          break;
-        case 'OAuthAccountNotLinked':
-          setError('This email is already associated with another account.');
-          setShowFallback(true);
-          break;
-        case 'EmailSignin':
-          setError('The email signin link is invalid or has expired.');
-          setShowFallback(true);
-          break;
-        case 'CredentialsSignin':
-          setError('The credentials you provided are invalid.');
-          setShowFallback(true);
-          break;
-        case 'SessionRequired':
-          setError('Please sign in to access this page.');
-          setShowFallback(true);
-          break;
-        default:
-          setError('An unexpected error occurred. Please try again.');
-          setShowFallback(true);
-          break;
+    const errorParam = searchParams?.get('error');
+    if (errorParam) {
+      if (errorParam === 'auth_callback_error') {
+        setError('Authentication failed. Please try again.');
+      } else if (errorParam === 'unknown') {
+        setError('An unknown error occurred. Please try again.');
+      } else {
+        setError(`Error: ${errorParam}`);
       }
     }
-  }, [searchParams, mounted]);
+  }, [searchParams]);
+  
+  // Redirect if already signed in
+  useEffect(() => {
+    if (session) {
+      router.push(callbackUrl);
+    }
+  }, [session, router, callbackUrl]);
 
-  const handleGoogleSignIn = async () => {
+  const handleSignIn = async () => {
     try {
-      setIsLoading(true);
+      setLoading(true);
       setError(null);
       
-      console.log("SignIn: Traditional Google sign-in initiated");
-      // Use absolute URL for callbackUrl
-      const callbackUrl = `${window.location.origin}/dashboard`;
+      // Pass the callback URL to the sign-in function
+      await signInWithGoogle(callbackUrl);
       
-      await signIn('google', {
-        callbackUrl,
-        redirect: true
-      });
-    } catch (error) {
-      console.error('Authentication error:', error);
-      setError('Failed to authenticate with Google. Please try again.');
-    } finally {
-      setIsLoading(false);
+      // The actual redirect will be handled by the auth callback
+    } catch (err) {
+      console.error('Error signing in with Google:', err);
+      setError(err instanceof Error ? err.message : 'Failed to sign in');
+      setLoading(false);
     }
   };
 
-  const handleOneTapSuccess = useCallback(() => {
-    console.log("SignIn: One Tap authentication successful");
-  }, []);
-
-  const handleOneTapError = useCallback((errorMessage: string) => {
-    console.log(`SignIn: One Tap error: ${errorMessage}`);
-    setError(errorMessage);
-    setShowFallback(true);
-  }, []);
-
-  // Return empty div until client-side hydration is complete
-  if (!mounted) {
-    return <Box sx={{ minHeight: '100vh' }} />;
-  }
-
-  console.log("SignIn: Rendering sign-in page, showFallback:", showFallback);
-
   return (
-    <Box 
-      sx={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center',
-        bgcolor: 'background.default',
-        p: 2
-      }}
-    >
-      <Container maxWidth="sm">
-        <Paper 
-          elevation={3} 
-          sx={{ 
-            p: 4, 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center' 
-          }}
-        >
-          <Typography variant="h4" component="h1" fontWeight="bold" gutterBottom>
-            Vacation Tracker
+    <Container maxWidth="sm">
+      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: 450 }}>
+          <Typography variant="h4" component="h1" align="center" gutterBottom>
+            Sign In
           </Typography>
-          <Typography variant="subtitle1" color="text.secondary" sx={{ mb: 4 }}>
-            Sign in to track your vacation days
+          
+          <Typography variant="body1" color="text.secondary" align="center" sx={{ mb: 4 }}>
+            Sign in to your Vacation Tracker account using your Google account.
           </Typography>
           
           {error && (
-            <Alert 
-              severity="error" 
-              sx={{ width: '100%', mb: 3 }}
-              onClose={() => setError(null)}
-            >
+            <Alert severity="error" sx={{ mb: 3 }}>
               {error}
             </Alert>
           )}
           
-          {/* Google One Tap Integration (invisible) */}
-          <div id="google-one-tap-container" data-testid="google-one-tap-container">
-            <GoogleOneTap onSuccess={handleOneTapSuccess} onError={handleOneTapError} />
-          </div>
-          
-          {showFallback && (
-            <>
-              {showFallback && !error && (
-                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                  Automatic sign-in didn't work. Please use the button below.
-                </Typography>
-              )}
-              
-              <Button
-                variant="outlined"
-                fullWidth
-                startIcon={isLoading ? <CircularProgress size={20} /> : <GoogleIcon />}
-                onClick={handleGoogleSignIn}
-                disabled={isLoading}
-                sx={{ 
-                  py: 1.5, 
-                  borderColor: 'divider',
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                  }
-                }}
-              >
-                {isLoading ? 'Signing in...' : 'Sign in with Google'}
-              </Button>
-            </>
-          )}
+          <Button
+            fullWidth
+            variant="contained"
+            color="primary"
+            size="large"
+            startIcon={loading ? <CircularProgress size={24} color="inherit" /> : <GoogleIcon />}
+            onClick={handleSignIn}
+            disabled={loading}
+          >
+            {loading ? 'Signing in...' : 'Sign in with Google'}
+          </Button>
         </Paper>
-      </Container>
-    </Box>
+      </Box>
+    </Container>
   );
 }
-
-export default function SignInPage() {
-  return (
-    <Suspense fallback={<div>Loading...</div>}>
-      <SignInContent />
-    </Suspense>
-  );
-} 

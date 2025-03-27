@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 /**
  * Client-side API interface

@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { 
   Box, 
@@ -13,8 +12,32 @@ import {
   Select,
   MenuItem,
   FormHelperText,
-  CircularProgress
+  CircularProgress,
+  Snackbar,
+  Alert
 } from '@mui/material';
+import { useSession } from '@/lib/auth-helpers';
+import type { Session, User } from '@/types/auth';
+import { createBrowserSupabaseClient } from '@/utils/supabase';
+
+// Define the extended user interface to match our custom fields
+interface ExtendedUser extends User {
+  // Make id required to match the Session.user.id requirement
+  id: string;
+  total_vacation_days?: number;
+  province?: string;
+  employment_type?: string;
+  week_starts_on?: string;
+}
+
+// Define the extended session interface that includes our custom user fields
+interface ExtendedSession extends Session {
+  user: ExtendedUser & {
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
+  };
+}
 
 const CANADIAN_PROVINCES = [
   { value: 'AB', label: 'Alberta' },
@@ -44,10 +67,12 @@ const WEEK_START_OPTIONS = [
 ];
 
 export default function UserSettings() {
-  const { data: session, update } = useSession();
+  const { data: session } = useSession();
   const router = useRouter();
   
   const [isSaving, setIsSaving] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [vacationDays, setVacationDays] = useState<number>(
     session?.user?.total_vacation_days || 14
   );
@@ -64,8 +89,28 @@ export default function UserSettings() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
+    setSuccessMessage(null);
+    setErrorMessage(null);
     
     try {
+      // Create Supabase client for updating user metadata
+      const supabase = createBrowserSupabaseClient();
+      
+      // Update user metadata in Supabase
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          total_vacation_days: vacationDays,
+          province,
+          employment_type: employmentType,
+          week_starts_on: weekStartsOn,
+        }
+      });
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      // Also update in our app's database if needed
       const response = await fetch('/api/user/settings', {
         method: 'PUT',
         headers: {
@@ -80,24 +125,14 @@ export default function UserSettings() {
       });
       
       if (!response.ok) {
-        throw new Error('Failed to update settings');
+        throw new Error('Failed to update settings in the database');
       }
       
-      // Update the session
-      await update({
-        ...session,
-        user: {
-          ...session?.user,
-          total_vacation_days: vacationDays,
-          province,
-          employment_type: employmentType,
-          week_starts_on: weekStartsOn,
-        },
-      });
-      
+      setSuccessMessage('Settings updated successfully');
       router.refresh();
     } catch (error) {
       console.error('Error saving settings:', error);
+      setErrorMessage(error instanceof Error ? error.message : 'Failed to update settings');
     } finally {
       setIsSaving(false);
     }
@@ -208,6 +243,26 @@ export default function UserSettings() {
           )}
         </Button>
       </form>
+      
+      <Snackbar 
+        open={!!successMessage} 
+        autoHideDuration={6000} 
+        onClose={() => setSuccessMessage(null)}
+      >
+        <Alert severity="success" onClose={() => setSuccessMessage(null)}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+      
+      <Snackbar 
+        open={!!errorMessage} 
+        autoHideDuration={6000} 
+        onClose={() => setErrorMessage(null)}
+      >
+        <Alert severity="error" onClose={() => setErrorMessage(null)}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
     </Box>
   );
-} 
+}

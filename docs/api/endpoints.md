@@ -2,19 +2,6 @@
 
 This document outlines the available API endpoints in the Vacation Tracker application.
 
-## Authentication
-
-### NextAuth Endpoints
-
-Base path: `/api/auth`
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| GET/POST | `/api/auth/signin` | Sign in page |
-| GET/POST | `/api/auth/callback/:provider` | OAuth callback URL |
-| GET/POST | `/api/auth/signout` | Sign out endpoint |
-| GET | `/api/auth/session` | Get current session information |
-
 ## Vacations
 
 ### Get User Vacations

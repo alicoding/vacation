@@ -1,17 +1,17 @@
-import type { AppProps } from 'next/app'
-import { SessionProvider } from 'next-auth/react'
+import type { AppProps } from 'next/app';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 
 // If you have a theme provider, import it here
 import ThemeRegistry from '../app/ThemeRegistry'; 
 
-function MyApp({ Component, pageProps: { session, ...pageProps } }: AppProps) {
+function MyApp({ Component, pageProps }: AppProps) {
   return (
-    <SessionProvider session={session}>
+    <AuthProvider>
       <ThemeRegistry>
         <Component {...pageProps} />
       </ThemeRegistry>
-    </SessionProvider>
-  )
+    </AuthProvider>
+  );
 }
 
-export default MyApp
+export default MyApp;

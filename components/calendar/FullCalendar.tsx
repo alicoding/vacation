@@ -10,7 +10,21 @@ import { styled } from '@mui/material/styles';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
-import { useSession } from 'next-auth/react';
+import { useSession } from '@/lib/auth-helpers';
+import type { Session } from '@/types/auth';
+
+// Extend the Session user type to include week_starts_on
+interface ExtendedUser {
+  id: string;
+  name?: string | null;
+  email?: string | null;
+  image?: string | null;
+  week_starts_on?: string;
+}
+
+interface ExtendedSession extends Session {
+  user: ExtendedUser;
+}
 
 // Styled components for the calendar
 const CalendarCell = styled(TableCell)(({ theme }) => ({
@@ -56,7 +70,6 @@ const DayNumber = styled(Typography)(({ theme }) => ({
 const EventChip = styled(Chip)(({ theme }) => ({
   marginBottom: theme.spacing(0.5),
   fontSize: '0.75rem',
-  height: 24,
 }));
 
 interface FullCalendarProps {
@@ -80,8 +93,8 @@ export default function FullCalendar({
   onNextMonth,
   onCurrentMonth
 }: FullCalendarProps) {
-  const { data: session } = useSession();
-  const weekStartsOn = session?.user?.week_starts_on || 'sunday';
+  const { data: session, status } = useSession();
+  const weekStartsOn = (session as ExtendedSession)?.user?.week_starts_on || 'sunday';
   
   // Generate calendar days
   const generateCalendarDays = () => {
@@ -283,4 +296,4 @@ export default function FullCalendar({
       )}
     </>
   );
-} 
+}

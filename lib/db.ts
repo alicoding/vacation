@@ -1,8 +1,8 @@
-"use client";
+'use client';
 
 /**
  * This file provides functions for client components to fetch data
- * instead of importing prisma directly which causes errors
+ * instead of importing Supabase directly which causes errors in client components
  */
 
 // Type for vacation bookings from your schema
