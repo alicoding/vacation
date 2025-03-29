@@ -44,7 +44,7 @@ export async function checkIsHoliday(date: Date, province: string): Promise<Holi
 export async function fetchHolidays(
   startDate: Date, 
   endDate: Date, 
-  province: string
+  province: string,
 ): Promise<Holiday[]> {
   if (!startDate || !endDate || !province) {
     throw new Error('Start date, end date, and province are required');
@@ -82,22 +82,51 @@ interface GetHolidaysInRangeProps {
 
 class HolidayClient {
   /**
+   * Get all holidays for a specific year
+   */
+  async getHolidaysForYear(year: number, province?: string): Promise<GlobalHoliday[]> {
+    try {
+      const url = new URL('/api/holidays', window.location.origin);
+      url.searchParams.append('year', year.toString());
+      if (province) {
+        url.searchParams.append('province', province);
+      }
+      
+      const response = await fetch(url.toString());
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch holidays');
+      }
+      
+      const data = await response.json();
+      return data;
+    } catch (error: any) {
+      console.error('Error fetching holidays for year:', error);
+      return [];
+    }
+  }
+
+  /**
    * Fetches holidays for a given date range
    */
   async getHolidaysInRange({ 
     startDate, 
     endDate, 
-    province 
+    province, 
   }: GetHolidaysInRangeProps): Promise<GlobalHoliday[]> {
     try {
-      const url = new URL('/api/holidays/range', window.location.origin);
-      url.searchParams.append('startDate', startDate);
-      url.searchParams.append('endDate', endDate);
-      if (province) {
-        url.searchParams.append('province', province);
-      }
-
-      const response = await fetch(url.toString());
+      // Use POST request with JSON body as expected by the server endpoint
+      const response = await fetch('/api/holidays/range', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          province,
+        }),
+      });
       
       if (!response.ok) {
         throw new Error('Failed to fetch holidays');

@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
+import { ensureUserRecord } from '@/lib/auth-helpers';
 
 export const runtime = 'edge';
 
@@ -13,27 +14,36 @@ export async function GET(request: NextRequest) {
   }
   
   try {
-    // Use the newer createServerClient with proper cookie handling
-    const cookieStore = cookies();
+    // Use cookies() with await as per Next.js 15 recommended pattern
+    const cookieStore = await cookies();
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       {
         cookies: {
-          get: async (name) => {
-            const cookie = (await cookieStore).get(name);
-            return cookie?.value;
+          get(name) {
+            return cookieStore.get(name)?.value;
           },
-          set: async (name, value, options) => {
-            // Await the cookie operation to fix the error
-            (await cookieStore).set(name, value, options);
+          set(name, value, options) {
+            try {
+              // Ensure sameSite is a string value required by cookie API
+              if (options?.sameSite === true) options.sameSite = 'strict';
+              if (options?.sameSite === false) options.sameSite = 'lax';
+              
+              cookieStore.set(name, value, options);
+            } catch (e) {
+              console.warn('Error setting cookie:', e);
+            }
           },
-          remove: async (name, options) => {
-            // Await the cookie operation to fix the error
-            (await cookieStore).set(name, '', { ...options, maxAge: 0 });
+          remove(name, options) {
+            try {
+              cookieStore.set(name, '', { ...options, maxAge: 0 });
+            } catch (e) {
+              console.warn('Error removing cookie:', e);
+            }
           },
         },
-      }
+      },
     );
     
     // Exchange the code for a session
@@ -52,7 +62,14 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/auth/signin?error=session_not_established', request.url));
     }
     
-    console.log('Auth successful, session established');
+    // Ensure user record exists in our database
+    await ensureUserRecord(
+      session.user.id,
+      session.user.email!,
+      session.user.user_metadata,
+    );
+    
+    console.log('Auth successful, session established for user:', session.user.email);
     
     // Get the callback URL or default to dashboard
     const callbackUrl = requestUrl.searchParams.get('callbackUrl') || '/dashboard';
@@ -65,7 +82,7 @@ export async function GET(request: NextRequest) {
     // URL to redirect to after sign in process completes
     return NextResponse.redirect(redirectUrl);
   } catch (error) {
-    console.error('Error in auth callback:', error);
-    return NextResponse.redirect(new URL('/auth/signin?error=unknown', request.url));
+    console.error('Unexpected error in auth callback:', error);
+    return NextResponse.redirect(new URL('/auth/signin?error=unexpected', request.url));
   }
 }

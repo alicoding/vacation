@@ -181,6 +181,38 @@ export type Database = {
           expires?: string
         }
       }
+      google_tokens: {
+        Row: {
+          id: string
+          user_id: string
+          access_token: string
+          refresh_token: string
+          token_type: string
+          scope: string
+          expires_at: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          access_token: string
+          refresh_token: string
+          token_type: string
+          scope: string
+          expires_at: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          access_token?: string
+          refresh_token?: string
+          token_type?: string
+          scope?: string
+          expires_at?: string
+          created_at?: string
+        }
+      }
     }
   }
-} 
+}

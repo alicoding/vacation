@@ -1,20 +1,22 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useSession } from '@/lib/auth-helpers'; // Updated import
-import { Container, Box } from '@mui/material';
+import { useSession } from '@/lib/auth-helpers';
+import { Container, Box, Typography, Paper, Divider } from '@mui/material';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
 import FullCalendar from '@/components/calendar/FullCalendar';
 import CalendarLegend from '@/components/calendar/CalendarLegend';
+import GoogleCalendarSync from '@/features/calendar/GoogleCalendarSync';
 
 export default function CalendarPage() {
-  const { data: session } = useSession(); // Using our Supabase compatible hook
+  const { data: session } = useSession();
   const [currentDate, setCurrentDate] = useState(DateTime.local());
   const [vacations, setVacations] = useState<VacationBooking[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState(false);
 
   // Fetch vacations and holidays
   useEffect(() => {
@@ -50,22 +52,45 @@ export default function CalendarPage() {
     fetchData();
   }, [currentDate.year]);
 
+  // Fetch user calendar sync preferences
+  useEffect(() => {
+    async function fetchUserSettings() {
+      if (!session) return;
+      
+      try {
+        const response = await fetch('/api/user');
+        if (response.ok) {
+          const userData = await response.json();
+          setCalendarSyncEnabled(userData.calendar_sync_enabled || false);
+        }
+      } catch (error) {
+        console.error('Error fetching user settings:', error);
+      }
+    }
+    
+    fetchUserSettings();
+  }, [session]);
+
   // Navigation functions
   const goToPreviousMonth = () => {
-    setCurrentDate(prev => prev.minus({ months: 1 }));
+    setCurrentDate((prev) => prev.minus({ months: 1 }));
   };
 
   const goToNextMonth = () => {
-    setCurrentDate(prev => prev.plus({ months: 1 }));
+    setCurrentDate((prev) => prev.plus({ months: 1 }));
   };
 
   const goToCurrentMonth = () => {
     setCurrentDate(DateTime.local());
   };
 
+  const handleToggleCalendarSync = (enabled: boolean) => {
+    setCalendarSyncEnabled(enabled);
+  };
+
   return (
     <Container maxWidth="xl">
-      <Box my={4}>
+      <Box my={4}>        
         <FullCalendar 
           currentDate={currentDate}
           vacations={vacations}
@@ -76,7 +101,20 @@ export default function CalendarPage() {
           onNextMonth={goToNextMonth}
           onCurrentMonth={goToCurrentMonth}
         />
-        <CalendarLegend />
+        
+        <Box display="flex" justifyContent="space-between" mt={4} gap={2}>
+          <Box sx={{ flex: 1 }}>
+            <CalendarLegend />
+          </Box>
+          <Box sx={{ flex: 1, maxWidth: '400px' }}>
+            <Paper elevation={1}>
+              <GoogleCalendarSync 
+                enabled={calendarSyncEnabled} 
+                onToggle={handleToggleCalendarSync} 
+              />
+            </Paper>
+          </Box>
+        </Box>
       </Box>
     </Container>
   );

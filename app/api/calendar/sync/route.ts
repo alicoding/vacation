@@ -1,93 +1,159 @@
 export const runtime = 'edge';
-
 import { NextRequest, NextResponse } from 'next/server';
 import { createDirectClient } from '@/utils/supabase';
-import { GoogleCalendarService } from '@/lib/services/googleCalendar';
+import { getGoogleToken, syncVacationToCalendar } from '@/utils/googleCalendar';
 
 export async function POST(request: NextRequest) {
-  // Get the session directly from Supabase
+  // Get the authenticated user using getUser() for better security
   const supabase = createDirectClient();
-  const { data: { session } } = await supabase.auth.getSession();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
   
-  if (!session?.user?.email) {
+  if (authError || !user) {
     return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
   }
-
+  
   try {
     const body = await request.json();
     const { enabled } = body;
-
-    // Get the user's Google OAuth2 tokens
-    const { data: account, error: accountError } = await supabase
-      .from('accounts')
-      .select('*')
-      .eq('provider', 'google')
-      .eq('user_email', session.user.email)
-      .single();
-
-    if (accountError || !account) {
-      return NextResponse.json({ message: 'Google account not connected' }, { status: 400 });
-    }
-
+    
     // Update user's sync preferences
     const { error: updateError } = await supabase
       .from('users')
       .update({ calendar_sync_enabled: enabled })
-      .eq('email', session.user.email);
-
+      .eq('id', user.id);
+      
     if (updateError) {
       throw updateError;
     }
-
+    
+    // If calendar sync is being enabled, sync all vacations
     if (enabled) {
-      // Initialize Google Calendar service with the user's access token
-      const googleCalendar = new GoogleCalendarService(account.access_token);
-
-      // Get user's vacation bookings that don't have a Google Calendar event yet
+      // Verify Google token exists and is valid
+      const token = await getGoogleToken(user.id);
+      
+      if (!token) {
+        return NextResponse.json(
+          { message: 'Google Calendar access not authorized. Please reconnect your Google account.' }, 
+          { status: 400 },
+        );
+      }
+      
+      // Get user's vacation bookings that need to be synced
+      // Either they don't have a Google event ID yet or sync failed previously
       const { data: vacations, error: vacationsError } = await supabase
         .from('vacation_bookings')
         .select('*')
-        .eq('user_email', session.user.email)
-        .is('google_event_id', null);
-
+        .eq('user_id', user.id)
+        .or('google_event_id.is.null,sync_status.eq.failed');
+        
       if (vacationsError) {
         throw vacationsError;
       }
-
+      
+      // Track successful and failed syncs
+      const results = {
+        total: vacations?.length || 0,
+        successful: 0,
+        failed: 0,
+      };
+      
       // Sync each vacation booking to Google Calendar
-      for (const vacation of vacations || []) {
-        const eventData = {
-          summary: 'Vacation',
-          description: vacation.note || 'Vacation day',
-          start: {
-            date: new Date(vacation.start_date).toISOString().split('T')[0],
-            timeZone: 'UTC',
-          },
-          end: {
-            date: new Date(vacation.end_date).toISOString().split('T')[0],
-            timeZone: 'UTC',
-          },
-        };
-
-        const event = await googleCalendar.insertEvent('primary', eventData);
-
-        // Store the Google Calendar event ID
-        if (event.id) {
-          const { error: updateEventError } = await supabase
-            .from('vacation_bookings')
-            .update({ google_event_id: event.id })
-            .eq('id', vacation.id);
+      if (vacations && vacations.length > 0) {
+        for (const vacation of vacations) {
+          try {
+            const eventId = await syncVacationToCalendar(user.id, vacation);
             
-          if (updateEventError) {
-            console.error('Failed to update vacation with Google event ID:', updateEventError);
+            if (eventId) {
+              results.successful++;
+            } else {
+              results.failed++;
+            }
+          } catch (error) {
+            console.error(`Failed to sync vacation ${vacation.id}:`, error);
+            results.failed++;
           }
         }
       }
+      
+      return NextResponse.json({ 
+        message: 'Calendar sync settings updated',
+        results,
+      }, { status: 200 });
     }
-
-    return NextResponse.json({ message: 'Calendar sync settings updated' }, { status: 200 });
+    
+    // If disabling sync, we don't delete any events, just update the preference
+    return NextResponse.json({ 
+      message: 'Calendar sync settings updated',
+      enabled: false,
+    }, { status: 200 });
   } catch (error) {
     console.error('Calendar sync error:', error);
-    return NextResponse.json({ message: 'Failed to sync calendar' }, { status: 500 });
+    return NextResponse.json({ 
+      message: 'Failed to sync calendar',
+      error: (error as Error).message, 
+    }, { status: 500 });
+  }
+}
+
+/**
+ * Endpoint for manually syncing a specific vacation
+ */
+export async function PATCH(request: NextRequest) {
+  const supabase = createDirectClient();
+  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  
+  if (authError || !user) {
+    return NextResponse.json({ message: 'Not authenticated' }, { status: 401 });
+  }
+  
+  try {
+    const body = await request.json();
+    const { vacationId } = body;
+    
+    if (!vacationId) {
+      return NextResponse.json({ message: 'Vacation ID is required' }, { status: 400 });
+    }
+    
+    // Verify Google token exists and is valid
+    const token = await getGoogleToken(user.id);
+    
+    if (!token) {
+      return NextResponse.json(
+        { message: 'Google Calendar access not authorized. Please reconnect your Google account.' }, 
+        { status: 400 },
+      );
+    }
+    
+    // Get the specific vacation
+    const { data: vacation, error: vacationError } = await supabase
+      .from('vacation_bookings')
+      .select('*')
+      .eq('id', vacationId)
+      .eq('user_id', user.id)
+      .single();
+      
+    if (vacationError) {
+      return NextResponse.json({ message: 'Vacation not found' }, { status: 404 });
+    }
+    
+    // Sync the vacation to Google Calendar
+    const eventId = await syncVacationToCalendar(user.id, vacation);
+    
+    if (eventId) {
+      return NextResponse.json({ 
+        message: 'Vacation synced successfully',
+        eventId,
+      }, { status: 200 });
+    } else {
+      return NextResponse.json({ 
+        message: 'Failed to sync vacation',
+      }, { status: 500 });
+    }
+  } catch (error) {
+    console.error('Manual vacation sync error:', error);
+    return NextResponse.json({ 
+      message: 'Failed to sync vacation',
+      error: (error as Error).message, 
+    }, { status: 500 });
   }
 }

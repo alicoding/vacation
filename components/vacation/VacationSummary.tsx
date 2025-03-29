@@ -15,7 +15,7 @@ import { format, differenceInBusinessDays, isWeekend, eachDayOfInterval } from '
 import { 
   Box, Typography, Paper, Divider, 
   Table, TableBody, TableCell, TableContainer, 
-  TableRow, Chip, Alert
+  TableRow, Chip, Alert,
 } from '@mui/material';
 
 interface VacationSummaryProps {
@@ -42,11 +42,11 @@ export default function VacationSummary({ startDate, endDate, isHalfDay, halfDay
     const allDays = eachDayOfInterval({ start: startDate, end: endDate });
     const totalDays = allDays.length;
     
-    const weekendDays = allDays.filter(day => isWeekend(day)).length;
-    const holidayDays = allDays.filter(day => 
-      holidays.some(holiday => 
-        format(holiday.date, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
-      )
+    const weekendDays = allDays.filter((day) => isWeekend(day)).length;
+    const holidayDays = allDays.filter((day) => 
+      holidays.some((holiday) => 
+        format(holiday.date, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'),
+      ),
     ).length;
 
     const businessDays = differenceInBusinessDays(endDate, startDate) + 1;
@@ -58,12 +58,12 @@ export default function VacationSummary({ startDate, endDate, isHalfDay, halfDay
       weekendDays,
       holidayDays,
       workingDays: workingDaysCalculated,
-      actualVacationDays: Number(actualVacationDays.toFixed(1)) // Fix decimal display
+      actualVacationDays: Number(actualVacationDays.toFixed(1)), // Fix decimal display
     };
   }, [startDate, endDate, isHalfDay, holidays]);
 
   const holidaysInRange = useMemo(() => {
-    return holidays.filter(holiday => {
+    return holidays.filter((holiday) => {
       const holidayDate = format(holiday.date, 'yyyy-MM-dd');
       return holidayDate >= format(startDate, 'yyyy-MM-dd') && 
              holidayDate <= format(endDate, 'yyyy-MM-dd');

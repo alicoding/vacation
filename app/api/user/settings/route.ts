@@ -45,7 +45,7 @@ export async function PUT(request: NextRequest) {
     
     // Update Supabase user metadata
     const { error: updateError } = await supabase.auth.updateUser({
-      data: body
+      data: body,
     });
     
     if (updateError) {

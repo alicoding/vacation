@@ -6,12 +6,9 @@
   "description": "## Project Overview Develop a fully responsive Vacation Tracker app using Next.js with TypeScript, deployable on Render.com's Free Tier. The app will track vacation days, automatically integrate holidays, and visually indicate extended weekends and adjacent holidays to help users maximize vacation planning.",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint --fix \"app/**/*.{js,jsx,ts,tsx}\" \"components/**/*.{js,jsx,ts,tsx}\" \"lib/**/*.{js,jsx,ts,tsx}\" \"pages/**/*.{js,jsx,ts,tsx}\" \"features/**/*.{js,jsx,ts,tsx}\" \"services/**/*.{js,jsx,ts,tsx}\" \"types/**/*.{js,jsx,ts,tsx}\" \"middleware.ts\" || eslint --config .eslintrc.cjs --fix \"app/**/*.{js,jsx,ts,tsx}\" \"components/**/*.{js,jsx,ts,tsx}\" \"lib/**/*.{js,jsx,ts,tsx}\" \"pages/**/*.{js,jsx,ts,tsx}\" \"features/**/*.{js,jsx,ts,tsx}\" \"services/**/*.{js,jsx,ts,tsx}\" \"types/**/*.{js,jsx,ts,tsx}\" \"middleware.ts\"",
-    "deploy": "npm run build && npx @cloudflare/next-on-pages && wrangler deploy",
-    "test": "jest"
+    "lint": "eslint --fix .",
+    "type-check": "tsc --noEmit",
+    "validate": "npm run lint && npm run type-check"
   },
   "keywords": [],
   "author": "",
@@ -48,19 +45,20 @@
   "devDependencies": {
     "@cloudflare/next-on-pages": "^1.9.0",
     "@eslint/eslintrc": "^3.0.0",
-    "@eslint/js": "^9.0.0",
+    "@eslint/js": "^9.23.0",
+    "@next/eslint-plugin-next": "^15.2.4",
     "@types/node": "^22.13.11",
     "@types/react": "^19.0.12",
     "@types/react-dom": "^19.0.4",
-    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/eslint-plugin": "^8.28.0",
     "@typescript-eslint/parser": "^6.21.0",
     "autoprefixer": "^10.4.16",
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.3",
-    "eslint-plugin-react": "^7.34.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react": "^7.37.4",
+    "eslint-plugin-react-hooks": "^5.2.0-canary-4280563b-20250326",
     "tailwindcss": "^3.4.1",
-    "typescript": "5.5.3",
+    "typescript": "5.8.2",
     "wrangler": "^4.4.0"
   }
 }

@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Unauthorized' },
-        { status: 401 }
+        { status: 401 },
       );
     }
     
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
     if (!body.startDate || !body.endDate) {
       return NextResponse.json(
         { error: 'Start date and end date are required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
     if (isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
       return NextResponse.json(
         { error: 'Invalid date format' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
     if (startDate > endDate) {
       return NextResponse.json(
         { error: 'Start date must be before end date' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
       endDate,
       body.note || null,
       body.isHalfDay || false,
-      body.halfDayPortion || null
+      body.halfDayPortion || null,
     );
     
     return NextResponse.json(booking, { status: 201 });
@@ -73,13 +73,13 @@ export async function POST(req: NextRequest) {
     if (error.code === 'OVERLAPPING_BOOKING') {
       return NextResponse.json(
         { error: error.message },
-        { status: 409 }
+        { status: 409 },
       );
     }
     
     return NextResponse.json(
       { error: 'Failed to create vacation booking' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -131,7 +131,7 @@ export async function GET(req: NextRequest) {
     console.error('Error fetching vacations:', error);
     return NextResponse.json(
       { error: 'Failed to fetch vacations' },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

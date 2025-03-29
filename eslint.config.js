@@ -1,92 +1,102 @@
-import { fileURLToPath } from 'node:url';
 import js from '@eslint/js';
-import { FlatCompat } from '@eslint/eslintrc';
+import reactPlugin from 'eslint-plugin-react';
+import reactHooksPlugin from 'eslint-plugin-react-hooks';
+import typescriptEslint from '@typescript-eslint/eslint-plugin';
+import typescriptParser from '@typescript-eslint/parser';
 import nextPlugin from '@next/eslint-plugin-next';
 
-// Determine directories
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-
-// Create the compatibility layer
-const compat = new FlatCompat({
-  baseDirectory: __dirname,
-  recommendedConfig: js.configs.recommended,
-  allConfig: js.configs.all
-});
-
 export default [
-  // Global ignores
+  js.configs.recommended,
   {
+    // Global ignores and settings
     ignores: [
+      'node_modules/**',
       '.next/**',
       'out/**',
+      'public/**',
       'dist/**',
-      'build/**',
-      'node_modules/**',
-      '.turbo/**',
-      '.vercel/**',
-      '.cloudflare/**',
-      '.wrangler/**',
-      'coverage/**',
-      'cypress/**',
-      'tests/**',
-      'next.config.js',
-      'postcss.config.js',
-      'tailwind.config.js',
-      'jest.config.js',
-      '*.config.js',
-      '*.config.cjs',
-      '*.config.mjs'
-    ]
+      '**/*.d.ts',
+    ],
   },
-
-  // Next.js plugin config
+  // TypeScript and React files
   {
-    plugins: {
-      '@next/next': nextPlugin
-    },
-    settings: {
-      next: {
-        rootDir: __dirname,
+    files: ['**/*.{ts,tsx,js,jsx}'],
+    languageOptions: {
+      ecmaVersion: 'latest',
+      sourceType: 'module',
+      parser: typescriptParser,
+      parserOptions: {
+        ecmaFeatures: { jsx: true },
+        project: './tsconfig.json',  // Point to your TypeScript config
+        tsconfigRootDir: '.',
+      },
+      globals: {
+        React: 'readonly',
+        JSX: 'readonly',
+        process: 'readonly',
+        console: 'readonly',
+        fetch: 'readonly',
+        URLSearchParams: 'readonly',
+        RequestInit: 'readonly',
+        Headers: 'readonly',
+        Response: 'readonly',
+        HeadersInit: 'readonly',
+        URL: 'readonly',
+        // Add browser globals
+        window: 'readonly',
+        document: 'readonly',
+        localStorage: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        AbortController: 'readonly',
+        HTMLElement: 'readonly',
+        HTMLDivElement: 'readonly',
+        SVGSVGElement: 'readonly',
       },
     },
-    rules: {
-      '@next/next/no-html-link-for-pages': 'error',
+    plugins: {
+      react: reactPlugin,
+      '@typescript-eslint': typescriptEslint,
+      'react-hooks': reactHooksPlugin,
+      '@next/next': nextPlugin,
     },
-  },
-
-  // Import the legacy configuration - it's more robust for your needs
-  ...compat.extends('.eslintrc.cjs'),
-  
-  // Override some rules for development
-  {
     rules: {
-      // Allow console statements in development
-      'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
-      
-      // Prefix unused variables with underscore
+      // TypeScript specific rules
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/explicit-module-boundary-types': 'off',
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-unused-vars': ['warn', { 
         argsIgnorePattern: '^_',
         varsIgnorePattern: '^_',
-        caughtErrorsIgnorePattern: '^_'
+        ignoreRestSiblings: true, 
       }],
+      '@typescript-eslint/no-unsafe-declaration-merging': 'off',
       
-      // Allow 'any' with a warning rather than error
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // React specific rules
+      'react/react-in-jsx-scope': 'off', 
+      'react/prop-types': 'off',
+      'react-hooks/rules-of-hooks': 'error',
+      'react-hooks/exhaustive-deps': 'warn',
       
-      // Handle React JSX escaping
-      'react/no-unescaped-entities': ['error', {
-        forbid: [
-          {
-            char: '>',
-            alternatives: ['&gt;']
-          },
-          {
-            char: '}',
-            alternatives: ['&#125;']
-          }
-        ]
-      }]
-    }
-  }
+      // General code style
+      'quotes': ['error', 'single'],
+      'semi': ['error', 'always'],
+      'indent': ['error', 2],
+      'comma-dangle': ['error', 'always-multiline'],
+      'arrow-parens': ['error', 'always'],
+      'no-console': ['warn', { allow: ['warn', 'error'] }],
+      
+      // Next.js specific
+      '@next/next/no-img-element': 'off',
+      
+      // Override core rules that conflict with TypeScript
+      'no-unused-vars': 'off', // Use TypeScript's version instead
+      'no-undef': 'off', // TypeScript handles this for us
+    },
+    settings: {
+      react: {
+        version: 'detect',
+      },
+    },
+  },
 ];

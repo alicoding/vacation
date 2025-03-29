@@ -3,18 +3,16 @@ export const runtime = 'edge';
 import { supabase } from '@/lib/supabase';
 import VacationStatsCard from '@/components/dashboard/VacationStatsCard';
 import UpcomingVacationsCard from '@/components/dashboard/UpcomingVacationsCard';
-import HolidayOverviewCard from '@/components/dashboard/HolidayOverviewCard';
-import HolidaySyncCard from '@/components/dashboard/HolidaySyncCard';
 import Link from 'next/dist/client/app-dir/link';
 import { 
-  Box, Typography, Grid, Paper, Container, Button 
+  Box, Typography, Grid, Paper, Container, Button, 
 } from '@mui/material';
 import { VacationBooking } from '@/types';
-import { DateTime, Interval } from 'luxon';
-import { getHolidays } from '@/services/holiday/holidayService';
 import { getVacationDaysUsed } from '@/services/vacation/vacationService';
 import { getServerSession } from '@/lib/auth-helpers';
-import { redirect } from 'next/navigation';
+import { cookies } from 'next/headers';
+import { createServerClient } from '@supabase/ssr';
+import type { Database } from '@/types/supabase';
 
 interface UserData {
   name: string | null;
@@ -26,8 +24,28 @@ interface UserData {
 
 async function getUserData(userId: string): Promise<UserData | null> {
   try {
-    // Get user data from Supabase Auth
-    const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(userId);
+    // Create a Supabase client that can be used server-side
+    const cookieStore = await cookies();
+    const supabase = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name, value, options) {
+            cookieStore.set(name, value, options);
+          },
+          remove(name, options) {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          },
+        },
+      },
+    );
+
+    // Get user data directly from the authenticated user
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
     
     if (userError || !user) {
       console.error('Error fetching user:', userError);
@@ -73,39 +91,81 @@ async function getUserData(userId: string): Promise<UserData | null> {
 
 // Update the getVacationBalance function to match the table structure
 async function getVacationBalance(userId: string, province: string) {
-  // Get current year
-  const currentYear = new Date().getFullYear();
-  
-  // Get used vacation days for current year
-  const usedDays = await getVacationDaysUsed(userId, currentYear);
-  
-  // Get user's total vacation days from their metadata
-  const { data: { user }, error: userError } = await supabase.auth.admin.getUserById(userId);
-  
-  if (userError) {
-    console.error('Error fetching user data for vacation balance:', userError);
+  try {
+    // Create a Supabase client that can be used server-side
+    const cookieStore = await cookies();
+    const supabase = createServerClient<Database>(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        cookies: {
+          get(name) {
+            return cookieStore.get(name)?.value;
+          },
+          set(name, value, options) {
+            cookieStore.set(name, value, options);
+          },
+          remove(name, options) {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          },
+        },
+      },
+    );
+    
+    // Get current year
+    const currentYear = new Date().getFullYear();
+    
+    // Get used vacation days for current year
+    const usedDays = await getVacationDaysUsed(userId, currentYear);
+    
+    // Get user metadata directly with getUser
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    
+    if (userError || !user) {
+      console.error('Error fetching user data for vacation balance:', userError);
+      return { total: 20, used: usedDays, remaining: 20 - usedDays }; // Default
+    }
+    
+    const totalDays = user.user_metadata?.total_vacation_days || 20; // Default to 20 days
+    
+    // Calculate remaining days
+    const remainingDays = Math.max(0, totalDays - usedDays);
+    
+    return {
+      total: totalDays,
+      used: usedDays,
+      remaining: remainingDays,
+    };
+  } catch (error) {
+    console.error('Error calculating vacation balance:', error);
+    return { total: 20, used: 0, remaining: 20 }; // Default fallback
   }
-  
-  const totalDays = user?.user_metadata?.total_vacation_days || 20; // Default to 20 days
-  
-  // Calculate remaining days
-  const remainingDays = Math.max(0, totalDays - usedDays);
-  
-  return {
-    total: totalDays,
-    used: usedDays,
-    remaining: remainingDays
-  };
 }
 
 export default async function DashboardPage() {
   // Get user session
   const session = await getServerSession();
   
-  // Check if session exists - add this protection as a fallback
+  // Trust that middleware has already handled authentication
+  // If somehow we get here without a session, show a helpful message instead of redirecting
   if (!session || !session.user) {
-    redirect('/auth/signin');
-    return null; // This line is never reached, but helps TypeScript
+    return (
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h4" component="h1" gutterBottom>
+          Session Error
+        </Typography>
+        <Typography paragraph>
+          Unable to verify your session. Please try signing in again.
+        </Typography>
+        <Button 
+          component={Link} 
+          href="/auth/signin" 
+          variant="contained"
+        >
+          Sign In
+        </Button>
+      </Box>
+    );
   }
   
   // Now safely use session.user.id since we've confirmed it exists
@@ -154,7 +214,7 @@ export default async function DashboardPage() {
   const vacationStats = {
     total: vacationBalance.total,
     used: vacationBalance.used,
-    remaining: vacationBalance.remaining
+    remaining: vacationBalance.remaining,
   };
   
   return (
@@ -192,7 +252,7 @@ export default async function DashboardPage() {
                 <Button 
                   variant="contained" 
                   component={Link} 
-                  href="/dashboard/request" 
+                  href="/dashboard/vacations" 
                   fullWidth
                 >
                   Request Vacation

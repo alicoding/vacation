@@ -32,8 +32,8 @@ const theme = createTheme({
         success: {
           main: '#10b981',
         },
-      }
-    }
+      },
+    },
   },
   typography: {
     fontFamily: [

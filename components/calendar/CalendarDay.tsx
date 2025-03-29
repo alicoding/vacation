@@ -14,7 +14,7 @@ const DayContainer = styled(Box, {
     prop !== 'isHoliday' && 
     prop !== 'isVacation' &&
     prop !== 'holidayType' &&
-    prop !== 'isHalfDay'
+    prop !== 'isHalfDay',
 })<{
   isWeekend?: boolean;
   isCurrentMonth?: boolean;
@@ -31,7 +31,7 @@ const DayContainer = styled(Box, {
   isHoliday, 
   isVacation,
   holidayType,
-  isHalfDay
+  isHalfDay,
 }) => ({
   height: '100%',
   width: '100%',
@@ -65,7 +65,7 @@ const DayContainer = styled(Box, {
       backgroundColor: theme.palette.success.light + '33', 
       zIndex: 0,
       pointerEvents: 'none',
-    }
+    },
   }),
   // Half-day vacation styling
   ...(isVacation && isHalfDay && {
@@ -79,8 +79,8 @@ const DayContainer = styled(Box, {
       background: `linear-gradient(135deg, ${theme.palette.success.light}33 50%, transparent 50%)`,
       zIndex: 0,
       pointerEvents: 'none',
-    }
-  })
+    },
+  }),
 }));
 
 const DayNumber = styled(Typography)(({ theme }) => ({
@@ -123,7 +123,7 @@ export default function CalendarDay({
   day, 
   currentMonth, 
   vacations, 
-  holiday 
+  holiday, 
 }: CalendarDayProps) {
   // Helper functions
   const isWeekend = day.weekday > 5; // 6 = Saturday, 7 = Sunday in Luxon
@@ -131,10 +131,10 @@ export default function CalendarDay({
   const isToday = day.hasSame(DateTime.local(), 'day');
   
   // Check if any vacation is a half-day
-  const isHalfDay = vacations.some(vacation => vacation.is_half_day);
+  const isHalfDay = vacations.some((vacation) => vacation.is_half_day);
   
   // Get the half-day portion if applicable
-  const halfDayPortion = isHalfDay && vacations.find(v => v.is_half_day)?.half_day_portion;
+  const halfDayPortion = isHalfDay && vacations.find((v) => v.is_half_day)?.half_day_portion;
   
   // Holiday type for color coding
   const holidayType = holiday?.type || null;

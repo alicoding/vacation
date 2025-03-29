@@ -41,6 +41,6 @@ export async function getVacationBookings(): Promise<any[]> {
     ...booking,
     startDate: new Date(booking.start_date),
     endDate: new Date(booking.end_date),
-    createdAt: booking.created_at ? new Date(booking.created_at) : undefined
+    createdAt: booking.created_at ? new Date(booking.created_at) : undefined,
   }));
 }

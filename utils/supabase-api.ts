@@ -7,27 +7,42 @@ import type { Database } from '@/types/supabase';
  * for Edge runtime compatibility
  */
 export async function createApiClient() {
-    const cookieStore = await cookies();
-    
-    return createServerClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-        {
-            cookies: {
-                getAll: async () => {
-                    return cookieStore.getAll().map(cookie => ({
-                        name: cookie.name,
-                        value: cookie.value,
-                    }));
-                },
-                setAll: async (cookieStrings) => {
-                    cookieStrings.forEach(cookie => {
-                        cookieStore.set(cookie.name, cookie.value, cookie.options);
-                    });
-                }
-            },
-        }
-    );
+  const cookieStore = await cookies();
+  
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          try {
+            return cookieStore.get(name)?.value;
+          } catch (e) {
+            console.warn('Error getting cookie in API context:', e);
+            return undefined;
+          }
+        },
+        set(name, value, options) {
+          try {
+            // Ensure sameSite is a string value as required by Cookie API
+            if (options?.sameSite === true) options.sameSite = 'strict';
+            if (options?.sameSite === false) options.sameSite = 'lax';
+            
+            cookieStore.set(name, value, options);
+          } catch (e) {
+            console.warn('Error setting cookie in API context:', e);
+          }
+        },
+        remove(name, options) {
+          try {
+            cookieStore.set(name, '', { ...options, maxAge: 0 });
+          } catch (e) {
+            console.warn('Error removing cookie in API context:', e);
+          }
+        },
+      },
+    },
+  );
 }
 
 /**
@@ -35,14 +50,19 @@ export async function createApiClient() {
  * Returns the authenticated user if present, or throws an error if not
  */
 export async function requireAuth() {
-    const supabase = await createApiClient();
-    
-    // Use getUser() instead of getSession() for better security
-    const { data: { user }, error } = await supabase.auth.getUser();
-    
-    if (error || !user) {
-        throw new Error('Not authenticated');
-    }
-    
-    return { supabase, user };
+  const supabase = await createApiClient();
+  
+  // Use getUser() instead of getSession() for better security as recommended by Supabase
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  
+  if (userError) {
+    console.error('Error getting authenticated user:', userError);
+    throw new Error('Authentication error');
+  }
+  
+  if (!user) {
+    throw new Error('Not authenticated');
+  }
+  
+  return { supabase, user };
 }

@@ -11,7 +11,7 @@ interface HolidaySyncCardProps {
 
 const HolidaySyncCard: React.FC<HolidaySyncCardProps> = ({ 
   userProvince,
-  employmentType = 'standard'
+  employmentType = 'standard',
 }) => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);

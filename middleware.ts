@@ -1,5 +1,5 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
+import { NextRequest, NextResponse } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
 
 export const config = {
   matcher: [
@@ -10,12 +10,11 @@ export const config = {
      * - favicon.ico (favicon file)
      * - images/* (image files stored in the public folder)
      * - public/* (public files)
-     * - /auth/* (auth routes)
      * - /api/* (API routes)
      */
-    '/((?!_next/static|_next/image|favicon.ico|images|public|auth|api).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|public|api).*)',
   ],
-}
+};
 
 export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
@@ -26,68 +25,90 @@ export async function middleware(req: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        get: async (name) => {
-          return req.cookies.get(name)?.value
+        get(name) {
+          return req.cookies.get(name)?.value;
         },
-        set: async (name, value, options) => {
-          res.cookies.set({ name, value, ...options })
+        set(name, value, options) {
+          res.cookies.set({
+            name,
+            value,
+            ...options,
+          });
         },
-        remove: async (name, options) => {
-          res.cookies.set({ name, value: '', ...options, maxAge: 0 })
+        remove(name, options) {
+          res.cookies.set({
+            name,
+            value: '',
+            ...options,
+            maxAge: 0,
+          });
         },
       },
-    }
-  )
+    },
+  );
 
   try {
     // Get the current path - we'll use this to prevent unnecessary redirects
-    const path = req.nextUrl.pathname
+    const path = req.nextUrl.pathname;
     
     // Check if this is a post-authentication redirect from the callback
-    const isAuthSuccess = req.nextUrl.searchParams.get('auth_success') === 'true'
-    if (isAuthSuccess) {
-      // Coming directly from authentication, remove the query param and proceed
-      const cleanUrl = new URL(req.url)
-      cleanUrl.searchParams.delete('auth_success')
+    if (req.nextUrl.searchParams.has('auth_success')) {
+      // Remove the parameter and proceed to prevent redirect loops
+      req.nextUrl.searchParams.delete('auth_success');
+      return NextResponse.redirect(req.nextUrl);
+    }
+    
+    // Get redirect count from cookies to prevent infinite loops
+    const redirectCount = parseInt(req.cookies.get('auth_redirect_count')?.value || '0');
+    
+    // Safety check: if we're redirecting too many times, reset and allow the user through
+    if (redirectCount > 3) {
+      console.warn('Too many auth redirects detected, resetting count and allowing access');
+      res.cookies.set('auth_redirect_count', '0', { path: '/', maxAge: 0 });
+      return res;
+    }
+    
+    // Use getUser() for better security as recommended by Supabase
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    // Add debug log to help troubleshoot authentication issues
+    console.log('Auth check in middleware:', { 
+      path, 
+      hasUser: !!user, 
+      userEmail: user?.email || 'none',
+      redirectCount,
+    });
+    
+    // Handle public routes for authenticated users
+    if (user && !authError) {
+      // If user is authenticated and visiting home page or signin page, redirect to dashboard
+      if (path === '/' || path === '/auth/signin') {
+        console.log('Authenticated user accessing public route, redirecting to dashboard');
+        return NextResponse.redirect(new URL('/dashboard', req.url));
+      }
       
-      // Just clean up the URL without doing auth checks
-      console.log('Post-authentication redirect detected, cleaning URL')
-      return NextResponse.redirect(cleanUrl)
+      // Reset redirect count when a valid user is found
+      res.cookies.set('auth_redirect_count', '0', { path: '/', maxAge: 0 });
+      return res;
     }
     
-    // Check for potential redirect loop by detecting repeated redirects
-    const redirectCount = parseInt(req.nextUrl.searchParams.get('redirectCount') || '0')
-    if (redirectCount > 2) {
-      console.warn('Detected potential redirect loop, allowing request to proceed', { path })
-      return res
-    }
-    
-    // Get auth state and session
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    // If there's no session and the user is trying to access a protected route,
+    // If there's no authenticated user and the user is trying to access a protected route,
     // redirect to the sign-in page
-    if (!session && !path.startsWith('/auth/')) {
-      console.log('No session detected, redirecting to sign-in', { path })
-      const redirectUrl = new URL('/auth/signin', req.url)
-      redirectUrl.searchParams.set('callbackUrl', path)
-      redirectUrl.searchParams.set('redirectCount', (redirectCount + 1).toString())
-      return NextResponse.redirect(redirectUrl)
+    if ((!user || authError) && path !== '/' && !path.startsWith('/auth/')) {
+      console.log('No authenticated user detected, redirecting to sign-in', { path });
+      
+      // Increment the redirect count and store it in a cookie
+      res.cookies.set('auth_redirect_count', (redirectCount + 1).toString(), { 
+        path: '/',
+        maxAge: 30, // Short expiry to avoid persistent issues
+      });
+      
+      return NextResponse.redirect(new URL('/auth/signin', req.url));
     }
     
-    // If the user is authenticated and trying to access the auth route,
-    // redirect to the dashboard
-    if (session && path.startsWith('/auth/signin')) {
-      console.log('Session detected, redirecting to dashboard', { path })
-      const dashboardUrl = new URL('/dashboard', req.url)
-      dashboardUrl.searchParams.set('redirectCount', (redirectCount + 1).toString())
-      return NextResponse.redirect(dashboardUrl)
-    }
-    
-    return res
+    return res;
   } catch (error) {
-    console.error('Middleware error:', error)
-    // In case of an error, proceed without redirecting
-    return res
+    console.error('Error in auth middleware:', error);
+    return res;
   }
 }

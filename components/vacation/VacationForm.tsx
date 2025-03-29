@@ -2,48 +2,47 @@
  * VacationForm Component for booking vacations.
  *
  * This component provides a form for users to select a start date, end date,
- * and add an optional note when booking a vacation. It integrates with
- * the `react-hook-form` library for form management and uses Material-UI
- * components for the user interface.  It also prevents booking on weekends
- * and bank holidays.
- *
- * @param {VacationFormProps} props - The properties passed to the component.
- * @returns {JSX.Element} A form for booking vacations.
+ * and add an optional note when booking a vacation.
  */
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { 
-  TextField, Button, Alert, Box, Typography,
-  FormControlLabel, Checkbox, FormHelperText, 
-  Stack, InputLabel, Paper, Grid, Dialog, Tooltip
+  TextField, Button, Alert, Box, Container, 
+  FormHelperText, Grid, Paper, Typography,
+  InputAdornment, IconButton, Popover, CircularProgress,
 } from '@mui/material';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
+import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterLuxon } from '@mui/x-date-pickers/AdapterLuxon';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { DateTime, Interval } from 'luxon';
-import { isWeekend } from '@/lib/client/holidayClient';
-import { createVacationBooking } from '@/lib/client/vacationClient';
-import VacationSummary from '@/components/vacation/VacationSummary';
 import { useRouter } from 'next/navigation';
-import { PickersDayProps } from '@mui/x-date-pickers';
-import { PickersDay } from '@mui/x-date-pickers/PickersDay';
-import { CALENDAR_COLORS, CALENDAR_DAY_BORDER_RADIUS } from '@/lib/constants/colors';
-import CalendarMonth from '@mui/icons-material/CalendarMonth';
+import useHolidays from '@/lib/hooks/useHolidays';
+import { createVacationBooking } from '@/lib/client/vacationClient';
+import VacationSummary from './VacationSummary';
+import HalfDaySettings, { HalfDayOption } from './HalfDaySettings';
+import HolidayDisplay from './HolidayDisplay';
+import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
+import MiniCalendar from '@/components/dashboard/MiniCalendar';
+import { 
+  generateBankHolidayMap, 
+  createShouldDisableDate,
+} from './VacationDateUtils';
+import { CALENDAR_COLORS } from '@/lib/constants/colors';
+import { Holiday, VacationBooking } from '@/types';
 
 interface VacationFormProps {
   userId: string;
   province: string;
   holidays: Array<{
-    date: Date;
+    date: Date | string;
     name: string;
     province: string | null;
     type: 'bank' | 'provincial';
   }>;
   existingVacations?: Array<{
-    start_date: Date;
-    end_date: Date;
+    start_date: Date | string;
+    end_date: Date | string;
     is_half_day?: boolean;
   }>;
   onSuccess?: () => void;
@@ -56,17 +55,74 @@ interface FormValues {
   isHalfDay: boolean;
   halfDayPortion: string;
   halfDayDate: DateTime | null;
-  halfDayDates: Record<string, {isHalfDay: boolean, portion: string}>;
+  halfDayDates: Record<string, HalfDayOption>;
 }
 
-export default function VacationForm({ userId, province, holidays, existingVacations = [], onSuccess }: VacationFormProps) {
+export default function VacationForm({ 
+  userId, 
+  province, 
+  holidays = [], 
+  existingVacations: initialVacations = [], 
+  onSuccess, 
+}: VacationFormProps) {
+  // Refs for date input fields for proper popover positioning
+  const startDateRef = useRef<HTMLDivElement>(null);
+  const endDateRef = useRef<HTMLDivElement>(null);
+  
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [startDateOpen, setStartDateOpen] = useState(false);
-  const [endDateOpen, setEndDateOpen] = useState(false);
+  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(null);
+  const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
+  const [normalizedHolidays, setNormalizedHolidays] = useState<Holiday[]>([]);
+  const [existingVacations, setExistingVacations] = useState<VacationBooking[]>(initialVacations as VacationBooking[]);
+  const [isLoadingVacations, setIsLoadingVacations] = useState(false);
   
+  // Fetch existing vacations from the API
+  useEffect(() => {
+    async function fetchVacations() {
+      setIsLoadingVacations(true);
+      try {
+        const response = await fetch('/api/vacations');
+        if (response.ok) {
+          const vacationsData = await response.json();
+          console.log('Fetched vacations from API:', vacationsData.length, 'entries');
+          setExistingVacations(vacationsData);
+        } else {
+          console.error('Failed to fetch vacations:', response.status);
+          // Fall back to any vacations passed as props
+          if (initialVacations.length > 0) {
+            console.log('Using prop-provided vacations:', initialVacations.length, 'entries');
+            setExistingVacations(initialVacations as VacationBooking[]);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching vacations:', error);
+        // Fall back to any vacations passed as props
+        if (initialVacations.length > 0) {
+          console.log('Using prop-provided vacations after error:', initialVacations.length, 'entries');
+          setExistingVacations(initialVacations as VacationBooking[]);
+        }
+      } finally {
+        setIsLoadingVacations(false);
+      }
+    }
+    
+    fetchVacations();
+  }, [initialVacations]);
+  
+  // Get current year for holiday fetching
+  const currentYear = new Date().getFullYear();
+  
+  // Use our useHolidays hook to fetch holidays from the client side
+  const { 
+    holidays: clientHolidays, 
+    loading: holidaysLoading, 
+    error: holidaysError, 
+  } = useHolidays(currentYear, province);
+  
+  // Form setup
   const { register, handleSubmit, control, formState: { errors }, watch, reset, setValue } = useForm<FormValues>({
     defaultValues: {
       startDate: null,
@@ -76,9 +132,10 @@ export default function VacationForm({ userId, province, holidays, existingVacat
       halfDayPortion: 'AM',
       halfDayDate: null,
       halfDayDates: {},
-    }
+    },
   });
   
+  // Watch form fields
   const watchIsHalfDay = watch('isHalfDay');
   const watchHalfDayPortion = watch('halfDayPortion');
   const watchStartDate = watch('startDate');
@@ -86,151 +143,159 @@ export default function VacationForm({ userId, province, holidays, existingVacat
   const watchHalfDayDate = watch('halfDayDate');
   const watchHalfDayDates = watch('halfDayDates');
   
+  // Combine holidays from both sources to ensure we have data
+  useEffect(() => {
+    const combinedHolidays = [...holidays];
+    
+    // Add client holidays if they're not duplicates
+    if (clientHolidays && clientHolidays.length > 0) {
+      clientHolidays.forEach((clientHoliday) => {
+        // Check if this holiday already exists in the combined list
+        const exists = combinedHolidays.some((h) => {
+          const hDate = typeof h.date === 'string' 
+            ? DateTime.fromISO(h.date).toISODate() 
+            : DateTime.fromJSDate(h.date as Date).toISODate();
+            
+          const clientDate = typeof clientHoliday.date === 'string'
+            ? DateTime.fromISO(clientHoliday.date).toISODate()
+            : DateTime.fromJSDate(clientHoliday.date as Date).toISODate();
+            
+          return hDate === clientDate && h.name === clientHoliday.name;
+        });
+        
+        if (!exists) {
+          // Convert clientHoliday to the expected format with proper province type
+          combinedHolidays.push({
+            ...clientHoliday,
+            // Ensure province is string | null, not string | undefined
+            province: clientHoliday.province || null,
+          });
+        }
+      });
+    }
+    
+    // Update the normalized holidays state
+    setNormalizedHolidays(combinedHolidays);
+  }, [holidays, clientHolidays]);
+  
   // Create a map of bank holiday dates for efficient lookup
-  const bankHolidayMap = new Map();
-  holidays.forEach(holiday => {
-    if (holiday.type === 'bank') {
-      // Create a DateTime object from the holiday date in UTC
-      const holidayDate = typeof holiday.date === 'string'
-        ? DateTime.fromISO(holiday.date, { zone: 'utc' })
-        : DateTime.fromJSDate(holiday.date, { zone: 'utc' });
-      
-      // Format as ISO date string for consistent lookup
-      const dateStr = holidayDate.toFormat('yyyy-MM-dd');
-      bankHolidayMap.set(dateStr, holiday.name);
-    }
-  });
+  const bankHolidayMap = generateBankHolidayMap(normalizedHolidays);
   
-  // Function to determine if a date is a bank holiday
-  const isBankHoliday = (date: DateTime): boolean => {
-    // Ensure we're using UTC for consistency
-    const utcDate = date.toUTC().startOf('day');
-    const dateStr = utcDate.toFormat('yyyy-MM-dd');
-    return bankHolidayMap.has(dateStr);
-  };
+  // Create shouldDisableDate function using the fetched vacations
+  const shouldDisableDate = useMemo(() => createShouldDisableDate(
+    bankHolidayMap,
+    existingVacations,
+  ), [bankHolidayMap, existingVacations]);
   
-  // Function to determine if a date should be disabled
-  const shouldDisableDate = (date: DateTime) => {
-    // Luxon weekdays are 1-7 where 6=Saturday, 7=Sunday
-    const isWeekendDay = date.weekday >= 6;
-    
-    // Check if the day is already booked as vacation
-    const isAlreadyBooked = existingVacations.some(vacation => {
-      const startDate = typeof vacation.start_date === 'string'
-        ? DateTime.fromISO(vacation.start_date)
-        : DateTime.fromJSDate(vacation.start_date);
-        
-      const endDate = typeof vacation.end_date === 'string'
-        ? DateTime.fromISO(vacation.end_date)
-        : DateTime.fromJSDate(vacation.end_date);
-      
-      // Check if the day is within the vacation range
-      return date >= startDate.startOf('day') && date <= endDate.endOf('day');
-    });
-    
-    // Disable both weekends and already booked days
-    return isWeekendDay || isAlreadyBooked;
-  };
-  
-  // Custom day renderer for DatePicker to highlight holidays and booked days
-  const renderDay = (props: PickersDayProps<DateTime>) => {
-    const { day, ...other } = props;
-    const isHoliday = isBankHoliday(day);
-    
-    // Check if the day is already booked as vacation
-    const isBooked = existingVacations.some(vacation => {
-      const startDate = typeof vacation.start_date === 'string'
-        ? DateTime.fromISO(vacation.start_date)
-        : DateTime.fromJSDate(vacation.start_date);
-        
-      const endDate = typeof vacation.end_date === 'string'
-        ? DateTime.fromISO(vacation.end_date)
-        : DateTime.fromJSDate(vacation.end_date);
-      
-      // Check if the day is within the vacation range
-      return day >= startDate.startOf('day') && day <= endDate.endOf('day');
-    });
-    
-    // Define the tooltip text based on the day type
-    let tooltipTitle = '';
-    if (isHoliday) {
-      tooltipTitle = bankHolidayMap.get(day.toUTC().toFormat('yyyy-MM-dd')) || 'Holiday';
-    } else if (isBooked) {
-      tooltipTitle = 'Already booked';
+  // Convert existingVacations to VacationBooking type for MiniCalendar
+  const formattedVacations: VacationBooking[] = useMemo(() => {
+    // Add debug logging for existingVacations
+    console.log('VacationForm received existingVacations:', existingVacations.length, 'entries');
+    if (existingVacations.length > 0) {
+      console.log('First vacation:', existingVacations[0]);
     }
     
-    return (
-      <Tooltip
-        title={tooltipTitle}
-        arrow
-      >
-        <PickersDay
-          {...props}
-          sx={{
-            ...(isHoliday && {
-              backgroundColor: CALENDAR_COLORS.HOLIDAY.BANK,
-              color: '#fff',
-              '&:hover': {
-                backgroundColor: CALENDAR_COLORS.HOLIDAY.BANK,
-              },
-              borderRadius: CALENDAR_DAY_BORDER_RADIUS
-            }),
-            ...(isBooked && !isHoliday && {
-              backgroundColor: CALENDAR_COLORS.VACATION.FULL_DAY,
-              color: '#fff',
-              '&:hover': {
-                backgroundColor: CALENDAR_COLORS.VACATION.FULL_DAY,
-              },
-              borderRadius: CALENDAR_DAY_BORDER_RADIUS
-            })
-          }}
-        />
-      </Tooltip>
-    );
+    return existingVacations.map((vacation, index) => {
+      // Format vacation with proper date handling
+      const formattedVacation = {
+        id: `vacation-${index}`,
+        start_date: vacation.start_date,
+        end_date: vacation.end_date,
+        is_half_day: vacation.is_half_day,
+        created_at: new Date().toISOString(),
+        userId: userId,
+      };
+      
+      // Verify the date conversion for the first item
+      if (index === 0) {
+        console.log('Formatted vacation dates:', {
+          original_start: vacation.start_date,
+          original_end: vacation.end_date,
+          formatted: formattedVacation,
+        });
+      }
+      
+      return formattedVacation;
+    });
+  }, [existingVacations, userId]);
+
+  // Open calendar popover for Start Date
+  const handleOpenStartDate = (event: React.MouseEvent<HTMLDivElement>) => {
+    setCalendarAnchorEl(event.currentTarget);
+    setActiveField('start');
   };
-  
-  // Handle start date selection - automatically focus end date picker
-  const handleStartDateChange = (date: DateTime | null) => {
-    setValue('startDate', date);
-    
-    if (date) {
+
+  // Open calendar popover for End Date
+  const handleOpenEndDate = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!watchStartDate) {
+      // If no start date, select that first
+      handleOpenStartDate(event);
+      return;
+    }
+    setCalendarAnchorEl(event.currentTarget);
+    setActiveField('end');
+  };
+
+  // Close calendar popover
+  const handleCloseCalendar = () => {
+    setCalendarAnchorEl(null);
+    setActiveField(null);
+  };
+
+  // Handle date selection from MiniCalendar
+  const handleMiniCalendarDateSelect = (date: DateTime) => {
+    if (activeField === 'start') {
+      setValue('startDate', date);
+      
       // If end date is before start date, reset it
       if (watchEndDate && watchEndDate < date) {
         setValue('endDate', null);
       }
       
-      // Close the start date picker
-      setStartDateOpen(false);
-      
-      // If it's a weekend/holiday, find the next available date
-      let suggestedEndDate = date.plus({ days: 1 });
-      while (shouldDisableDate(suggestedEndDate)) {
-        suggestedEndDate = suggestedEndDate.plus({ days: 1 });
+      // If selecting start date and we don't have an end date yet, 
+      // switch to end date selection automatically
+      if (!watchEndDate || watchEndDate < date) {
+        setActiveField('end');
+      } else {
+        // Close calendar if both dates are set
+        handleCloseCalendar();
       }
-      
-      // If no end date is set yet, set a suggested end date
-      if (!watchEndDate) {
-        setValue('endDate', suggestedEndDate);
+    } else if (activeField === 'end') {
+      // Ensure end date is not before start date
+      if (watchStartDate && date >= watchStartDate) {
+        setValue('endDate', date);
+        handleCloseCalendar();
       }
-      
-      // Open the end date picker after a short delay
-      setTimeout(() => {
-        setEndDateOpen(true);
-      }, 100);
     }
   };
   
-  // Handle end date selection
-  const handleEndDateChange = (date: DateTime | null) => {
-    setValue('endDate', date);
-    if (date) {
-      // Simply close the end date picker
-      setEndDateOpen(false);
+  // Initialize halfDayDates when workingDays change
+  useEffect(() => {
+    if (watchStartDate && watchEndDate) {
+      // Get the working days
+      const workingDays = getWorkingDays();
+      
+      if (workingDays.length > 0) {
+        // Create default half-day settings for each working day
+        const halfDaySettings: Record<string, HalfDayOption> = {};
+        
+        workingDays.forEach((day) => {
+          const dateKey = day.toISODate();
+          if (dateKey && !watchHalfDayDates[dateKey]) {
+            halfDaySettings[dateKey] = { isHalfDay: false, portion: 'AM' };
+          }
+        });
+        
+        // Only update if there are new days
+        if (Object.keys(halfDaySettings).length > 0) {
+          setValue('halfDayDates', { ...watchHalfDayDates, ...halfDaySettings });
+        }
+      }
     }
-  };
+  }, [watchStartDate, watchEndDate, setValue, watchHalfDayDates]);
   
-  // Generate the list of working days for half-day selection
-  const getWorkingDays = () => {
+  // Generate the list of working days
+  const getWorkingDays = (): DateTime[] => {
     const startDate = watchStartDate;
     const endDate = watchEndDate;
     if (!startDate || !endDate) {
@@ -250,31 +315,7 @@ export default function VacationForm({ userId, province, holidays, existingVacat
     
     return workingDays;
   };
-  
-  // Use this to determine if multiple working days are selected
-  const workingDays = getWorkingDays();
-  const hasMultipleWorkingDays = workingDays.length > 1;
-  
-  // Initialize halfDayDates when workingDays change
-  React.useEffect(() => {
-    if (workingDays.length > 0) {
-      // Create default half-day settings for each working day
-      const halfDaySettings: Record<string, {isHalfDay: boolean, portion: string}> = {};
-      
-      workingDays.forEach(day => {
-        const dateKey = day.toISODate();
-        if (dateKey && !watchHalfDayDates[dateKey]) {
-          halfDaySettings[dateKey] = { isHalfDay: false, portion: 'AM' };
-        }
-      });
-      
-      // Only update if there are new days
-      if (Object.keys(halfDaySettings).length > 0) {
-        setValue('halfDayDates', { ...watchHalfDayDates, ...halfDaySettings });
-      }
-    }
-  }, [workingDays, setValue, watchHalfDayDates]);
-  
+
   // Toggle half-day for a specific date
   const toggleHalfDay = (dateKey: string) => {
     const currentSettings = watchHalfDayDates[dateKey];
@@ -282,7 +323,7 @@ export default function VacationForm({ userId, province, holidays, existingVacat
       const newHalfDayDates = { ...watchHalfDayDates };
       newHalfDayDates[dateKey] = { 
         ...currentSettings,
-        isHalfDay: !currentSettings.isHalfDay 
+        isHalfDay: !currentSettings.isHalfDay, 
       };
       setValue('halfDayDates', newHalfDayDates);
     }
@@ -295,12 +336,51 @@ export default function VacationForm({ userId, province, holidays, existingVacat
       const newHalfDayDates = { ...watchHalfDayDates };
       newHalfDayDates[dateKey] = { 
         ...currentSettings,
-        portion 
+        portion, 
       };
       setValue('halfDayDates', newHalfDayDates);
     }
   };
   
+  // Calculate vacation duration (excluding weekends and holidays)
+  const calculateWorkingDays = () => {
+    const startDate = watchStartDate;
+    const endDate = watchEndDate;
+    if (!startDate || !endDate) {
+      return 0;
+    }
+    
+    let days = 0;
+    
+    // Create an interval between the dates
+    const interval = Interval.fromDateTimes(startDate.startOf('day'), endDate.endOf('day'));
+    
+    // Iterate through each day in the interval
+    let currentDate = startDate.startOf('day');
+    while (currentDate <= endDate) {
+      // Only count weekdays (not weekends)
+      if (![6, 7].includes(currentDate.weekday)) {
+        days++;
+      }
+      currentDate = currentDate.plus({ days: 1 });
+    }
+    
+    // Adjust for multiple half days if applicable
+    if (watchIsHalfDay) {
+      // Count how many half days are selected
+      const halfDayCount = Object.values(watchHalfDayDates).filter((day) => day.isHalfDay).length;
+      if (halfDayCount > 0) {
+        days -= halfDayCount * 0.5;
+      } else {
+        // Fallback to old behavior if no specific days are selected
+        days -= 0.5;
+      }
+    }
+    
+    return days;
+  };
+  
+  // Form submission handler
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     setError(null);
@@ -320,7 +400,7 @@ export default function VacationForm({ userId, province, holidays, existingVacat
           .filter(([_, settings]) => settings.isHalfDay)
           .map(([dateStr, settings]) => ({
             date: DateTime.fromISO(dateStr).toJSDate(),
-            portion: settings.portion
+            portion: settings.portion,
           }))
         : [];
       
@@ -362,223 +442,204 @@ export default function VacationForm({ userId, province, holidays, existingVacat
                       watchEndDate && 
                       watchStartDate.hasSame(watchEndDate, 'day');
   
-  // Calculate vacation duration (excluding weekends and holidays)
-  const calculateWorkingDays = () => {
-    const startDate = watchStartDate;
-    const endDate = watchEndDate;
-    if (!startDate || !endDate) {
-      return 0;
+  const workingDays = getWorkingDays();
+  const hasMultipleWorkingDays = workingDays.length > 1;
+
+  // Create processed holidays with consistent Date objects for VacationSummary
+  const processedHolidays = useMemo(() => {
+    return holidays.map((holiday) => ({
+      ...holiday,
+      // Convert any string dates to Date objects
+      date: typeof holiday.date === 'string' 
+        ? new Date(holiday.date) 
+        : holiday.date,
+    }));
+  }, [holidays]);
+
+  // Is calendar popover open
+  const isCalendarOpen = Boolean(calendarAnchorEl);
+  
+  // Get active date for MiniCalendar
+  const getActiveDate = () => {
+    if (activeField === 'start') {
+      return watchStartDate || DateTime.now();
+    } else if (activeField === 'end') {
+      return watchEndDate || (watchStartDate ? watchStartDate.plus({ days: 1 }) : DateTime.now());
     }
-    
-    let days = 0;
-    
-    // Create an interval between the dates
-    const interval = Interval.fromDateTimes(startDate.startOf('day'), endDate.endOf('day'));
-    
-    // Iterate through each day in the interval
-    let currentDate = startDate.startOf('day');
-    while (currentDate <= endDate) {
-      // Only count weekdays (not weekends)
-      if (![6, 7].includes(currentDate.weekday)) {
-        days++;
-      }
-      currentDate = currentDate.plus({ days: 1 });
-    }
-    
-    // Adjust for multiple half days if applicable
-    if (watchIsHalfDay) {
-      // Count how many half days are selected
-      const halfDayCount = Object.values(watchHalfDayDates).filter(day => day.isHalfDay).length;
-      if (halfDayCount > 0) {
-        days -= halfDayCount * 0.5;
-      } else {
-        // Fallback to old behavior if no specific days are selected
-        days -= 0.5;
-      }
-    }
-    
-    return days;
+    return DateTime.now();
   };
 
   return (
     <form onSubmit={handleSubmit(onSubmit)}>
       <div className="space-y-4">
-        <LocalizationProvider dateAdapter={AdapterLuxon}>
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+        {/* Holiday information display */}
+        <HolidayDisplay 
+          holidays={normalizedHolidays}
+          loading={holidaysLoading}
+          error={holidaysError}
+        />
+        
+        <Grid container spacing={2}>
+          <Grid item xs={12} md={6}>
             <Controller
               name="startDate"
               control={control}
               rules={{ required: 'Start date is required' }}
-              render={({ field }) => (
-                <DatePicker
+              render={({ field, fieldState }) => (
+                <TextField
                   label="Start Date"
-                  value={field.value}
-                  onChange={(newValue) => handleStartDateChange(newValue)}
-                  shouldDisableDate={shouldDisableDate}
-                  slots={{
-                    day: renderDay
+                  fullWidth
+                  inputRef={startDateRef}
+                  onClick={handleOpenStartDate}
+                  value={field.value ? field.value.toFormat('MMM d, yyyy') : ''}
+                  InputProps={{
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton edge="end" onClick={(e) => handleOpenStartDate(e as any)}>
+                          <CalendarTodayIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
                   }}
-                  slotProps={{
-                    textField: {
-                      fullWidth: true,
-                      error: !!errors.startDate,
-                      helperText: errors.startDate?.message as string,
-                      InputProps: {
-                        startAdornment: (
-                          <Box position="relative" sx={{ mr: 1 }}>
-                            <CalendarMonth color="action" fontSize="small" />
-                          </Box>
-                        )
-                      }
-                    }
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
+                  sx={{
+                    cursor: 'pointer',
+                    '& .MuiInputBase-root': {
+                      cursor: 'pointer',
+                    },
                   }}
-                  open={startDateOpen}
-                  onOpen={() => setStartDateOpen(true)}
-                  onClose={() => setStartDateOpen(false)}
                 />
               )}
             />
-            
+          </Grid>
+          
+          <Grid item xs={12} md={6}>
             <Controller
               name="endDate"
               control={control}
               rules={{ required: 'End date is required' }}
-              render={({ field }) => (
-                <DatePicker
+              render={({ field, fieldState }) => (
+                <TextField
                   label="End Date"
-                  value={field.value}
-                  onChange={(newValue) => handleEndDateChange(newValue)}
-                  shouldDisableDate={shouldDisableDate}
-                  minDate={watchStartDate || undefined}
-                  slots={{
-                    day: renderDay
+                  fullWidth
+                  inputRef={endDateRef}
+                  onClick={handleOpenEndDate}
+                  value={field.value ? field.value.toFormat('MMM d, yyyy') : ''}
+                  InputProps={{
+                    readOnly: true,
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <IconButton edge="end" onClick={(e) => handleOpenEndDate(e as any)}>
+                          <CalendarTodayIcon />
+                        </IconButton>
+                      </InputAdornment>
+                    ),
                   }}
-                  slotProps={{
-                    textField: {
-                      fullWidth: true,
-                      error: !!errors.endDate,
-                      helperText: errors.endDate?.message as string,
-                      InputProps: {
-                        startAdornment: (
-                          <Box position="relative" sx={{ mr: 1 }}>
-                            <CalendarMonth color="action" fontSize="small" />
-                          </Box>
-                        )
-                      }
-                    }
+                  error={!!fieldState.error}
+                  helperText={fieldState.error?.message}
+                  sx={{
+                    cursor: 'pointer',
+                    '& .MuiInputBase-root': {
+                      cursor: 'pointer',
+                    },
                   }}
-                  open={endDateOpen}
-                  onOpen={() => setEndDateOpen(true)}
-                  onClose={() => setEndDateOpen(false)}
                 />
               )}
             />
-          </Box>
-        </LocalizationProvider>
-        
-        <Controller
-          name="isHalfDay"
-          control={control}
-          render={({ field }) => (
-            <FormControlLabel
-              control={<Checkbox 
-                checked={field.value} 
-                onChange={field.onChange} 
-              />}
-              label="Enable half-day vacation(s)"
-            />
-          )}
-        />
-        
-        {watchIsHalfDay && hasMultipleWorkingDays && (
-          <Box sx={{ mt: 1, mb: 2, p: 2, bgcolor: 'background.paper', borderRadius: 1, border: '1px solid', borderColor: 'divider' }}>
-            <Typography variant="body2" gutterBottom>
-              Select which days should be half-days:
+          </Grid>
+        </Grid>
+
+        {/* MiniCalendar Popover */}
+        <Popover
+          open={isCalendarOpen}
+          anchorEl={calendarAnchorEl}
+          onClose={handleCloseCalendar}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'left',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'left',
+          }}
+          sx={{
+            mt: 1,
+            '& .MuiPopover-paper': {
+              boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.2)',
+              borderRadius: 1,
+            },
+          }}
+        >
+          <Box sx={{ p: 1, width: 280 }}>
+            <Typography variant="subtitle2" sx={{ mb: 1 }}>
+              {activeField === 'start' ? 'Select Start Date' : 'Select End Date'}
             </Typography>
             
-            {workingDays.map((day) => {
-              const dateKey = day.toISODate();
-              const daySettings = dateKey ? watchHalfDayDates[dateKey] : undefined;
-              
-              return dateKey && daySettings ? (
-                <Box key={dateKey} sx={{ mb: 1, ml: 1 }}>
-                  <FormControlLabel
-                    control={
-                      <Checkbox 
-                        checked={daySettings.isHalfDay}
-                        onChange={() => toggleHalfDay(dateKey)}
-                      />
-                    }
-                    label={day.toFormat('EEE, MMM d, yyyy')}
-                  />
-                  
-                  {daySettings.isHalfDay && (
-                    <Box sx={{ ml: 4, mt: 0.5 }}>
-                      <FormControlLabel
-                        control={
-                          <input
-                            type="radio"
-                            checked={daySettings.portion === 'AM'}
-                            onChange={() => setHalfDayPortion(dateKey, 'AM')}
-                          />
-                        }
-                        label="Morning (AM)"
-                      />
-                      <FormControlLabel
-                        control={
-                          <input
-                            type="radio"
-                            checked={daySettings.portion === 'PM'}
-                            onChange={() => setHalfDayPortion(dateKey, 'PM')}
-                          />
-                        }
-                        label="Afternoon (PM)"
-                      />
-                    </Box>
-                  )}
-                </Box>
-              ) : null;
-            })}
+            {isLoadingVacations ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <MiniCalendar
+                holidays={normalizedHolidays}
+                vacations={existingVacations}
+                province={province}
+                onDateSelect={handleMiniCalendarDateSelect}
+                selectedDate={getActiveDate()}
+              />
+            )}
+            
+            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box 
+                  sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: '50%', 
+                    bgcolor: CALENDAR_COLORS.VACATION.FULL_DAY,
+                    border: `1px solid ${CALENDAR_COLORS.VACATION.TEXT}`,
+                  }} 
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Already booked vacation (not selectable)
+                </Typography>
+              </Box>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box 
+                  sx={{ 
+                    width: 12, 
+                    height: 12, 
+                    borderRadius: '50%', 
+                    bgcolor: CALENDAR_COLORS.HOLIDAY.BANK,
+                    border: `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT}`,
+                  }} 
+                />
+                <Typography variant="caption" color="text.secondary">
+                  Holiday
+                </Typography>
+              </Box>
+            </Box>
           </Box>
-        )}
+        </Popover>
         
-        {watchIsHalfDay && !hasMultipleWorkingDays && (
-          <Box sx={{ mt: 1, mb: 2 }}>
-            <Typography variant="body2" color="text.secondary" gutterBottom>
-              Select half-day portion:
-            </Typography>
-            <Controller
-              name="halfDayPortion"
-              control={control}
-              render={({ field }) => (
-                <Box>
-                  <FormControlLabel
-                    control={
-                      <input
-                        type="radio"
-                        {...field}
-                        value="AM"
-                        checked={field.value === 'AM'}
-                      />
-                    }
-                    label="Morning (AM)"
-                  />
-                  <FormControlLabel
-                    control={
-                      <input
-                        type="radio"
-                        {...field}
-                        value="PM"
-                        checked={field.value === 'PM'}
-                      />
-                    }
-                    label="Afternoon (PM)"
-                  />
-                </Box>
-              )}
-            />
-          </Box>
-        )}
+        {/* Half-day vacation settings */}
+        <HalfDaySettings
+          startDate={watchStartDate}
+          endDate={watchEndDate}
+          halfDayData={{
+            isHalfDay: watchIsHalfDay,
+            halfDayPortion: watchHalfDayPortion,
+            halfDayDate: watchHalfDayDate,
+            halfDayDates: watchHalfDayDates,
+          }}
+          onToggleHalfDay={(enabled) => setValue('isHalfDay', enabled)}
+          onHalfDayPortionChange={(portion) => setValue('halfDayPortion', portion)}
+          onToggleDateHalfDay={toggleHalfDay}
+          onDatePortionChange={setHalfDayPortion}
+          shouldDisableDate={shouldDisableDate}
+        />
         
         {isSingleDay && !watchIsHalfDay && (
           <FormHelperText>
@@ -608,9 +669,9 @@ export default function VacationForm({ userId, province, holidays, existingVacat
               .filter(([_, settings]) => settings.isHalfDay)
               .map(([dateStr, settings]) => ({
                 date: DateTime.fromISO(dateStr).toJSDate(),
-                portion: settings.portion
+                portion: settings.portion,
               }))}
-            holidays={holidays}
+            holidays={processedHolidays}
           />
         )}
         

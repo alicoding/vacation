@@ -12,7 +12,7 @@ type SupabaseClientType = SupabaseClient<Database>;
 export async function findFirst<T = unknown>(
   supabase: SupabaseClientType,
   table: string,
-  where: Record<string, unknown> = {}
+  where: Record<string, unknown> = {},
 ): Promise<T | null> {
   // Convert nested where conditions to flat conditions
   let query = supabase.from(table).select('*');
@@ -50,7 +50,7 @@ export async function findMany<T = unknown>(
     select?: string[];
     orderBy?: Record<string, 'asc' | 'desc'>;
     limit?: number;
-  } = {}
+  } = {},
 ): Promise<T[]> {
   const { where = {}, select, orderBy, limit } = options;
   
@@ -103,7 +103,7 @@ export async function findMany<T = unknown>(
 export async function create<T = unknown>(
   supabase: SupabaseClientType,
   table: string,
-  data: Record<string, unknown>
+  data: Record<string, unknown>,
 ): Promise<T> {
   const { data: result, error } = await supabase
     .from(table)
@@ -127,7 +127,7 @@ export async function update<T = unknown>(
   options: {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
-  }
+  },
 ): Promise<T> {
   const { where, data } = options;
   
@@ -153,7 +153,7 @@ export async function update<T = unknown>(
 export async function remove<T = unknown>(
   supabase: SupabaseClientType,
   table: string,
-  where: Record<string, unknown>
+  where: Record<string, unknown>,
 ): Promise<T> {
   let query = supabase.from(table).delete();
   

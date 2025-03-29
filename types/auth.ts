@@ -29,19 +29,33 @@ export interface User {
 export function convertSupabaseSession(supabaseSession: SupabaseSession | null): Session | null {
   if (!supabaseSession) return null;
   
+  // Ensure we have a valid user object
+  if (!supabaseSession.user) {
+    console.error('Session has no user object');
+    return null;
+  }
+  
+  // Extract expiry time safely
+  const expiresAt = supabaseSession.expires_at 
+    ? new Date(supabaseSession.expires_at * 1000).toISOString()
+    : new Date(Date.now() + 3600 * 1000).toISOString(); // Default to 1 hour from now
+  
   return {
     user: {
       id: supabaseSession.user.id,
-      name: supabaseSession.user.user_metadata?.full_name || supabaseSession.user.user_metadata?.name || null,
+      name: supabaseSession.user.user_metadata?.full_name || 
+            supabaseSession.user.user_metadata?.name || 
+            supabaseSession.user.email?.split('@')[0] || 
+            null,
       email: supabaseSession.user.email || null,
       image: supabaseSession.user.user_metadata?.avatar_url || null,
-      // Include any custom fields from user metadata
-      total_vacation_days: supabaseSession.user.user_metadata?.total_vacation_days,
-      province: supabaseSession.user.user_metadata?.province,
-      employment_type: supabaseSession.user.user_metadata?.employment_type,
-      week_starts_on: supabaseSession.user.user_metadata?.week_starts_on,
+      // Include any custom fields from user metadata, with fallbacks
+      total_vacation_days: supabaseSession.user.user_metadata?.total_vacation_days || 20,
+      province: supabaseSession.user.user_metadata?.province || 'ON',
+      employment_type: supabaseSession.user.user_metadata?.employment_type || 'standard',
+      week_starts_on: supabaseSession.user.user_metadata?.week_starts_on || 'sunday',
     },
-    expires: new Date(supabaseSession.expires_at! * 1000).toISOString(),
+    expires: expiresAt,
   };
 }
 
@@ -67,7 +81,7 @@ interface UseSessionReturn {
  */
 export function createSessionHook(useAuth: () => UseAuthReturn): () => UseSessionReturn {
   return function useSession() {
-    const { session, user, isLoading } = useAuth();
+    const { session, isLoading } = useAuth();
     
     return {
       data: session ? convertSupabaseSession(session) : null,

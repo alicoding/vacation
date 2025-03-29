@@ -15,7 +15,7 @@ export async function fetchFromDB<T>(asyncFn: () => Promise<T>): Promise<T> {
   if (typeof window !== 'undefined') {
     throw new Error(
       'Database queries must be run on the server. ' +
-      'Use server components, server actions, or API routes.'
+      'Use server components, server actions, or API routes.',
     );
   }
   
@@ -40,5 +40,5 @@ export const db = {
     supabaseUtils.remove<T>(supabase, table, where),
   
   // Direct access to Supabase client if needed
-  supabase
+  supabase,
 };

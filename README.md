@@ -71,7 +71,7 @@
 - [x] UI reflects current user preferences
 
 ### Vacation Booking
-- [x] Create the vacation request page at `/dashboard/request`
+- [x] Create the vacation request page at `/dashboard/vacations`
 - [x] Date picker works correctly
 - [x] Cannot book on holidays or weekends (FIXED: validation now blocks booking on holidays)
 - [x] Vacation days are calculated correctly (FIXED: calculation now considers partial days and holidays)

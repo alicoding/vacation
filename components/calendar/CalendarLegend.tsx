@@ -14,7 +14,7 @@ const LegendItem = ({ color, label }: LegendItemProps) => (
         width: 16, 
         height: 16, 
         backgroundColor: color, 
-        borderRadius: '50%' 
+        borderRadius: '50%', 
       }} 
     />
     <Typography variant="body2">{label}</Typography>

@@ -13,13 +13,13 @@ export default function DashboardLayout({
     <Box sx={{ 
       minHeight: '100vh', 
       backgroundColor: '#f3f4f6',
-      overflow: 'hidden'
+      overflow: 'hidden',
     }}>
       <Header />
       <Box sx={{ 
         display: 'flex', 
         flexDirection: { xs: 'column', md: 'row' },
-        minHeight: 'calc(100vh - 64px)'
+        minHeight: 'calc(100vh - 64px)',
       }}>
         <Box 
           component="nav"
@@ -31,7 +31,7 @@ export default function DashboardLayout({
             zIndex: 10,
             flexShrink: 0,
             transition: 'width 0.3s ease',
-            borderRight: { xs: 'none', md: '1px solid #e0e0e0' }
+            borderRight: { xs: 'none', md: '1px solid #e0e0e0' },
           }}
         >
           <Sidebar />
@@ -42,7 +42,7 @@ export default function DashboardLayout({
             flex: 1,
             p: { xs: 2, sm: 3, md: 4 },
             width: { xs: '100%', md: 'calc(100% - 240px)' },
-            overflow: 'auto'
+            overflow: 'auto',
           }}
         >
           {children}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Card, CardContent, CardHeader, Typography, Box, 
   List, ListItem, ListItemText, Divider, Chip, IconButton,
-  Alert, Button
+  Alert, Button,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { DateTime, Interval } from 'luxon';
@@ -89,14 +89,14 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
   useEffect(() => {
     if (vacations.length === 0 || holidays.length === 0) return;
 
-    const enhanced = vacations.map(vacation => {
+    const enhanced = vacations.map((vacation) => {
       const startDate = new Date(vacation.start_date);
       const endDate = new Date(vacation.end_date);
       
       // Calculate total days off (including weekends)
       const totalDaysOff = Interval.fromDateTimes(
         DateTime.fromJSDate(startDate), 
-        DateTime.fromJSDate(endDate).plus({ days: 1 })
+        DateTime.fromJSDate(endDate).plus({ days: 1 }),
       ).length('days');
       
       // Check if this is a long weekend
@@ -122,7 +122,7 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
       }
       
       // Find adjacent holidays
-      const adjacentHolidays = holidays.filter(holiday => {
+      const adjacentHolidays = holidays.filter((holiday) => {
         const holidayDateTime = DateTime.fromISO(holiday.date);
         
         // Check if holiday is directly before or after the vacation dates
@@ -142,8 +142,8 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
       
       while (current <= lastDay) {
         if (![6, 7].includes(current.weekday)) { // Not a weekend
-          const isHoliday = holidays.some(holiday => 
-            DateTime.fromISO(holiday.date).hasSame(current, 'day')
+          const isHoliday = holidays.some((holiday) => 
+            DateTime.fromISO(holiday.date).hasSame(current, 'day'),
           );
           
           if (!isHoliday) {
@@ -223,13 +223,13 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
         isHalfDay,
         halfDayPortion,
         vacationType,
-        extendedTimeOffMessage
+        extendedTimeOffMessage,
       };
     });
     
     // Sort by start date (upcoming first)
     const sortedVacations = enhanced
-      .filter(vacation => new Date(vacation.end_date) >= new Date()) // Only show future or current vacations
+      .filter((vacation) => new Date(vacation.end_date) >= new Date()) // Only show future or current vacations
       .sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
     
     // Take at most 5 vacations to display on the dashboard
@@ -315,7 +315,7 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
                     py: 2,
                     display: 'flex',
                     flexDirection: 'column',
-                    alignItems: 'flex-start'
+                    alignItems: 'flex-start',
                   }}
                 >
                   <Box sx={{ width: '100%', display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -355,7 +355,7 @@ export default function UpcomingVacationsCard({ vacations: initialVacations, hol
                       display: 'flex', 
                       flexWrap: 'wrap', 
                       gap: 0.5,
-                      mt: 1
+                      mt: 1,
                     }}
                   >
                     {vacation.vacationType === 'long-weekend' && vacation.extendedTimeOffMessage && (

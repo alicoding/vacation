@@ -75,6 +75,29 @@
           "response_format": "json"
         }
       ]
+    },
+    {
+      "name": "calendar",
+      "description": "API for Google Calendar sync",
+      "methods": [
+        {
+          "type": "POST",
+          "path": "/api/calendar/sync",
+          "description": "Synchronize vacation bookings with Google Calendar",
+          "authentication_required": true,
+          "request_body": {
+            "enabled": "Boolean - whether to enable calendar sync"
+          },
+          "response_format": "json"
+        },
+        {
+          "type": "POST",
+          "path": "/api/calendar/sync/:id",
+          "description": "Manually sync a specific vacation booking with Google Calendar",
+          "authentication_required": true,
+          "response_format": "json"
+        }
+      ]
     }
   ],
   "critical_issues": [
@@ -149,19 +172,19 @@
       "priority": "high",
       "tasks": [
         {
-          "id": "update_oauth_scopes",
-          "description": "Update OAuth configuration to include Google Calendar scopes",
-          "implementation_details": "Add 'https://www.googleapis.com/auth/calendar' to the Google OAuth scopes in the authentication configuration and NextAuth settings."
+          "id": "consolidate_google_calendar_code",
+          "description": "Consolidate Google Calendar helper code",
+          "implementation_details": "Merge functionality from utils/googleCalendar.ts and lib/services/googleCalendar.ts into a single, consistent implementation following the project's coding standards."
         },
         {
           "id": "implement_sync_on_create_update",
           "description": "Implement API calls to create and update Google Calendar events on vacation booking creation and update",
-          "implementation_details": "On creation or update of a vacation booking, call the Google Calendar API to create or update the corresponding event; store/update the googleEventId accordingly; implement real-time sync."
+          "implementation_details": "On creation or update of a vacation booking, call the Google Calendar API to create or update the corresponding event; store/update the google_event_id accordingly; implement real-time sync."
         },
         {
           "id": "implement_sync_on_delete",
           "description": "Implement deletion of Google Calendar event when a vacation booking is deleted",
-          "implementation_details": "On deletion of a vacation booking, call the Google Calendar API to delete the associated event using googleEventId."
+          "implementation_details": "On deletion of a vacation booking, call the Google Calendar API to delete the associated event using google_event_id."
         },
         {
           "id": "implement_retry_and_error_handling",
@@ -169,9 +192,19 @@
           "implementation_details": "Use a retry strategy for API calls (e.g., 3 retries) and display an error message or notification in the app if syncing fails, prompting manual intervention."
         },
         {
+          "id": "improve_token_refresh_mechanism",
+          "description": "Implement robust token refresh handling",
+          "implementation_details": "Enhance the token refresh mechanism to automatically refresh expired tokens before making API calls to Google Calendar."
+        },
+        {
           "id": "add_user_settings_for_sync",
           "description": "Add user settings options for controlling calendar sync behavior",
           "implementation_details": "Provide options for auto-sync, manual add, or disabling sync; update UI and backend to respect these preferences."
+        },
+        {
+          "id": "manual_sync_button",
+          "description": "Add manual sync button for individual vacation bookings",
+          "implementation_details": "Add a button to manually sync a specific vacation booking with Google Calendar, particularly useful if automatic sync fails."
         },
         {
           "id": "test_google_calendar_sync",
@@ -189,6 +222,10 @@
     "date_display_fixes": {
       "description": "Fix date display issues",
       "implementation": "Ensure all dates are displayed consistently and correctly across the application, including holiday dates and date ranges"
+    },
+    "google_calendar_implementation": {
+      "description": "Complete Google Calendar sync implementation",
+      "implementation": "Ensure all vacation bookings can be synced to Google Calendar (create, update, delete) with proper error handling and token refresh"
     }
   },
   "database_schema_updates": [
@@ -203,11 +240,32 @@
           "status": "missing_from_db"
         },
         {
-          "field": "googleEventId",
+          "field": "google_event_id",
           "type": "String",
           "default": null,
           "description": "Stores the Google Calendar event ID for syncing vacation booking events",
           "status": "pending"
+        },
+        {
+          "field": "sync_status",
+          "type": "String",
+          "default": "pending",
+          "description": "Status of Google Calendar sync (pending, synced, failed)",
+          "status": "missing_from_db"
+        },
+        {
+          "field": "last_sync_attempt",
+          "type": "DateTime",
+          "default": null,
+          "description": "Timestamp of the last sync attempt",
+          "status": "missing_from_db"
+        },
+        {
+          "field": "sync_error",
+          "type": "String",
+          "default": null,
+          "description": "Error message if sync failed",
+          "status": "missing_from_db"
         }
       ]
     },
@@ -220,6 +278,55 @@
           "default": "sunday",
           "description": "User preference for which day the week starts (sunday or monday)",
           "status": "added"
+        },
+        {
+          "field": "calendar_sync_enabled",
+          "type": "Boolean",
+          "default": false,
+          "description": "User preference for enabling Google Calendar sync",
+          "status": "pending"
+        },
+        {
+          "field": "calendar_sync_mode",
+          "type": "String",
+          "default": "auto",
+          "description": "User preference for sync mode (auto, manual, disabled)",
+          "status": "missing_from_db"
+        }
+      ]
+    },
+    {
+      "model": "GoogleToken",
+      "updates": [
+        {
+          "field": "user_id",
+          "type": "UUID",
+          "description": "Foreign key to User table",
+          "status": "exists"
+        },
+        {
+          "field": "access_token",
+          "type": "String",
+          "description": "Google OAuth access token",
+          "status": "exists"
+        },
+        {
+          "field": "refresh_token",
+          "type": "String",
+          "description": "Google OAuth refresh token",
+          "status": "exists"
+        },
+        {
+          "field": "expires_at",
+          "type": "Number",
+          "description": "Timestamp when the access token expires",
+          "status": "exists"
+        },
+        {
+          "field": "token_type",
+          "type": "String",
+          "description": "Type of token (e.g., 'Bearer')",
+          "status": "exists"
         }
       ]
     }

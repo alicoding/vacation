@@ -1,8 +1,8 @@
-'use client'
+'use client';
 
-import { ThemeProvider, createTheme } from '@mui/material/styles'
-import CssBaseline from '@mui/material/CssBaseline'
-import { AuthProvider } from '@/components/auth/AuthProvider'
+import { ThemeProvider, createTheme } from '@mui/material/styles';
+import CssBaseline from '@mui/material/CssBaseline';
+import { AuthProvider } from '@/components/auth/AuthProvider';
 
 // Create a theme instance
 const theme = createTheme({

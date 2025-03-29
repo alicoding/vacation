@@ -7,7 +7,7 @@ import Link from 'next/dist/client/app-dir/link';
 import Image from 'next/image';
 import { 
   AppBar, Toolbar, Box, Button, Avatar, Menu, MenuItem, IconButton,
-  Typography, Container
+  Typography, Container,
 } from '@mui/material';
 import { User } from '@/types';
 

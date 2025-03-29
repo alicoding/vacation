@@ -4,7 +4,7 @@ import {
   Box, Typography, Container, Paper, Grid, 
   Table, TableBody, TableCell, TableContainer, 
   TableHead, TableRow, CircularProgress, 
-  Chip, Alert
+  Chip, Alert,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { DateTime } from 'luxon';
@@ -57,8 +57,8 @@ const CalendarCell = styled(TableCell)(({ theme }) => ({
       backgroundColor: CALENDAR_COLORS.VACATION.FULL_DAY,
       zIndex: 0,
       pointerEvents: 'none',
-    }
-  }
+    },
+  },
 }));
 
 const DayNumber = styled(Typography)(({ theme }) => ({
@@ -91,7 +91,7 @@ export default function FullCalendar({
   error,
   onPrevMonth,
   onNextMonth,
-  onCurrentMonth
+  onCurrentMonth,
 }: FullCalendarProps) {
   const { data: session, status } = useSession();
   const weekStartsOn = (session as ExtendedSession)?.user?.week_starts_on || 'sunday';
@@ -135,7 +135,7 @@ export default function FullCalendar({
 
   // Helper to check if a date has a vacation
   const getVacationsForDate = (date: DateTime) => {
-    return vacations.filter(vacation => {
+    return vacations.filter((vacation) => {
       const startDate = DateTime.fromISO(vacation.start_date.toString());
       const endDate = DateTime.fromISO(vacation.end_date.toString());
       return date >= startDate.startOf('day') && date <= endDate.endOf('day');
@@ -144,7 +144,7 @@ export default function FullCalendar({
 
   // Helper to check if a date is a holiday
   const getHolidayForDate = (date: DateTime) => {
-    return holidays.find(holiday => {
+    return holidays.find((holiday) => {
       // Convert both dates to UTC for consistent comparison
       const holidayDate = DateTime.fromISO(holiday.date, { zone: 'utc' });
       const dateInUtc = date.toUTC();

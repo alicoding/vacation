@@ -11,11 +11,10 @@ import {
   ListItem,
   ListItemText,
   Divider,
-  Chip
+  Chip,
 } from '@mui/material';
-import useHolidays, { Holiday } from '@/lib/hooks/useHolidays';
+import useHolidays from '@/lib/hooks/useHolidays';
 import { DateTime } from 'luxon';
-import { fetchHolidays, Holiday as ClientHoliday } from '@/lib/client/holidayClient';
 
 interface HolidayOverviewCardProps {
   province: string;
@@ -25,35 +24,52 @@ interface HolidayOverviewCardProps {
 export default function HolidayOverviewCard({ province, employmentType = 'standard' }: HolidayOverviewCardProps) {
   const currentYear = new Date().getFullYear();
   const { holidays, loading, error } = useHolidays(currentYear, province);
-  const [upcomingHolidays, setUpcomingHolidays] = useState<Holiday[]>([]);
-
-  useEffect(() => {
-    const fetchUpcomingHolidays = async () => {
-      try {
-        const today = DateTime.now();
-        const sixMonthsFromNow = today.plus({ months: 6 });
-        
-        // Use the fetchHolidays function with correct arguments
-        const holidays = await fetchHolidays(
-          today.toJSDate(), 
-          sixMonthsFromNow.toJSDate(), 
-          province
-        );
-        
-        // Filter holidays based on employment type if needed
-        const filteredHolidays = employmentType === 'bank' 
-          ? holidays.filter(h => h.type === 'bank') 
-          : holidays;
-        
-        setUpcomingHolidays(filteredHolidays as unknown as Holiday[]);
-      } catch (error) {
-        console.error('Error fetching upcoming holidays:', error);
-      }
-    };
+  
+  // Filter holidays to show only upcoming ones
+  const getUpcomingHolidays = () => {
+    if (!holidays || holidays.length === 0) {
+      console.log('[HolidayOverviewCard] No holidays available');
+      return [];
+    }
     
-    fetchUpcomingHolidays();
-  }, [province, employmentType]);
-
+    console.log('[HolidayOverviewCard] Filtering upcoming holidays from total:', holidays.length);
+    
+    const today = DateTime.now().startOf('day');
+    const sixMonthsFromNow = today.plus({ months: 6 });
+    
+    // Filter for upcoming holidays in the next 6 months
+    const upcoming = holidays.filter((holiday) => {
+      // Parse the date consistently using Luxon
+      const holidayDate = typeof holiday.date === 'string'
+        ? DateTime.fromISO(holiday.date).startOf('day')
+        : DateTime.fromJSDate(holiday.date as Date).startOf('day');
+      
+      // Keep only future holidays within 6 months
+      const isUpcoming = holidayDate >= today && holidayDate <= sixMonthsFromNow;
+      
+      // Apply employment type filter if needed
+      const matchesType = employmentType === 'bank' ? holiday.type === 'bank' : true;
+      
+      return isUpcoming && matchesType;
+    }).sort((a, b) => {
+      // Sort by date (ascending)
+      const dateA = typeof a.date === 'string'
+        ? DateTime.fromISO(a.date)
+        : DateTime.fromJSDate(a.date as Date);
+        
+      const dateB = typeof b.date === 'string'
+        ? DateTime.fromISO(b.date)
+        : DateTime.fromJSDate(b.date as Date);
+        
+      return dateA.toMillis() - dateB.toMillis();
+    });
+    
+    console.log('[HolidayOverviewCard] Found upcoming holidays:', upcoming.length);
+    return upcoming;
+  };
+  
+  const upcomingHolidays = getUpcomingHolidays();
+  
   if (loading) {
     return (
       <Card>
@@ -63,7 +79,7 @@ export default function HolidayOverviewCard({ province, employmentType = 'standa
       </Card>
     );
   }
-
+  
   if (error) {
     return (
       <Card>
@@ -75,8 +91,7 @@ export default function HolidayOverviewCard({ province, employmentType = 'standa
       </Card>
     );
   }
-
-  // Rest of the component rendering
+  
   return (
     <Card>
       <CardContent>
@@ -90,27 +105,34 @@ export default function HolidayOverviewCard({ province, employmentType = 'standa
           </Typography>
         ) : (
           <List>
-            {upcomingHolidays.slice(0, 5).map((holiday, index) => (
-              <React.Fragment key={holiday.id}>
-                {index > 0 && <Divider component="li" />}
-                <ListItem>
-                  <ListItemText
-                    primary={holiday.name}
-                    secondary={
-                      <>
-                        {DateTime.fromISO(holiday.date).toFormat('MMMM dd, yyyy')}
-                        <Chip 
-                          size="small" 
-                          label={holiday.type}
-                          color={holiday.type === 'bank' ? 'primary' : 'secondary'}
-                          sx={{ ml: 1, height: 20 }}
-                        />
-                      </>
-                    }
-                  />
-                </ListItem>
-              </React.Fragment>
-            ))}
+            {upcomingHolidays.slice(0, 5).map((holiday, index) => {
+              // Parse date consistently with Luxon
+              const holidayDate = typeof holiday.date === 'string'
+                ? DateTime.fromISO(holiday.date)
+                : DateTime.fromJSDate(holiday.date as Date);
+                
+              return (
+                <React.Fragment key={holiday.id || index}>
+                  {index > 0 && <Divider component="li" />}
+                  <ListItem>
+                    <ListItemText
+                      primary={holiday.name}
+                      secondary={
+                        <>
+                          {holidayDate.toFormat('MMMM dd, yyyy')}
+                          <Chip 
+                            size="small" 
+                            label={holiday.type === 'bank' ? 'Bank Holiday' : 'Provincial'}
+                            color={holiday.type === 'bank' ? 'primary' : 'secondary'}
+                            sx={{ ml: 1, height: 20 }}
+                          />
+                        </>
+                      }
+                    />
+                  </ListItem>
+                </React.Fragment>
+              );
+            })}
           </List>
         )}
       </CardContent>

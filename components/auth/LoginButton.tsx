@@ -1,21 +1,27 @@
-'use client'
+'use client';
 
-import { useAuth } from './AuthProvider'
-import Button from '@mui/material/Button'
-import SvgIcon from '@mui/material/SvgIcon'
+import { useAuth } from './AuthProvider';
+import Button from '@mui/material/Button';
+import SvgIcon from '@mui/material/SvgIcon';
 
 export default function LoginButton() {
-  const { signInWithGoogle } = useAuth()
-
+  const { signInWithGoogle } = useAuth();
+  
+  // Create a wrapper function that accepts the MouseEvent and calls signInWithGoogle
+  const handleSignIn = (event: React.MouseEvent) => {
+    event.preventDefault();
+    signInWithGoogle();
+  };
+  
   return (
     <Button 
-      onClick={signInWithGoogle} 
+      onClick={handleSignIn} 
       variant="outlined" 
       sx={{ 
         textTransform: 'none',
         display: 'flex',
         alignItems: 'center',
-        gap: 1
+        gap: 1,
       }}
     >
       <SvgIcon sx={{ fontSize: 20 }}>
@@ -28,5 +34,5 @@ export default function LoginButton() {
       </SvgIcon>
       Sign in with Google
     </Button>
-  )
+  );
 }

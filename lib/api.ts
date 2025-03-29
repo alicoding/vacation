@@ -24,7 +24,7 @@ export async function fetchWithZrok(url: string, options: RequestInit = {}): Pro
 export async function apiRequest<T>(
   url: string, 
   method: string = 'GET', 
-  data?: any
+  data?: any,
 ): Promise<T> {
   const options: RequestInit = {
     method,

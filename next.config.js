@@ -7,7 +7,7 @@ const nextConfig = {
       bodySizeLimit: '2mb',
     },
     turbo: {
-      enabled: true
+      enabled: true,
     },
   },
   

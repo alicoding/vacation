@@ -19,21 +19,21 @@ export async function POST(request: Request) {
     if (!startDate) {
       return NextResponse.json(
         { error: 'startDate parameter is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
     if (!endDate) {
       return NextResponse.json(
         { error: 'endDate parameter is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
     if (!province) {
       return NextResponse.json(
         { error: 'province parameter is required' },
-        { status: 400 }
+        { status: 400 },
       );
     }
     
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     console.error('Error fetching holidays:', error);
     return NextResponse.json(
       { error: 'Failed to fetch holidays', details: String(error) },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -8,429 +8,237 @@
  * @returns {React.ReactNode} A React component displaying the list of vacations.
  */
 'use client';
-
 import React, { useState } from 'react';
 import { 
-  Paper, 
-  Typography, 
-  List, 
-  ListItem, 
-  Divider, 
-  Chip, 
-  IconButton, 
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  DialogContentText,
-  DialogTitle,
-  Snackbar,
-  Alert,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails
+  Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
+  TableRow, Typography, IconButton, Tooltip, Dialog,
+  DialogTitle, DialogContent, DialogContentText, DialogActions,
+  Button, CircularProgress,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { DateTime, Interval } from 'luxon';
-import { VacationBooking } from '@/services/vacation/vacationTypes';
+import EditIcon from '@mui/icons-material/Edit';
+import { DateTime } from 'luxon';
 import { useRouter } from 'next/navigation';
-import VacationSummary from '@/components/vacation/VacationSummary';
+import VacationEditDialog from './VacationEditDialog';
 
-// Enhanced vacation type that includes both camelCase and snake_case properties
-// as well as our calculated fields
-interface EnhancedVacation extends Partial<VacationBooking> {
-  id?: string;
-  userId?: string;
-  startDate?: Date;
-  endDate?: Date;
-  start_date?: Date | string;
-  end_date?: Date | string;
-  note?: string | null;
-  createdAt?: Date;
-  created_at?: Date | string;
-  totalDays?: number;
-  businessDays?: number;
-  formattedStartDate?: string;
-  formattedEndDate?: string;
-  isHalfDay?: boolean;
-  halfDayPortion?: string | null;
+interface Vacation {
+  id: string;
+  start_date: string;
+  end_date: string;
+  note?: string;
   is_half_day?: boolean;
-  half_day_portion?: string | null;
+  half_day_portion?: string;
+  user_id: string;
+  created_at: string;
+  google_event_id?: string;
 }
 
-interface VacationListProps {
-  vacations: (VacationBooking | any)[];
-  holidays: Array<{
-    date: Date;
-    name: string;
-    province: string | null;
-    type: 'bank' | 'provincial';
-  }>;
-  province: string;
+// Helper function to calculate duration
+function calculateDuration(start: string, end: string) {
+  const startDate = DateTime.fromISO(start);
+  const endDate = DateTime.fromISO(end);
+  const diff = endDate.diff(startDate, 'days').days + 1;
+  return `${diff} ${diff === 1 ? 'day' : 'days'}`;
 }
 
-export default function VacationList({ vacations, holidays, province }: VacationListProps) {
-  const router = useRouter();
+// Helper function to determine status text
+function getStatusText(vacation: Vacation) {
+  const now = DateTime.now();
+  const startDate = DateTime.fromISO(vacation.start_date);
+  const endDate = DateTime.fromISO(vacation.end_date);
+  
+  if (endDate < now) {
+    return 'Completed';
+  } else if (startDate <= now && endDate >= now) {
+    return 'In Progress';
+  } else {
+    return 'Upcoming';
+  }
+}
+
+export default function VacationList({ vacations }: { vacations: Vacation[] }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [vacationToDelete, setVacationToDelete] = useState<string | null>(null);
+  const [vacationToDelete, setVacationToDelete] = useState<Vacation | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  
-  // Function to calculate business days (excluding weekends and holidays)
-  const calculateBusinessDays = (startDate: Date | string, endDate: Date | string) => {
-    if (!startDate || !endDate) return 0;
-    
-    try {
-      // Convert to DateTime objects safely
-      const start = startDate instanceof Date ? 
-        DateTime.fromJSDate(startDate) : 
-        DateTime.fromISO(startDate.toString());
-        
-      const end = endDate instanceof Date ? 
-        DateTime.fromJSDate(endDate) : 
-        DateTime.fromISO(endDate.toString());
-      
-      if (!start.isValid || !end.isValid) {
-        console.error('Invalid date in calculateBusinessDays', { startDate, endDate });
-        return 0;
-      }
-      
-      let count = 0;
-      let current = start.startOf('day');
-      const lastDay = end.startOf('day');
-      
-      // Get holiday dates for comparison
-      const holidayDates = holidays.map(h => 
-        DateTime.fromJSDate(h.date).toISODate()
-      );
-      
-      while (current <= lastDay) {
-        if (![6, 7].includes(current.weekday)) { // Not a weekend
-          // Check if it's a holiday
-          if (!holidayDates.includes(current.toISODate())) {
-            count++;
-          }
-        }
-        current = current.plus({ days: 1 });
-      }
-      
-      return count;
-    } catch (error) {
-      console.error('Error calculating business days:', error, { startDate, endDate });
-      return 0;
-    }
-  };
-  
-  const formatDateRange = (startDate: Date | string, endDate: Date | string) => {
-    // Check if dates are valid before proceeding
-    if (!startDate || !endDate) {
-      return 'Invalid date range';
-    }
-    
-    try {
-      // Convert to DateTime objects safely
-      const start = startDate instanceof Date ? 
-        DateTime.fromJSDate(startDate) : 
-        DateTime.fromISO(startDate.toString());
-        
-      const end = endDate instanceof Date ? 
-        DateTime.fromJSDate(endDate) : 
-        DateTime.fromISO(endDate.toString());
-      
-      // Validate that the dates are properly parsed
-      if (!start.isValid || !end.isValid) {
-        console.error('Invalid date in formatDateRange', { startDate, endDate });
-        return 'Invalid date range';
-      }
-      
-      // If same day, return single date
-      if (start.hasSame(end, 'day')) {
-        return start.toFormat('MMMM d, yyyy');
-      }
-      
-      // If same month and year, return range with single month/year
-      if (start.hasSame(end, 'month') && start.hasSame(end, 'year')) {
-        return `${start.toFormat('MMMM d')} - ${end.toFormat('d, yyyy')}`;
-      }
-      
-      // If different months but same year
-      if (start.hasSame(end, 'year')) {
-        return `${start.toFormat('MMM d')} - ${end.toFormat('MMM d, yyyy')}`;
-      }
-      
-      // Different years
-      return `${start.toFormat('MMM d, yyyy')} - ${end.toFormat('MMM d, yyyy')}`;
-    } catch (error) {
-      console.error('Error formatting date range:', error, { startDate, endDate });
-      return 'Invalid date range';
-    }
-  };
-  
-  const confirmDelete = (id: string) => {
-    setVacationToDelete(id);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [vacationToEdit, setVacationToEdit] = useState<Vacation | null>(null);
+  const router = useRouter();
+
+  // Delete vacation handlers
+  const handleDeleteClick = (vacation: Vacation) => {
+    setVacationToDelete(vacation);
     setDeleteDialogOpen(true);
   };
-  
-  const handleDelete = async () => {
+
+  const handleDeleteConfirm = async () => {
     if (!vacationToDelete) return;
     
     setIsDeleting(true);
+    setErrorMessage(null);
     
     try {
-      const response = await fetch(`/api/vacations/${vacationToDelete}`, {
+      const response = await fetch(`/api/vacations/${vacationToDelete.id}`, {
         method: 'DELETE',
+        credentials: 'include', // Include credentials to send cookies with the request
       });
       
       if (!response.ok) {
-        throw new Error('Failed to delete vacation booking');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to delete vacation');
       }
       
-      // Close dialog and show success message
+      // Close dialog and refresh data
       setDeleteDialogOpen(false);
-      setSuccessMessage('Vacation deleted successfully');
-      
-      // Refresh the page to update the list
       router.refresh();
     } catch (error) {
       console.error('Error deleting vacation:', error);
-      setErrorMessage('Failed to delete vacation. Please try again.');
+      setErrorMessage(error instanceof Error ? error.message : 'An unknown error occurred');
     } finally {
       setIsDeleting(false);
-      setVacationToDelete(null);
     }
   };
-  
-  const handleCancelDelete = () => {
+
+  const handleCloseDialog = () => {
     setDeleteDialogOpen(false);
     setVacationToDelete(null);
-  };
-  
-  const handleCloseSnackbar = () => {
     setErrorMessage(null);
-    setSuccessMessage(null);
   };
-  
-  const handleAccordionChange = (id: string) => {
-    setExpandedId(expandedId === id ? null : id);
+
+  // Edit vacation handlers
+  const handleEditClick = (vacation: Vacation) => {
+    setVacationToEdit(vacation);
+    setEditDialogOpen(true);
   };
-  
-  // Calculate total and business days for each vacation
-  const vacationsWithDetails: EnhancedVacation[] = vacations.map(vacation => {
-    try {
-      // Safely parse dates by checking the type
-      const startDateValue = vacation.startDate || vacation.start_date;
-      const endDateValue = vacation.endDate || vacation.end_date;
-      
-      // Safely convert to DateTime objects
-      const start = typeof startDateValue === 'string' ? 
-        DateTime.fromISO(startDateValue) : 
-        DateTime.fromJSDate(startDateValue as Date);
-        
-      const end = typeof endDateValue === 'string' ? 
-        DateTime.fromISO(endDateValue) : 
-        DateTime.fromJSDate(endDateValue as Date);
-      
-      // Validate that the dates are properly parsed
-      if (!start.isValid || !end.isValid) {
-        console.error('Invalid date in vacationsWithDetails', { startDateValue, endDateValue });
-        return {
-          ...vacation,
-          totalDays: 0,
-          businessDays: 0
-        };
-      }
-      
-      // Calculate total days (including weekends and holidays)
-      const totalDays = Interval.fromDateTimes(
-        start,
-        end.plus({ days: 1 })
-      ).length('days');
-      
-      // Calculate business days (excluding weekends and holidays)
-      const businessDays = calculateBusinessDays(startDateValue, endDateValue);
-      
-      return {
-        ...vacation,
-        totalDays,
-        businessDays,
-        // Add formatted dates for display
-        formattedStartDate: start.toFormat('LLL d, yyyy'),
-        formattedEndDate: end.toFormat('LLL d, yyyy')
-      };
-    } catch (error) {
-      console.error('Error calculating vacation details:', error, vacation);
-      return {
-        ...vacation,
-        totalDays: 0,
-        businessDays: 0,
-        formattedStartDate: 'Invalid date',
-        formattedEndDate: 'Invalid date'
-      };
-    }
-  });
-  
-  // Sort vacations by date (most recent first)
-  const sortedVacations = [...vacationsWithDetails].sort((a, b) => {
-    const aStart = a.startDate || a.start_date;
-    const bStart = b.startDate || b.start_date;
-    
-    if (!aStart) return 1;
-    if (!bStart) return -1;
-    
-    // Convert to DateTime for comparison
-    const aDateTime = aStart instanceof Date ? 
-      DateTime.fromJSDate(aStart) : 
-      DateTime.fromISO(aStart.toString());
-      
-    const bDateTime = bStart instanceof Date ? 
-      DateTime.fromJSDate(bStart) : 
-      DateTime.fromISO(bStart.toString());
-    
-    // Sort descending (newest first)
-    return bDateTime.toMillis() - aDateTime.toMillis();
-  });
-  
+
+  const handleEditSuccess = () => {
+    router.refresh();
+  };
+
+  const handleCloseEditDialog = () => {
+    setEditDialogOpen(false);
+    setVacationToEdit(null);
+  };
+
   return (
     <>
-      {sortedVacations.length === 0 ? (
-        <Paper sx={{ p: 4, textAlign: 'center' }}>
-          <Typography variant="body1" color="text.secondary" gutterBottom>
-            You haven't booked any vacations yet.
-          </Typography>
-          <Typography variant="body2" color="text.secondary" gutterBottom>
-            Use the form to book your first vacation!
-          </Typography>
-        </Paper>
-      ) : (
-        <List>
-          {sortedVacations.map((vacation, index) => {
-            const startDate = vacation.startDate || vacation.start_date;
-            const endDate = vacation.endDate || vacation.end_date;
-            
-            return (
-              <React.Fragment key={vacation.id}>
-                <Accordion 
-                  expanded={expandedId === vacation.id} 
-                  onChange={() => handleAccordionChange(vacation.id || '')}
-                  sx={{ 
-                    boxShadow: 'none', 
-                    '&:before': { display: 'none' },
-                    border: expandedId === vacation.id ? '1px solid rgba(0, 0, 0, 0.12)' : 'none',
-                    my: 1
-                  }}
-                >
-                  <AccordionSummary 
-                    expandIcon={<ExpandMoreIcon />}
-                    sx={{ px: 2 }}
-                  >
-                    <div className="w-full flex justify-between items-start">
-                      <div>
-                        <Typography variant="subtitle1" component="div" sx={{ fontWeight: 'medium' }}>
-                          {formatDateRange(
-                            vacation.startDate || vacation.start_date || '', 
-                            vacation.endDate || vacation.end_date || ''
-                          )}
-                        </Typography>
-                        
-                        {vacation.note && (
-                          <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                            {vacation.note}
-                          </Typography>
-                        )}
-                        
-                        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-                          <Chip 
-                            size="small" 
-                            label={`${vacation.totalDays || 0} total days`} 
-                            variant="outlined"
-                          />
-                          {(vacation.businessDays || 0) > 0 && (
-                            <Chip 
-                              size="small" 
-                              label={`${vacation.businessDays || 0} working days`} 
-                              color="primary"
-                              variant="outlined"
-                            />
-                          )}
-                          {vacation.isHalfDay && (
-                            <Chip 
-                              size="small" 
-                              label="Half-day" 
-                              color="secondary"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
-                      </div>
-                      
+      <TableContainer component={Paper} variant="outlined">
+        <Table sx={{ minWidth: 650 }}>
+          <TableHead>
+            <TableRow>
+              <TableCell>Start Date</TableCell>
+              <TableCell>End Date</TableCell>
+              <TableCell>Duration</TableCell>
+              <TableCell>Note</TableCell>
+              <TableCell>Status</TableCell>
+              <TableCell align="right">Actions</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {vacations.length > 0 ? (
+              vacations.map((vacation) => (
+                <TableRow key={vacation.id} hover>
+                  <TableCell>{DateTime.fromISO(vacation.start_date).toFormat('MMM d, yyyy')}</TableCell>
+                  <TableCell>{DateTime.fromISO(vacation.end_date).toFormat('MMM d, yyyy')}</TableCell>
+                  <TableCell>
+                    {calculateDuration(vacation.start_date, vacation.end_date)}
+                    {vacation.is_half_day && (
+                      <Typography variant="caption" display="block" color="text.secondary">
+                        (Half-day {vacation.half_day_portion})
+                      </Typography>
+                    )}
+                  </TableCell>
+                  <TableCell>{vacation.note || '-'}</TableCell>
+                  <TableCell>{getStatusText(vacation)}</TableCell>
+                  <TableCell align="right">
+                    <Tooltip title="Edit">
                       <IconButton 
-                        edge="end" 
-                        aria-label="delete" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          confirmDelete(vacation.id as string);
-                        }}
+                        size="small" 
+                        color="primary"
+                        onClick={() => handleEditClick(vacation)}
                       >
-                        <DeleteIcon />
+                        <EditIcon fontSize="small" />
                       </IconButton>
-                    </div>
-                  </AccordionSummary>
-                  <AccordionDetails sx={{ pt: 0 }}>
-                    <Divider sx={{ mb: 2 }} />
-                    <VacationSummary 
-                      startDate={startDate ? new Date(startDate) : new Date()}
-                      endDate={endDate ? new Date(endDate) : new Date()}
-                      isHalfDay={vacation.isHalfDay}
-                      holidays={holidays}
-                    />
-                  </AccordionDetails>
-                </Accordion>
-                {!expandedId && index < sortedVacations.length - 1 && <Divider component="li" />}
-              </React.Fragment>
-            );
-          })}
-        </List>
-      )}
-      
+                    </Tooltip>
+                    <Tooltip title="Delete">
+                      <IconButton 
+                        size="small" 
+                        color="error"
+                        onClick={() => handleDeleteClick(vacation)}
+                      >
+                        <DeleteIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={6} align="center" sx={{ py: 3 }}>
+                  <Typography variant="body1" color="text.secondary">
+                    No vacation bookings found
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                    Click "Request Vacation" to create your first booking
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
       {/* Delete Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCancelDelete}>
-        <DialogTitle>Confirm Deletion</DialogTitle>
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={handleCloseDialog}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">
+          Confirm Vacation Cancellation
+        </DialogTitle>
         <DialogContent>
-          <DialogContentText>
-            Are you sure you want to delete this vacation booking? This action cannot be undone.
+          <DialogContentText id="alert-dialog-description">
+            Are you sure you want to cancel your vacation from{' '}
+            {vacationToDelete && DateTime.fromISO(vacationToDelete.start_date).toFormat('MMM d, yyyy')}{' '}
+            to{' '}
+            {vacationToDelete && DateTime.fromISO(vacationToDelete.end_date).toFormat('MMM d, yyyy')}?
+            {vacationToDelete?.google_event_id && (
+              <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
+                This will also remove the event from your Google Calendar.
+              </Typography>
+            )}
           </DialogContentText>
+          {errorMessage && (
+            <Typography color="error" variant="body2" sx={{ mt: 2 }}>
+              {errorMessage}
+            </Typography>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCancelDelete} disabled={isDeleting}>
+          <Button onClick={handleCloseDialog} disabled={isDeleting}>
             Cancel
           </Button>
           <Button 
-            onClick={handleDelete} 
+            onClick={handleDeleteConfirm} 
             color="error" 
-            disabled={isDeleting} 
             variant="contained"
+            disabled={isDeleting}
+            startIcon={isDeleting ? <CircularProgress size={20} color="inherit" /> : null}
           >
-            {isDeleting ? 'Deleting...' : 'Delete'}
+            {isDeleting ? 'Deleting...' : 'Delete Vacation'}
           </Button>
         </DialogActions>
       </Dialog>
-      
-      {/* Snackbars for success/error messages */}
-      <Snackbar open={!!errorMessage} autoHideDuration={6000} onClose={handleCloseSnackbar}>
-        <Alert onClose={handleCloseSnackbar} severity="error" variant="filled">
-          {errorMessage}
-        </Alert>
-      </Snackbar>
-      
-      <Snackbar open={!!successMessage} autoHideDuration={6000} onClose={handleCloseSnackbar}>
-        <Alert onClose={handleCloseSnackbar} severity="success" variant="filled">
-          {successMessage}
-        </Alert>
-      </Snackbar>
+
+      {/* Edit Vacation Dialog */}
+      <VacationEditDialog
+        open={editDialogOpen}
+        onClose={handleCloseEditDialog}
+        vacation={vacationToEdit}
+        onSuccess={handleEditSuccess}
+      />
     </>
   );
 }

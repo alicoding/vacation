@@ -4,7 +4,7 @@ import React, { ReactNode } from 'react';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 
 export default function Provider({ 
-  children
+  children,
 }: { 
   children: ReactNode;
 }) {

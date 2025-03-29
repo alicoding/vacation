@@ -2,7 +2,7 @@
 
 import { 
   Card, CardContent, CardHeader, Typography, Box,
-  Divider, LinearProgress, Grid
+  Divider, LinearProgress, Grid,
 } from '@mui/material';
 
 interface VacationStats {

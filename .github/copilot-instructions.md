@@ -18,6 +18,7 @@ The app allows users to:
 - **Google Integration**: Includes Google Calendar integration (read/write) using tokens stored in Supabase.
 - **UI Framework**: Uses MUI Core components throughout the application.
 - **Runtime**: Avoids Node-only APIs in favor of edge-compatible alternatives.
+- **Date Library**: Uses Luxon exclusively for all date manipulation and formatting.
 
 ## Application Architecture
 
@@ -58,6 +59,20 @@ The app allows users to:
 - Use 2 spaces for indentation
 - Use kebab-case for file names, except for component files which use PascalCase
 
+### Component Structure
+- Keep component files under 300 lines of code
+- Break down large components into smaller, focused components
+- Factor out reusable logic into custom hooks or utility functions
+- Create dedicated utility components for repetitive UI patterns
+- Consider splitting complex forms into multiple component files
+
+### Date Handling
+- Use Luxon DateTime exclusively for all date manipulation and formatting
+- Avoid mixing native Date objects with Luxon - convert consistently
+- Use appropriate timezone handling with Luxon's zone capabilities
+- Follow consistent date formatting patterns across the application
+- Document date format expectations in component props
+
 ### Functional Patterns
 - Use arrow functions for all callbacks
 - Use async/await for asynchronous logic
@@ -97,8 +112,3 @@ The app allows users to:
 - Define strong types for all tables in Database type
 - Use RLS policies in Supabase for security
 - Follow the schema defined in the Database type
-
-### Google Calendar Integration
-- Store Google OAuth tokens in the `google_tokens` table
-- Use token refresh mechanism in `app/api/auth/refresh-token/route.ts`
-- Google Calendar operations should use the utils/googleCalendar.ts helpers

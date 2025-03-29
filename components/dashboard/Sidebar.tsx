@@ -6,7 +6,7 @@ import { useSession } from '@/lib/auth-helpers';
 import Link from 'next/dist/client/app-dir/link';
 import { 
   Box, List, ListItem, ListItemIcon, ListItemText, ListItemButton, 
-  Typography, Divider, IconButton, Paper, Stack, Collapse, Drawer, Chip
+  Typography, Divider, IconButton, Paper, Stack, Collapse, Drawer, Chip,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChevronDoubleLeftIcon from '@heroicons/react/24/outline/ChevronDoubleLeftIcon';
@@ -46,13 +46,13 @@ export default function DashboardSidebar() {
   const [vacationStats, setVacationStats] = useState({
     used: 0,
     booked: 0,
-    remaining: 0
+    remaining: 0,
   });
 
   // Navigation links for the sidebar - properly typed
   const navLinks: NavLink[] = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Request Vacation', href: '/dashboard/request', icon: CalendarIcon },
+    { name: 'Request Vacation', href: '/dashboard/vacations', icon: CalendarIcon },
     { name: 'Calendar', href: '/dashboard/calendar', icon: CalendarIcon },
     { name: 'Settings', href: '/dashboard/settings', icon: CogIcon },
   ];
@@ -99,7 +99,7 @@ export default function DashboardSidebar() {
             setVacationStats({
               used: 0, // This would come from a more complex calculation
               booked: bookedDays,
-              remaining: totalDays - bookedDays
+              remaining: totalDays - bookedDays,
             });
           }
         }
@@ -118,7 +118,7 @@ export default function DashboardSidebar() {
 
   // Get upcoming holidays (next 3)
   const upcomingHolidays = holidays
-    .filter(holiday => {
+    .filter((holiday) => {
       // Use Luxon to correctly handle dates in UTC
       const holidayDate = parseHolidayDate(holiday.date);
       const today = DateTime.now();
@@ -133,7 +133,7 @@ export default function DashboardSidebar() {
   // Create a wrapper component to handle HeroIcon with MUI props
   const IconWrapper = ({ 
     icon: Icon, 
-    sx 
+    sx, 
   }: { 
     icon: React.ForwardRefExoticComponent<React.SVGProps<SVGSVGElement>>, 
     sx?: Record<string, unknown> 
@@ -149,7 +149,7 @@ export default function DashboardSidebar() {
         flexDirection: 'column',
         height: '100%',
         borderRight: 1,
-        borderColor: 'divider'
+        borderColor: 'divider',
       }}
     >
       <Box display="flex" alignItems="center" justifyContent="space-between" px={2} py={1}>
@@ -175,13 +175,13 @@ export default function DashboardSidebar() {
             position: 'relative', 
             border: 'none',
             boxSizing: 'border-box',
-            width: collapsed ? 'auto' : 240
-          }
+            width: collapsed ? 'auto' : 240,
+          },
         }}
       >
         <Box sx={{ p: 1 }}>
           <List>
-            {navLinks.map(link => (
+            {navLinks.map((link) => (
               <ListItem key={link.name} disablePadding>
                 <ListItemButton 
                   component={Link}
@@ -190,7 +190,7 @@ export default function DashboardSidebar() {
                   sx={{
                     borderRadius: 1,
                     mb: 0.5,
-                    bgcolor: isActive(link.href) ? 'action.selected' : 'transparent'
+                    bgcolor: isActive(link.href) ? 'action.selected' : 'transparent',
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: collapsed ? 'auto' : 40 }}>
@@ -301,7 +301,7 @@ export default function DashboardSidebar() {
                   width: 8, 
                   height: 8, 
                   borderRadius: '50%', 
-                  bgcolor: 'warning.main' 
+                  bgcolor: 'warning.main', 
                 }} 
               />
               <Typography variant="caption" color="text.secondary">
@@ -314,7 +314,7 @@ export default function DashboardSidebar() {
                   width: 8, 
                   height: 8, 
                   borderRadius: '50%', 
-                  bgcolor: 'secondary.main' 
+                  bgcolor: 'secondary.main', 
                 }} 
               />
               <Typography variant="caption" color="text.secondary">
