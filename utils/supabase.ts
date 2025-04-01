@@ -2,12 +2,22 @@ import { createBrowserClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
+// Validate required environment variables
+const getRequiredEnvVar = (name: string): string => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} environment variable is not set`);
+  }
+  return value;
+};
+
 // For client components - works in both App Router and Pages Router
-export const createBrowserSupabaseClient = () => 
-  createBrowserClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
-  );
+export const createBrowserSupabaseClient = () => {
+  const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  
+  return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+};
 
 // For direct API access with proper cookie handling
 export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?: string }) => {
@@ -28,9 +38,12 @@ export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?:
     headers['Cookie'] = cookieString;
   }
   
+  const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  
   return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL ?? '',
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? '',
+    supabaseUrl,
+    supabaseAnonKey,
     {
       auth: {
         persistSession: false,

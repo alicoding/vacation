@@ -3,11 +3,23 @@ import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
 
+// Validate required environment variables
+const getRequiredEnvVar = (name: string): string => {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`${name} environment variable is not set`);
+  }
+  return value;
+};
+
 // For server components in App Router only
 export const createServerClient = (cookieStore = cookies()) => {
+  const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  
   return createClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         get: async (name) => {
@@ -26,15 +38,16 @@ export const createServerClient = (cookieStore = cookies()) => {
 
 // Create a service role client for admin operations (bypasses RLS)
 export const createServiceClient = () => {
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+  const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   
   if (!supabaseServiceKey) {
     console.error('Service role key is not defined!');
     // Fallback to regular client if service key is not available
+    const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
     return createSupabaseClient<Database>(
       supabaseUrl,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      supabaseAnonKey,
     );
   }
   
