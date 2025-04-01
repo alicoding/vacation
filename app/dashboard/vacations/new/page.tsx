@@ -33,7 +33,7 @@ export default async function NewVacationPage() {
   const { data: existingVacations, error: vacationsError } = await supabase
     .from('vacation_bookings')
     .select('start_date, end_date, is_half_day')
-    .eq('user_id', session.user.id);
+    .eq('user_id', session.user.id as any);
     
   if (vacationsError) {
     console.error('Error fetching existing vacations:', vacationsError);
@@ -49,25 +49,58 @@ export default async function NewVacationPage() {
   const { data: userProfile, error: userError } = await supabase
     .from('users')
     .select('province')
-    .eq('id', session.user.id)
+    .eq('id', session.user.id as any)
     .single();
   
-  const userProvince = userProfile?.province || 'ON'; // Default to Ontario if not set
+  // Safely check if userProfile exists and has province property
+  const userProvince = 
+    userProfile && 'province' in userProfile ? 
+      userProfile.province || 'ON' : 
+      'ON'; // Default to Ontario if not set
   
   // If there are no vacations for this user, fetch all vacations (for testing)
-  let allVacations = existingVacations;
-  if (!existingVacations || existingVacations.length === 0) {
-    // For testing purposes, fetch some other vacations to ensure display works
-    const { data: testVacations } = await supabase
-      .from('vacation_bookings')
-      .select('start_date, end_date, is_half_day')
-      .limit(5);
-      
-    if (testVacations && testVacations.length > 0) {
-      console.log(`For testing, using ${testVacations.length} sample vacations`);
-      allVacations = testVacations;
-    }
-  }
+  const allVacations = existingVacations && existingVacations.length > 0 ? 
+    // Format existing vacations to ensure they match the expected type
+    (existingVacations as any[]).map((vacation) => ({
+      start_date: vacation.start_date,
+      end_date: vacation.end_date,
+      is_half_day: vacation.is_half_day,
+    })) : 
+    // Try to fetch some sample vacations if none exist for this user
+    await (async () => {
+      const { data: testVacations } = await supabase
+        .from('vacation_bookings')
+        .select('start_date, end_date, is_half_day')
+        .limit(5);
+        
+      if (testVacations && testVacations.length > 0) {
+        console.log(`For testing, using ${testVacations.length} sample vacations`);
+        return (testVacations as any[]).map((vacation) => ({
+          start_date: vacation.start_date,
+          end_date: vacation.end_date,
+          is_half_day: vacation.is_half_day,
+        }));
+      }
+      return [];
+    })();
+  
+  // Map holidays to the expected structure for VacationForm component
+  // This ensures type compatibility by explicitly mapping each required field
+  const formattedHolidays = holidays ? 
+    // First filter for valid holiday objects, then map to required format
+    (holidays as any[])
+      .filter((holiday) => 
+        holiday && typeof holiday === 'object' && 
+        'date' in holiday && 
+        'name' in holiday && 
+        'type' in holiday)
+      .map((holiday) => ({
+        date: holiday.date,
+        name: holiday.name,
+        province: holiday.province || null,
+        type: holiday.type as 'bank' | 'provincial',
+      })) 
+    : [];
   
   return (
     <Container maxWidth="md">
@@ -80,7 +113,7 @@ export default async function NewVacationPage() {
           <VacationForm 
             userId={session.user.id}
             province={userProvince}
-            holidays={holidays || []}
+            holidays={formattedHolidays}
             existingVacations={allVacations || []}
           />
         </Card>

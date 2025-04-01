@@ -52,6 +52,27 @@ The app allows users to:
 - Use type-safe practices—avoid `any`, prefer strong typing over convenience
 - Create and maintain comprehensive type definitions in `/types`
 
+### Supabase Type Safety
+- When working with Supabase query responses, always implement proper type checking
+- Use type guards for Supabase data to ensure safety (e.g., `'property' in object`)
+- Filter data before mapping to ensure valid properties exist
+- For strict typing errors in Supabase query parameters, use type assertions only when necessary
+- Implement proper error handling for database operations
+
+### Type Assertions
+- Avoid using `as any` except when absolutely necessary (e.g., for Supabase query parameters that cause type errors)
+- When type assertions are needed, document the reason with a comment
+- For Supabase query results, use proper type guards instead of assertions:
+  ```typescript
+  // Good
+  .filter((item): item is ValidType => item && 'property' in item)
+  
+  // Avoid
+  item as ValidType
+  ```
+- When mapping Supabase results to component props, explicitly map only required properties
+- Always check for null/undefined values and presence of properties
+
 ### Naming and Formatting
 - Use camelCase for variables and function names
 - Use PascalCase for React components and type definitions
@@ -112,3 +133,37 @@ The app allows users to:
 - Define strong types for all tables in Database type
 - Use RLS policies in Supabase for security
 - Follow the schema defined in the Database type
+- Implement proper type checking for database query results
+- Handle potential errors or null values from Supabase
+
+### Handling Supabase Type Issues
+When working with Supabase query responses, follow these patterns to ensure type safety:
+
+1. For query parameters with strict typing:
+```typescript
+// Use type assertions sparingly and document why
+.eq('id', userId as any) // Type assertion needed for Supabase parameter compatibility
+```
+
+2. For filtering Supabase query results:
+```typescript
+// Use type guards with filter before mapping
+const formattedData = queryResult ? 
+  queryResult
+    .filter((item): item is ExpectedType => 
+      item && 'requiredProp1' in item && 'requiredProp2' in item)
+    .map((item) => ({
+      prop1: item.requiredProp1,
+      prop2: item.requiredProp2,
+    })) 
+  : [];
+```
+
+3. For checking property existence:
+```typescript
+// Check if object exists and has required property
+const value = 
+  object && 'property' in object ? 
+    object.property || defaultValue : 
+    defaultValue;
+```

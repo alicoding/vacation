@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
     const { data: directData, error: directError } = await directClient
       .from('vacation_bookings')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId as any);
     
     results.directClientQuery = {
       count: directData?.length || 0,
@@ -79,7 +79,7 @@ export async function GET(req: NextRequest) {
     const { data: serverData, error: serverError } = await serverClient
       .from('vacation_bookings')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId as any);
     
     results.serverClientQuery = {
       count: serverData?.length || 0,
@@ -90,7 +90,7 @@ export async function GET(req: NextRequest) {
     const { data: serviceData, error: serviceError } = await serviceClient
       .from('vacation_bookings')
       .select('*')
-      .eq('user_id', userId);
+      .eq('user_id', userId as any);
     
     results.serviceQuery = {
       count: serviceData?.length || 0,

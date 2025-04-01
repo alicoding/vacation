@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import type { Database } from '@/types/supabase';
+import type { CookieOptions } from '@supabase/ssr';
 
 /**
  * Creates a Supabase client for use in API routes with proper cookie handling
@@ -28,14 +29,14 @@ export async function createApiClient() {
             if (options?.sameSite === true) options.sameSite = 'strict';
             if (options?.sameSite === false) options.sameSite = 'lax';
             
-            cookieStore.set(name, value, options);
+            cookieStore.set(name, value, options as CookieOptions);
           } catch (e) {
             console.warn('Error setting cookie in API context:', e);
           }
         },
         remove(name, options) {
           try {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
+            cookieStore.set(name, '', { ...options, maxAge: 0 } as CookieOptions);
           } catch (e) {
             console.warn('Error removing cookie in API context:', e);
           }

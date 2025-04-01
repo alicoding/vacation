@@ -7,7 +7,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
 // This approach prevents client-side imports from failing
-export async function getSupabaseClient(): Promise<SupabaseClient<Database>> {
+export async function getSupabaseClient(): Promise<SupabaseClient<Database, 'public', any>> {
   // Check if we're on the server
   if (typeof window !== 'undefined') {
     throw new Error('Cannot use Supabase client directly in the browser');
@@ -15,11 +15,11 @@ export async function getSupabaseClient(): Promise<SupabaseClient<Database>> {
   
   // Dynamic import only happens on the server
   const { supabase } = await import('./supabase');
-  return supabase;
+  return supabase as SupabaseClient<Database, 'public', any>;
 }
 
 // Helper for server components/actions to safely get the Supabase client
-export async function withSupabase<T>(fn: (supabase: SupabaseClient<Database>) => Promise<T>): Promise<T> {
+export async function withSupabase<T>(fn: (supabase: SupabaseClient<Database, 'public', any>) => Promise<T>): Promise<T> {
   const supabase = await getSupabaseClient();
   return fn(supabase);
 }

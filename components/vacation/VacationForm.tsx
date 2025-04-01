@@ -145,7 +145,12 @@ export default function VacationForm({
   
   // Combine holidays from both sources to ensure we have data
   useEffect(() => {
-    const combinedHolidays = [...holidays];
+    const combinedHolidays = [...holidays].map((holiday, index) => ({
+      ...holiday,
+      id: `holiday-${index}-${typeof holiday.date === 'string' ? holiday.date : DateTime.fromJSDate(holiday.date as Date).toISODate()}`,
+      // Ensure province is string | null, not string | undefined
+      province: holiday.province || null,
+    }));
     
     // Add client holidays if they're not duplicates
     if (clientHolidays && clientHolidays.length > 0) {
@@ -164,9 +169,10 @@ export default function VacationForm({
         });
         
         if (!exists) {
-          // Convert clientHoliday to the expected format with proper province type
+          // Add the client holiday with an id
           combinedHolidays.push({
             ...clientHoliday,
+            id: `client-holiday-${clientHoliday.id || combinedHolidays.length}`,
             // Ensure province is string | null, not string | undefined
             province: clientHoliday.province || null,
           });
@@ -175,7 +181,7 @@ export default function VacationForm({
     }
     
     // Update the normalized holidays state
-    setNormalizedHolidays(combinedHolidays);
+    setNormalizedHolidays(combinedHolidays as Holiday[]);
   }, [holidays, clientHolidays]);
   
   // Create a map of bank holiday dates for efficient lookup

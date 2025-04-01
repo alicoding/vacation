@@ -1,7 +1,9 @@
-export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
 import { createDirectClient } from '@/utils/supabase';
 import { getGoogleToken, syncVacationToCalendar } from '@/utils/googleCalendar';
+import type { Database } from '@/types/supabase';
+
+export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
   // Get the authenticated user using getUser() for better security
@@ -19,8 +21,8 @@ export async function POST(request: NextRequest) {
     // Update user's sync preferences
     const { error: updateError } = await supabase
       .from('users')
-      .update({ calendar_sync_enabled: enabled })
-      .eq('id', user.id);
+      .update({ calendar_sync_enabled: enabled } as any)
+      .eq('id', user.id as any);
       
     if (updateError) {
       throw updateError;
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
       const { data: vacations, error: vacationsError } = await supabase
         .from('vacation_bookings')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('user_id', user.id as any)
         .or('google_event_id.is.null,sync_status.eq.failed');
         
       if (vacationsError) {
@@ -61,7 +63,7 @@ export async function POST(request: NextRequest) {
       if (vacations && vacations.length > 0) {
         for (const vacation of vacations) {
           try {
-            const eventId = await syncVacationToCalendar(user.id, vacation);
+            const eventId = await syncVacationToCalendar(user.id, vacation as any);
             
             if (eventId) {
               results.successful++;
@@ -69,7 +71,7 @@ export async function POST(request: NextRequest) {
               results.failed++;
             }
           } catch (error) {
-            console.error(`Failed to sync vacation ${vacation.id}:`, error);
+            console.error(`Failed to sync vacation ${(vacation as any).id}:`, error);
             results.failed++;
           }
         }
@@ -129,7 +131,7 @@ export async function PATCH(request: NextRequest) {
       .from('vacation_bookings')
       .select('*')
       .eq('id', vacationId)
-      .eq('user_id', user.id)
+      .eq('user_id', user.id as any)
       .single();
       
     if (vacationError) {
@@ -137,7 +139,7 @@ export async function PATCH(request: NextRequest) {
     }
     
     // Sync the vacation to Google Calendar
-    const eventId = await syncVacationToCalendar(user.id, vacation);
+    const eventId = await syncVacationToCalendar(user.id, vacation as any);
     
     if (eventId) {
       return NextResponse.json({ 

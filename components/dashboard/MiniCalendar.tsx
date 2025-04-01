@@ -15,6 +15,7 @@ interface MiniCalendarProps {
   province?: string;
   onDateSelect?: (date: DateTime) => void;
   selectedDate?: DateTime;
+  vacationToExclude?: string; // Add prop to exclude a specific vacation from the display
 }
 
 const CalendarDay = styled(Box)(({ theme }) => ({
@@ -55,6 +56,7 @@ export default function MiniCalendar({
   province = 'ON',
   onDateSelect,
   selectedDate: externalSelectedDate, 
+  vacationToExclude,
 }: MiniCalendarProps) {
   const [currentMonth, setCurrentMonth] = useState(DateTime.now());
   const [selectedDate, setSelectedDate] = useState(externalSelectedDate || DateTime.now());

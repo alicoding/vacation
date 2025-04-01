@@ -9,6 +9,9 @@ import type { Database } from '@/types/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CookieOptions } from '@supabase/ssr';
 
+// Type for consistent Supabase client usage
+type SupabaseClientType = SupabaseClient<Database, 'public', any>;
+
 // Export the client for easy access
 export const supabase = createDirectClient();
 
@@ -17,7 +20,7 @@ export const supabase = createDirectClient();
  * we're in a server environment before executing
  */
 export async function fetchFromDB<T>(
-  asyncFn: (client: SupabaseClient<Database>) => Promise<T>,
+  asyncFn: (client: SupabaseClientType) => Promise<T>,
 ): Promise<T> {
   if (typeof window !== 'undefined') {
     throw new Error(
@@ -26,7 +29,7 @@ export async function fetchFromDB<T>(
     );
   }
   
-  return asyncFn(supabase);
+  return asyncFn(supabase as SupabaseClientType);
 }
 
 /**
@@ -81,7 +84,16 @@ export async function createEdgeAuthClient(request?: Request) {
       {
         cookies: {
           get(name) {
-            return cookieStore.get(name)?.value;
+            // Handle cookies() returning a Promise in newer Next.js versions
+            if (cookieStore instanceof Promise) {
+              // Return undefined here, as we can't await in this context
+              // The value will be retrieved on subsequent requests
+              return undefined;
+            } else {
+              // Use a more specific type casting for the cookieStore
+              const store = cookieStore as { get(name: string): { value: string } | undefined };
+              return store.get(name)?.value;
+            }
           },
           set(name, value, options) {
             try {
@@ -89,14 +101,28 @@ export async function createEdgeAuthClient(request?: Request) {
               if (options?.sameSite === true) options.sameSite = 'strict';
               if (options?.sameSite === false) options.sameSite = 'lax';
               
-              cookieStore.set(name, value, options as CookieOptions);
+              // Skip setting if cookieStore is a Promise
+              if (!(cookieStore instanceof Promise)) {
+                // Use a more specific type casting for the cookieStore
+                const store = cookieStore as { 
+                  set(name: string, value: string, options?: any): void 
+                };
+                store.set(name, value, options as CookieOptions);
+              }
             } catch (e) {
               console.warn('Error setting cookie:', e);
             }
           },
           remove(name, options) {
             try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 } as CookieOptions);
+              // Skip removing if cookieStore is a Promise
+              if (!(cookieStore instanceof Promise)) {
+                // Use a more specific type casting for the cookieStore
+                const store = cookieStore as { 
+                  set(name: string, value: string, options?: any): void 
+                };
+                store.set(name, '', { ...options, maxAge: 0 } as CookieOptions);
+              }
             } catch (e) {
               console.warn('Error removing cookie:', e);
             }

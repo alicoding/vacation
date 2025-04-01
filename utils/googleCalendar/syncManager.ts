@@ -29,8 +29,8 @@ export async function syncVacationToCalendar(
           sync_status: 'synced',
           last_sync_attempt: new Date().toISOString(),
           sync_error: null,
-        })
-        .eq('id', vacation.id);
+        } as any) // Type assertion needed for Supabase parameter compatibility
+        .eq('id', vacation.id as any); // Type assertion needed for Supabase parameter compatibility
         
       return updatedEvent?.id || null;
     } 
@@ -47,8 +47,8 @@ export async function syncVacationToCalendar(
             sync_status: 'synced',
             last_sync_attempt: new Date().toISOString(),
             sync_error: null,
-          })
-          .eq('id', vacation.id);
+          } as any) // Type assertion needed for Supabase parameter compatibility
+          .eq('id', vacation.id as any); // Type assertion needed for Supabase parameter compatibility
       }
       
       return newEvent?.id || null;
@@ -64,8 +64,8 @@ export async function syncVacationToCalendar(
         sync_status: 'failed',
         last_sync_attempt: new Date().toISOString(),
         sync_error: (error as Error).message,
-      })
-      .eq('id', vacation.id);
+      } as any) // Type assertion needed for Supabase parameter compatibility
+      .eq('id', vacation.id as any); // Type assertion needed for Supabase parameter compatibility
       
     return null;
   }
@@ -109,7 +109,7 @@ export async function syncAllVacations(userId: string): Promise<{
   const { data: vacations, error } = await supabase
     .from('vacation_bookings')
     .select('*')
-    .eq('user_id', userId)
+    .eq('user_id', userId as any) // Type assertion needed for Supabase parameter compatibility
     .or('google_event_id.is.null,sync_status.eq.failed');
   
   if (error || !vacations) {
@@ -123,10 +123,16 @@ export async function syncAllVacations(userId: string): Promise<{
     failed: 0,
   };
   
-  // Sync each vacation
+  // Filter out any invalid items and process each valid vacation
   for (const vacation of vacations) {
+    if (!vacation || !('id' in vacation) || !('start_date' in vacation) || !('end_date' in vacation)) {
+      console.error('Invalid vacation data:', vacation);
+      results.failed++;
+      continue;
+    }
+    
     try {
-      const eventId = await syncVacationToCalendar(userId, vacation);
+      const eventId = await syncVacationToCalendar(userId, vacation as VacationEventData);
       
       if (eventId) {
         results.successful++;
@@ -153,8 +159,8 @@ export async function updateCalendarSyncPreference(
   
   const { error } = await supabase
     .from('users')
-    .update({ calendar_sync_enabled: enabled })
-    .eq('id', userId);
+    .update({ calendar_sync_enabled: enabled } as any) // Type assertion needed for Supabase parameter compatibility
+    .eq('id', userId as any); // Type assertion needed for Supabase parameter compatibility
   
   if (error) {
     console.error('Error updating calendar sync preference:', error);
@@ -190,8 +196,8 @@ export async function updateVacationInGoogle(
           sync_status: 'synced',
           last_sync_attempt: new Date().toISOString(),
           sync_error: null,
-        })
-        .eq('id', vacation.id);
+        } as any) // Type assertion needed for Supabase parameter compatibility
+        .eq('id', vacation.id as any); // Type assertion needed for Supabase parameter compatibility
         
       return true;
     }
@@ -208,8 +214,8 @@ export async function updateVacationInGoogle(
         sync_status: 'failed',
         last_sync_attempt: new Date().toISOString(),
         sync_error: (error as Error).message,
-      })
-      .eq('id', vacation.id);
+      } as any) // Type assertion needed for Supabase parameter compatibility
+      .eq('id', vacation.id as any); // Type assertion needed for Supabase parameter compatibility
       
     return false;
   }

@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { Box, Container, Typography, Button, Paper, CircularProgress, Alert } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function SignIn() {
+function SignInContent() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
@@ -85,5 +85,26 @@ export default function SignIn() {
         </Paper>
       </Box>
     </Container>
+  );
+}
+
+// Fallback component to show while the main content is loading
+function SignInFallback() {
+  return (
+    <Container maxWidth="sm">
+      <Box sx={{ mt: 8, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Paper elevation={3} sx={{ p: 4, width: '100%', maxWidth: 450, display: 'flex', justifyContent: 'center' }}>
+          <CircularProgress />
+        </Paper>
+      </Box>
+    </Container>
+  );
+}
+
+export default function SignIn() {
+  return (
+    <Suspense fallback={<SignInFallback />}>
+      <SignInContent />
+    </Suspense>
   );
 }

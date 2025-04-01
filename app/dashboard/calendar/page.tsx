@@ -1,13 +1,34 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useSession } from '@/lib/auth-helpers';
-import { Container, Box, Typography, Paper, Divider } from '@mui/material';
+import { Container, Box, Typography, Paper, Divider, CircularProgress } from '@mui/material';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
 import FullCalendar from '@/components/calendar/FullCalendar';
 import CalendarLegend from '@/components/calendar/CalendarLegend';
 import GoogleCalendarSync from '@/features/calendar/GoogleCalendarSync';
+
+// Separated component for the GoogleCalendarSync with Suspense
+function GoogleCalendarSyncWrapper({ calendarSyncEnabled, onToggle }: { 
+  calendarSyncEnabled: boolean; 
+  onToggle: (enabled: boolean) => void 
+}) {
+  return (
+    <Suspense fallback={
+      <Paper elevation={1} sx={{ p: 3, minHeight: '120px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <CircularProgress size={24} />
+      </Paper>
+    }>
+      <Paper elevation={1}>
+        <GoogleCalendarSync 
+          enabled={calendarSyncEnabled} 
+          onToggle={onToggle} 
+        />
+      </Paper>
+    </Suspense>
+  );
+}
 
 export default function CalendarPage() {
   const { data: session } = useSession();
@@ -107,12 +128,10 @@ export default function CalendarPage() {
             <CalendarLegend />
           </Box>
           <Box sx={{ flex: 1, maxWidth: '400px' }}>
-            <Paper elevation={1}>
-              <GoogleCalendarSync 
-                enabled={calendarSyncEnabled} 
-                onToggle={handleToggleCalendarSync} 
-              />
-            </Paper>
+            <GoogleCalendarSyncWrapper 
+              calendarSyncEnabled={calendarSyncEnabled} 
+              onToggle={handleToggleCalendarSync} 
+            />
           </Box>
         </Box>
       </Box>

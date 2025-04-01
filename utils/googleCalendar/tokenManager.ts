@@ -1,4 +1,3 @@
-// filepath: /Users/ali/Documents/projects/vacation/utils/googleCalendar/tokenManager.ts
 import { createDirectClient } from '../supabase';
 import { TokenRefreshResponse, GoogleTokenData } from './types';
 import type { SupabaseClient } from '@supabase/supabase-js';
@@ -15,7 +14,7 @@ export async function getGoogleToken(userId: string): Promise<string | null> {
     const { data: tokenData, error } = await supabase
       .from('google_tokens')
       .select('*')
-      .eq('user_id', userId)
+      .eq('user_id', userId as any) // Type assertion needed for Supabase parameter compatibility
       .single();
       
     // Handle "no rows returned" gracefully - this is expected for users who haven't authorized yet
@@ -36,18 +35,35 @@ export async function getGoogleToken(userId: string): Promise<string | null> {
       return null;
     }
     
-    // Log token data for debugging (without sensitive values)
+    // Type guard to ensure tokenData has the expected properties
+    const isValidTokenData = (data: unknown): data is GoogleTokenData => {
+      return (
+        data !== null &&
+        typeof data === 'object' &&
+        'user_id' in data &&
+        'access_token' in data &&
+        'refresh_token' in data &&
+        'expires_at' in data
+      );
+    };
+    
+    if (!isValidTokenData(tokenData)) {
+      console.error('Invalid token data structure:', Object.keys(tokenData as object));
+      return null;
+    }
+    
+    // Now we can safely access the properties
     console.log('Found token data:', {
       userId: tokenData.user_id,
       hasAccessToken: !!tokenData.access_token,
       hasRefreshToken: !!tokenData.refresh_token,
       expiresAt: tokenData.expires_at,
-      tokenType: tokenData.token_type || 'Not specified',
+      tokenType: tokenData.token_type ? tokenData.token_type : 'Not specified',
     });
     
-    // Check if token is expired and needs refresh
-    // Convert expires_at (timestamp with time zone) to a comparable format using Luxon
-    const expiresAt = DateTime.fromISO(tokenData.expires_at);
+    // Convert expires_at to string before passing to DateTime
+    const expiresAtStr = String(tokenData.expires_at);
+    const expiresAt = DateTime.fromISO(expiresAtStr);
     const now = DateTime.now();
     
     if (now > expiresAt) {
@@ -77,10 +93,10 @@ export async function getGoogleToken(userId: string): Promise<string | null> {
         
         const newTokenData = await response.json();
         console.log('Token refreshed successfully');
-        return newTokenData.access_token;
-      } catch (error) {
-        console.error('Error refreshing Google token:', error);
-        if (error.name === 'AbortError') {
+        return String(newTokenData.access_token);
+      } catch (refreshError) {
+        console.error('Error refreshing Google token:', refreshError);
+        if (refreshError instanceof Error && refreshError.name === 'AbortError') {
           console.error('Token refresh timed out after 10 seconds');
         }
         return null;
@@ -88,7 +104,7 @@ export async function getGoogleToken(userId: string): Promise<string | null> {
     }
     
     console.log(`Token valid until ${expiresAt.toISO()}`);
-    return tokenData.access_token;
+    return String(tokenData.access_token);
   } catch (e) {
     console.error('Unexpected error in getGoogleToken:', e);
     return null;
@@ -203,12 +219,13 @@ export async function saveTokensToSupabase(
     // Calculate when the token will expire as an ISO string using Luxon for timestamp compatibility
     const expiresAt = DateTime.now().plus({ seconds: tokens.expires_in }).toISO();
     
-    // Check if a record already exists
-    const { data: existingRecord, error: queryError } = await supabase
+    // Check if a record already exists - use a more specific type with `from` directly
+    const { data: existingRecord, error: queryError } = await (supabase as any)
       .from('google_tokens')
       .select('id')
-      .eq('user_id', userId)
+      .eq('user_id', userId as any) // Type assertion needed for Supabase parameter compatibility
       .maybeSingle();
+    
     if (queryError && queryError.code !== 'PGRST116') {
       console.error('Error checking for existing token:', queryError);
       throw new Error('Failed to save tokens: database error');
@@ -223,16 +240,19 @@ export async function saveTokensToSupabase(
       token_type: tokens.token_type,
     });
     
+    // Create a properly typed token record
+    const tokenRecord = {
+      user_id: userId as any, // Type assertion needed for Supabase parameter compatibility
+      access_token: tokens.access_token,
+      refresh_token: tokens.refresh_token,
+      expires_at: expiresAt,
+      token_type: tokens.token_type,
+    };
+    
     // Use upsert with the correct date format for expires_at
-    const { error } = await supabase
+    const { error } = await (supabase as any)
       .from('google_tokens')
-      .upsert({
-        user_id: userId,
-        access_token: tokens.access_token,
-        refresh_token: tokens.refresh_token,
-        expires_at: expiresAt, // Now using ISO format for timestamp compatibility
-        token_type: tokens.token_type, // Include token_type as it appears to be in the schema now
-      }, {
+      .upsert(tokenRecord, {
         onConflict: 'user_id',
       });
       

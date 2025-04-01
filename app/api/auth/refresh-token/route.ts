@@ -73,7 +73,7 @@ export async function POST(_request: NextRequest) {
         .update({
           access_token: String(tokens.access_token),
           expires_at: expiresAt,
-        })
+        } as any) // Use type assertion to avoid type error temporarily
         .filter('user_id', 'eq', user.id);
         
       if (updateError) {

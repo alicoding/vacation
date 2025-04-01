@@ -41,6 +41,7 @@ interface HalfDaySettingsProps {
   onToggleDateHalfDay: (dateKey: string) => void;
   onDatePortionChange: (dateKey: string, portion: string) => void;
   shouldDisableDate?: (date: DateTime) => boolean;
+  simplified?: boolean; // Add simplified prop to support simpler UI in edit dialog
 }
 
 export function HalfDaySettings({

@@ -304,9 +304,17 @@ export default function VacationEditDialog({
                 halfDayData={{
                   isHalfDay: watchIsHalfDay,
                   halfDayPortion: watchHalfDayPortion,
+                  halfDayDate: watchIsHalfDay ? watchStartDate : null,
+                  halfDayDates: {},
                 }}
                 onToggleHalfDay={(enabled) => setValue('isHalfDay', enabled)}
                 onHalfDayPortionChange={(portion) => setValue('halfDayPortion', portion)}
+                onToggleDateHalfDay={(dateKey) => {
+                  // Empty handler, simplified edit mode doesn't use this
+                }}
+                onDatePortionChange={(dateKey, portion) => {
+                  // Empty handler, simplified edit mode doesn't use this
+                }}
                 simplified={true} // Use simplified mode for edit dialog
               />
             </Grid>

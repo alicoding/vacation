@@ -1,6 +1,7 @@
 import { createSessionHook } from '@/types/auth';
 import { getServerSession } from './auth-server';
 import { supabase } from '@/lib/supabase';
+import type { Database } from '@/types/supabase';
 
 // Store for auth-related functions and state
 let _authStore: { 
@@ -88,25 +89,28 @@ export async function ensureUserRecord(userId: string, userEmail: string, metada
     const { data: _existingUser, error: checkError } = await supabase
       .from('users')
       .select('id')
-      .eq('id', userId)
+      .eq('id', userId as any)
       .single();
     
     if (checkError && checkError.code === 'PGRST116') {
       // User doesn't exist, create a new record
-      console.log(`Creating new user record for ${userEmail}`);
+      console.warn(`Creating new user record for ${userEmail}`);
       
       // Extract province from metadata if available or use default
-      const province = metadata?.province || 'ON';
+      // Ensure province is a string
+      const province = typeof metadata?.province === 'string' 
+        ? metadata.province 
+        : 'ON';
       
       const { error: insertError } = await supabase
         .from('users')
         .insert({
           id: userId,
           email: userEmail,
-          province,
+          province: province,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        } as any);
       
       if (insertError) {
         console.error('Error creating user record:', insertError);

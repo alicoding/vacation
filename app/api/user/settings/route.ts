@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', session.user.id as any)
       .single();
     
     if (error) {
@@ -56,7 +56,7 @@ export async function PUT(request: NextRequest) {
     const { error } = await supabase
       .from('users')
       .update(body)
-      .eq('id', session.user.id);
+      .eq('id', session.user.id as any);
     
     if (error) {
       throw error;

@@ -53,6 +53,10 @@ export type Database = {
           is_half_day: boolean
           half_day_portion: string | null
           googleEventId: string | null
+          google_event_id: string | null
+          sync_status: string | null
+          last_sync_attempt: string | null
+          sync_error: string | null
         }
         Insert: {
           id?: string
@@ -64,6 +68,10 @@ export type Database = {
           is_half_day?: boolean
           half_day_portion?: string | null
           googleEventId?: string | null
+          google_event_id?: string | null
+          sync_status?: string | null
+          last_sync_attempt?: string | null
+          sync_error?: string | null
         }
         Update: {
           id?: string
@@ -75,6 +83,10 @@ export type Database = {
           is_half_day?: boolean
           half_day_portion?: string | null
           googleEventId?: string | null
+          google_event_id?: string | null
+          sync_status?: string | null
+          last_sync_attempt?: string | null
+          sync_error?: string | null
         }
       }
       holidays: {

@@ -6,9 +6,13 @@
   "description": "## Project Overview Develop a fully responsive Vacation Tracker app using Next.js with TypeScript, deployable on Render.com's Free Tier. The app will track vacation days, automatically integrate holidays, and visually indicate extended weekends and adjacent holidays to help users maximize vacation planning.",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint --fix .",
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
     "type-check": "tsc --noEmit",
-    "validate": "npm run lint && npm run type-check"
+    "validate": "npm run lint && npm run type-check",
+    "deploy": "npm run build && npx @cloudflare/next-on-pages && wrangler deploy",
+    "test": "jest"
   },
   "keywords": [],
   "author": "",
