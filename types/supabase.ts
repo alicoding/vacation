@@ -237,6 +237,7 @@ export type Database = {
           scope: string
           expires_at: string
           created_at: string
+          updated_at: string
         }
         Insert: {
           id?: string
@@ -247,6 +248,7 @@ export type Database = {
           scope: string
           expires_at: string
           created_at?: string
+          updated_at?: string
         }
         Update: {
           id?: string
@@ -257,6 +259,7 @@ export type Database = {
           scope?: string
           expires_at?: string
           created_at?: string
+          updated_at?: string
         }
         Relationships: [
           {

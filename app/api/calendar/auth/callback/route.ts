@@ -126,6 +126,7 @@ export async function GET(request: NextRequest) {
           refresh_token: tokens.refresh_token,
           expires_at: expiresAt, // ISO string compatible with timestamp type
           token_type: tokens.token_type,
+          scope: '', // Default empty string for required scope field
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'user_id',
