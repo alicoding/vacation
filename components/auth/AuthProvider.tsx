@@ -40,7 +40,7 @@ interface AuthProviderProps {
 export function AuthProvider({ 
   children, 
   supabaseUrl,
-  supabaseAnonKey
+  supabaseAnonKey,
 }: AuthProviderProps) {
   // Use createBrowserSupabaseClient which now implements singleton pattern
   // This prevents multiple GoTrueClient instances
