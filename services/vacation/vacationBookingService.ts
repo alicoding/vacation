@@ -72,10 +72,10 @@ export async function createVacationBooking(
     }
     
     // Create the booking using the authenticated client
-    const { data: booking, error } = await supabaseServer
+    const { data: dbBooking, error } = await supabaseServer
       .from('vacation_bookings')
       .insert({
-        user_id: userId,
+        userId: userId,
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         note,
@@ -92,14 +92,14 @@ export async function createVacationBooking(
     }
     
     // If calendar sync is enabled for the user, sync this vacation to Google Calendar
-    if (calendarSyncEnabled && booking) {
+    if (calendarSyncEnabled && dbBooking) {
       try {
         await syncVacationToCalendar(userId, {
-          id: booking.id,
+          id: dbBooking.id,
           title: 'Vacation',
-          note: booking.note,
-          start_date: booking.start_date,
-          end_date: booking.end_date,
+          note: dbBooking.note || undefined, // Convert null to undefined
+          start_date: dbBooking.start_date,
+          end_date: dbBooking.end_date,
         });
       } catch (syncError) {
         console.error('Failed to sync vacation to Google Calendar:', syncError);
@@ -112,11 +112,23 @@ export async function createVacationBooking(
             sync_error: (syncError as Error).message,
             last_sync_attempt: new Date().toISOString(),
           })
-          .eq('id', booking.id);
+          .eq('id', dbBooking.id);
       }
     }
     
-    return booking;
+    // Transform the DB response to match the VacationBooking interface
+    const vacation: VacationBooking = {
+      id: dbBooking?.id,
+      userId: dbBooking?.userId,
+      startDate: new Date(dbBooking?.start_date),
+      endDate: new Date(dbBooking?.end_date),
+      note: dbBooking?.note,
+      createdAt: dbBooking?.created_at ? new Date(dbBooking.created_at) : undefined,
+      isHalfDay: dbBooking?.is_half_day,
+      halfDayPortion: dbBooking?.half_day_portion,
+    };
+    
+    return vacation;
   } catch (error) {
     console.error('Error creating vacation booking:', error);
     if (error instanceof VacationServiceError) {
@@ -160,7 +172,7 @@ export async function updateVacationBooking(
       .from('vacation_bookings')
       .select('*')
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('userId', userId)
       .single();
     
     if (findError || !existingBooking) {
@@ -181,7 +193,7 @@ export async function updateVacationBooking(
     }
     
     // Update the booking
-    const { data: updatedBooking, error: updateError } = await supabaseServer
+    const { data: dbBooking, error: updateError } = await supabaseServer
       .from('vacation_bookings')
       .update({
         start_date: startDate.toISOString(),
@@ -195,7 +207,7 @@ export async function updateVacationBooking(
         } : {}),
       })
       .eq('id', id)
-      .eq('user_id', userId)
+      .eq('userId', userId)
       .select()
       .single();
     
@@ -204,20 +216,20 @@ export async function updateVacationBooking(
     }
     
     // If calendar sync is enabled and there's a change in dates or note, update Google Calendar
-    if (calendarSyncEnabled && updatedBooking) {
+    if (calendarSyncEnabled && dbBooking) {
       const datesChanged = 
-        updatedBooking.start_date !== existingBooking.start_date || 
-        updatedBooking.end_date !== existingBooking.end_date;
-      const noteChanged = updatedBooking.note !== existingBooking.note;
+        dbBooking.start_date !== existingBooking.start_date || 
+        dbBooking.end_date !== existingBooking.end_date;
+      const noteChanged = dbBooking.note !== existingBooking.note;
         
       if (datesChanged || noteChanged) {
         try {
           await syncVacationToCalendar(userId, {
-            id: updatedBooking.id,
+            id: dbBooking.id,
             title: 'Vacation',
-            note: updatedBooking.note,
-            start_date: updatedBooking.start_date,
-            end_date: updatedBooking.end_date,
+            note: dbBooking.note || undefined,
+            start_date: dbBooking.start_date,
+            end_date: dbBooking.end_date,
             google_event_id: existingBooking.google_event_id,
           });
         } catch (syncError) {
@@ -230,12 +242,24 @@ export async function updateVacationBooking(
               sync_error: (syncError as Error).message,
               last_sync_attempt: new Date().toISOString(),
             })
-            .eq('id', updatedBooking.id);
+            .eq('id', dbBooking.id);
         }
       }
     }
     
-    return updatedBooking;
+    // Transform the DB response to match the VacationBooking interface
+    const vacation: VacationBooking = {
+      id: dbBooking?.id,
+      userId: dbBooking?.userId,
+      startDate: new Date(dbBooking?.start_date),
+      endDate: new Date(dbBooking?.end_date),
+      note: dbBooking?.note,
+      createdAt: dbBooking?.created_at ? new Date(dbBooking.created_at) : undefined,
+      isHalfDay: dbBooking?.is_half_day,
+      halfDayPortion: dbBooking?.half_day_portion,
+    };
+    
+    return vacation;
   } catch (error) {
     console.error('Error updating vacation booking:', error);
     if (error instanceof VacationServiceError) {
@@ -264,7 +288,7 @@ export async function deleteVacationBooking(
       .from('vacation_bookings')
       .delete()
       .eq('id', id)
-      .eq('user_id', userId);
+      .eq('userId', userId);
     
     if (error) {
       throw new VacationServiceError(error.message, 'DATABASE_ERROR');

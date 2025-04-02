@@ -13,17 +13,29 @@ export async function getVacationBookings(userId: string): Promise<VacationBooki
     const cookieStore = cookies();
     const supabaseServer = createServerClient(cookieStore);
     
-    const { data: bookings, error } = await supabaseServer
+    const { data: dbBookings, error } = await supabaseServer
       .from('vacation_bookings')
       .select('*')
-      .eq('user_id', userId)
+      .eq('userId', userId) // Changed from user_id to userId to match schema
       .order('start_date', { ascending: false });
     
     if (error) {
       throw new VacationServiceError(error.message, 'DATABASE_ERROR');
     }
     
-    return bookings || [];
+    // Transform the DB response to match the VacationBooking interface
+    const bookings: VacationBooking[] = (dbBookings || []).map(booking => ({
+      id: booking.id,
+      userId: booking.userId,
+      startDate: new Date(booking.start_date),
+      endDate: new Date(booking.end_date),
+      note: booking.note,
+      createdAt: booking.created_at ? new Date(booking.created_at) : undefined,
+      isHalfDay: booking.is_half_day,
+      halfDayPortion: booking.half_day_portion
+    }));
+    
+    return bookings;
   } catch (error) {
     console.error('Error fetching vacation bookings:', error);
     throw new VacationServiceError(
@@ -77,11 +89,11 @@ export async function getVacationDaysUsed(
     const startOfYear = new Date(year, 0, 1).toISOString();
     const endOfYear = new Date(year, 11, 31).toISOString();
     
-    // Note: Use snake_case column names to match the database schema
+    // Note: Using camelCase column names to match the database schema
     const { data: vacations, error } = await supabaseServer
       .from('vacation_bookings')
       .select('*')
-      .eq('user_id', userId)
+      .eq('userId', userId) // Changed from user_id to userId
       .gte('start_date', startOfYear)
       .lte('end_date', endOfYear);
     

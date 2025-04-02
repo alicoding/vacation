@@ -11,6 +11,8 @@ import type { Database } from '@/types/supabase';
 
 // Type for consistent Supabase client usage
 type SupabaseClientType = SupabaseClient<Database, 'public', any>;
+// Define valid table names type from the Database type
+type TableNames = keyof Database['public']['Tables'];
 
 /**
  * Helper function for safer database access that verifies
@@ -29,19 +31,19 @@ export async function fetchFromDB<T>(asyncFn: () => Promise<T>): Promise<T> {
 
 // Re-export Supabase utility functions
 export const db = {
-  findFirst: <T>(table: string, where?: Record<string, any>) => 
+  findFirst: <T>(table: TableNames, where?: Record<string, any>) => 
     supabaseUtils.findFirst<T>(supabase as SupabaseClientType, table, where),
   
-  findMany: <T>(table: string, options?: Parameters<typeof supabaseUtils.findMany>[2]) => 
+  findMany: <T>(table: TableNames, options?: Parameters<typeof supabaseUtils.findMany>[2]) => 
     supabaseUtils.findMany<T>(supabase as SupabaseClientType, table, options),
   
-  create: <T>(table: string, data: Record<string, any>) => 
+  create: <T>(table: TableNames, data: Record<string, any>) => 
     supabaseUtils.create<T>(supabase as SupabaseClientType, table, data),
   
-  update: <T>(table: string, options: Parameters<typeof supabaseUtils.update>[2]) => 
+  update: <T>(table: TableNames, options: Parameters<typeof supabaseUtils.update>[2]) => 
     supabaseUtils.update<T>(supabase as SupabaseClientType, table, options),
   
-  delete: <T>(table: string, where: Record<string, any>) => 
+  delete: <T>(table: TableNames, where: Record<string, any>) => 
     supabaseUtils.remove<T>(supabase as SupabaseClientType, table, where),
   
   // Direct access to Supabase client if needed

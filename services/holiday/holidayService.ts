@@ -83,7 +83,7 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
   
   // Define the type for our database format
   type HolidayInsert = {
-    date: Date;
+    date: string; // Changed from Date to string to match Supabase schema requirements
     name: string;
     province: string | null;
     type: string;
@@ -102,13 +102,13 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
       return [];
     }
     
-    // Create a date directly from the Luxon DateTime
-    const date = dt.toJSDate();
+    // Convert the Luxon DateTime to an ISO date string for Supabase
+    const dateStr = dt.toISODate();
     
     // For global holidays (apply to all provinces)
     if (holiday.global) {
       return [{
-        date,
+        date: dateStr,
         name: holiday.localName,
         province: null, // National holiday
         type: isBank ? 'bank' : 'provincial',
@@ -118,7 +118,7 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
     // For non-global holidays, create an entry for each province it applies to
     if (holiday.counties && holiday.counties.length > 0) {
       return holiday.counties.map((county) => ({
-        date,
+        date: dateStr,
         name: holiday.localName,
         province: county, // Provincial specific
         type: isBank ? 'bank' : 'provincial',
@@ -128,7 +128,7 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
     // If no specific provinces are listed but it's not global,
     // we'll still add it but mark as provincial
     return [{
-      date,
+      date: dateStr,
       name: holiday.localName,
       province: null,
       type: 'provincial',
@@ -176,6 +176,11 @@ export async function isHoliday(
     const supabaseServer = createServerClient(cookieStore);
     
     const dateStr = DateTime.fromJSDate(date).toISODate();
+    
+    if (!dateStr) {
+      console.error('Invalid date for holiday check');
+      return { isHoliday: false, name: null };
+    }
     
     const { data, error } = await supabaseServer
       .from('holidays')
@@ -317,11 +322,46 @@ export async function importHolidays(
       console.error('Error deleting provincial holidays:', deleteProvincialError);
     }
     
-    // Insert new holidays
+    // Insert new holidays - convert any Date objects to strings for Supabase
     if (holidays.length > 0) {
+      // Ensure all date values are strings as required by Supabase
+      const holidaysToInsert = holidays
+        .map(holiday => {
+          // Convert Date objects to ISO date strings
+          let dateStr: string | null = null;
+          if (typeof holiday.date === 'string') {
+            dateStr = holiday.date;
+          } else if (holiday.date instanceof Date) {
+            dateStr = DateTime.fromJSDate(holiday.date).toISODate();
+          }
+          
+          // Skip holidays with invalid dates
+          if (!dateStr) {
+            console.error('Invalid date for holiday:', holiday.name);
+            return null;
+          }
+          
+          return {
+            ...holiday,
+            date: dateStr
+          };
+        })
+        // Filter out holidays with invalid dates (null values)
+        .filter((holiday): holiday is { 
+          date: string; 
+          name: string; 
+          province: string | null; 
+          type: string; 
+        } => holiday !== null);
+      
+      if (holidaysToInsert.length === 0) {
+        console.warn('No valid holidays to insert after filtering');
+        return;
+      }
+      
       const { error: insertError } = await supabaseServer
         .from('holidays')
-        .insert(holidays);
+        .insert(holidaysToInsert);
       
       if (insertError) {
         console.error('Error inserting holidays:', insertError);
@@ -348,6 +388,11 @@ export async function holidayExists(
     const supabaseServer = createServerClient(cookieStore);
     
     const dateStr = DateTime.fromJSDate(date).toISODate();
+    
+    if (!dateStr) {
+      console.error('Invalid date for holiday check');
+      return false;
+    }
     
     let query = supabaseServer
       .from('holidays')
