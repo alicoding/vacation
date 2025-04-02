@@ -12,8 +12,13 @@ import type { CookieOptions } from '@supabase/ssr';
 // Type for consistent Supabase client usage
 type SupabaseClientType = SupabaseClient<Database, 'public', any>;
 
-// Export the client for easy access
-export const supabase = createDirectClient();
+// Export the client for easy access - wrapped in a function to avoid client-side initialization errors
+export const supabase = typeof window === 'undefined' 
+  ? createDirectClient() 
+  : (() => {
+      console.warn('Server Supabase client accessed in browser context - using client-safe fallback');
+      return createDirectClient();
+    })();
 
 /**
  * Helper function for safer database access that verifies

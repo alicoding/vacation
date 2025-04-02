@@ -17,11 +17,20 @@ const theme = createTheme({
   },
 });
 
+/**
+ * Global providers for the application
+ * Includes theme provider and auth provider with environment variables
+ */
 export function Providers({ children }: { children: React.ReactNode }) {
+  // Explicitly extract environment variables for client components
+  // This ensures they're properly available during client-side rendering
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <AuthProvider>
+      <AuthProvider supabaseUrl={supabaseUrl} supabaseAnonKey={supabaseAnonKey}>
         {children}
       </AuthProvider>
     </ThemeProvider>

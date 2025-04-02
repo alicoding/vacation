@@ -1,3 +1,5 @@
+import 'dotenv/config';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {
@@ -6,12 +8,12 @@ const nextConfig = {
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
     NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
     NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-    SUPABASE_KEY: process.env.SUPABASE_KEY,
     SUPABASE_PASSWORD: process.env.SUPABASE_PASSWORD,
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     SUPABASE_URL: process.env.SUPABASE_URL,
+    // Add the public Supabase variables needed in the browser
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   },
   experimental: {
     serverActions: {

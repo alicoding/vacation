@@ -1,9 +1,10 @@
 'use client';
 
-import { createBrowserSupabaseClient } from '@/utils/supabase';
+import { createBrowserClient } from '@supabase/ssr';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
+import type { Database } from '@/types/supabase';
 
 export type AuthContextType = {
   user: User | null;
@@ -16,8 +17,22 @@ export type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [supabase] = useState(() => createBrowserSupabaseClient());
+interface AuthProviderProps {
+  children: React.ReactNode;
+  supabaseUrl: string;
+  supabaseAnonKey: string;
+}
+
+export function AuthProvider({ 
+  children, 
+  supabaseUrl, 
+  supabaseAnonKey 
+}: AuthProviderProps) {
+  // Initialize Supabase client directly with the provided URL and anon key
+  const [supabase] = useState(() => 
+    createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
+  );
+  
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(true);
