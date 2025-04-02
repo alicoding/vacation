@@ -1,40 +1,9 @@
-name = "vacation-app"
-compatibility_date = "2023-11-01"
-
-# Configure the Workers runtime
-workers_dev = true
-main = ".next/standalone/server.js"
-
-[assets]
-directory = ".next/static"
-not_found_handling = "single-page-application"
+name = "vacation"
+compatibility_date = "2025-04-02"
 
 [build]
-command = "npm run build"
+command = "npx @cloudflare/next-on-pages build"
 
 [build.upload]
-format = "service-worker"
-
-[build.environment]
-NODE_VERSION = "20"
-
-[site]
-bucket = ".next/static"
-
-[vars]
-# Replace with your actual Supabase details
-NEXT_PUBLIC_SUPABASE_URL = "https://your-project.supabase.co"
-SUPABASE_SERVICE_ROLE_KEY = "your-supabase-service-role-key"
-# Auth configuration
-NEXTAUTH_URL = "https://your-app-url.com"
-NEXTAUTH_SECRET = "your-nextauth-secret"
-GOOGLE_CLIENT_ID = "your-google-client-id"
-GOOGLE_CLIENT_SECRET = "your-google-client-secret"
-
-[env.production]
-name = "vacation"
-workers_dev = true
-
-[env.development]
-name = "vacation-dev"
-workers_dev = true
+format = "directory"
+dir = ".vercel/output"
