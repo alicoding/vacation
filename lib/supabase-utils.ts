@@ -5,13 +5,15 @@ import { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
 type SupabaseClientType = SupabaseClient<Database>;
+// Define valid table names type from the Database type
+type TableNames = keyof Database['public']['Tables'];
 
 /**
  * Helper to handle Prisma-like findFirst operations with Supabase
  */
 export async function findFirst<T = unknown>(
   supabase: SupabaseClientType,
-  table: string,
+  table: TableNames,
   where: Record<string, unknown> = {},
 ): Promise<T | null> {
   // Convert nested where conditions to flat conditions
@@ -23,10 +25,10 @@ export async function findFirst<T = unknown>(
       // Handle nested conditions (e.g., user: { email: ... })
       Object.entries(value).forEach(([nestedKey, nestedValue]) => {
         const columnName = `${key}_${nestedKey}`;
-        query = query.eq(columnName, nestedValue);
+        query = query.eq(columnName, nestedValue as any); // Type assertion needed for Supabase parameter compatibility
       });
     } else {
-      query = query.eq(key, value);
+      query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
     }
   });
   
@@ -44,7 +46,7 @@ export async function findFirst<T = unknown>(
  */
 export async function findMany<T = unknown>(
   supabase: SupabaseClientType,
-  table: string,
+  table: TableNames,
   options: {
     where?: Record<string, unknown>;
     select?: string[];
@@ -68,11 +70,11 @@ export async function findMany<T = unknown>(
         if (nestedValue === null) {
           query = query.is(columnName, null);
         } else {
-          query = query.eq(columnName, nestedValue);
+          query = query.eq(columnName, nestedValue as any); // Type assertion needed for Supabase parameter compatibility
         }
       });
     } else {
-      query = query.eq(key, value);
+      query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
     }
   });
   
@@ -102,12 +104,12 @@ export async function findMany<T = unknown>(
  */
 export async function create<T = unknown>(
   supabase: SupabaseClientType,
-  table: string,
+  table: TableNames,
   data: Record<string, unknown>,
 ): Promise<T> {
   const { data: result, error } = await supabase
     .from(table)
-    .insert(data)
+    .insert(data as any) // Type assertion needed for Supabase parameter compatibility
     .select()
     .single();
     
@@ -123,7 +125,7 @@ export async function create<T = unknown>(
  */
 export async function update<T = unknown>(
   supabase: SupabaseClientType,
-  table: string,
+  table: TableNames,
   options: {
     where: Record<string, unknown>;
     data: Record<string, unknown>;
@@ -135,7 +137,7 @@ export async function update<T = unknown>(
   
   // Apply where conditions
   Object.entries(where).forEach(([key, value]) => {
-    query = query.eq(key, value);
+    query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
   });
   
   const { data: result, error } = await query.select().single();
@@ -152,14 +154,14 @@ export async function update<T = unknown>(
  */
 export async function remove<T = unknown>(
   supabase: SupabaseClientType,
-  table: string,
+  table: TableNames,
   where: Record<string, unknown>,
 ): Promise<T> {
   let query = supabase.from(table).delete();
   
   // Apply where conditions
   Object.entries(where).forEach(([key, value]) => {
-    query = query.eq(key, value);
+    query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
   });
   
   const { data: result, error } = await query.select().single();
