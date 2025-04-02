@@ -14,9 +14,7 @@ const nextConfig = {
     SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
     SUPABASE_URL: process.env.SUPABASE_URL,
   },
-  // Set runtime configuration
   experimental: {
-    // These are the supported experimental options
     serverActions: {
       bodySizeLimit: '2mb',
     },
@@ -24,16 +22,10 @@ const nextConfig = {
       enabled: true,
     },
   },
-
-  // Add specific configuration for Cloudflare Pages
   transpilePackages: ['@cloudflare/next-on-pages'],
-
-  // Other Next.js configurations
   reactStrictMode: true,
-
   webpack: (config, { isServer }) => {
     if (!isServer) {
-      // Don't attempt to bundle server-only packages on the client
       config.resolve.fallback = {
         ...config.resolve.fallback,
         'async_hooks': false,
@@ -44,47 +36,28 @@ const nextConfig = {
     }
     return config;
   },
-
   async headers() {
     return [
       {
         source: '/_next/static/media/:path*',
         headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-          {
-            key: 'Cache-Control',
-            value: 'public, max-age=31536000, immutable',
-          },
+          { key: 'Access-Control-Allow-Origin', value: '*' },
+          { key: 'Cache-Control', value: 'public, max-age=31536000, immutable' },
         ],
       },
       {
         source: '/_next/webpack-hmr',
-        headers: [
-          {
-            key: 'Access-Control-Allow-Origin',
-            value: '*',
-          },
-        ],
+        headers: [{ key: 'Access-Control-Allow-Origin', value: '*' }],
       },
     ];
   },
-
   poweredByHeader: false,
-
-  // Specific Cloudflare configuration
   images: {
     domains: ['vacation.alicoding.com'],
     unoptimized: true,
   },
-
-  // Allow cross-origin requests during development
   allowedDevOrigins: ['vacation.alicoding.com'],
-
-  // This is important for Cloudflare deployment
   output: 'standalone',
 };
 
-export default nextConfig;
+module.exports = nextConfig;
