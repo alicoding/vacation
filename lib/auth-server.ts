@@ -12,6 +12,7 @@ export async function getServerSession() {
     // Create two versions of the client - try cookie-based first for app dir
     // then fall back to direct client as backup
     let session = null;
+    let user = null;
     
     try {
       // Only import cookies() when needed to avoid static import errors
@@ -60,17 +61,18 @@ export async function getServerSession() {
         },
       );
       
-      // First, try to get session which is cookie-based
-      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.warn('Error getting session:', sessionError);
-      }
+      // First, get the user directly which is more secure
+      // This follows Supabase's recommendation for better security
+      const { data: userData, error: userError } = await supabase.auth.getUser();
       
-      session = sessionData.session;
-      
-      // Then get the user if we have a session
-      if (session) {
-        await supabase.auth.getUser();
+      if (userError) {
+        console.warn('Error getting user:', userError);
+      } else if (userData.user) {
+        user = userData.user;
+        
+        // After verifying the user, get the session for access tokens
+        const { data: sessionData } = await supabase.auth.getSession();
+        session = sessionData.session;
       }
     } catch (e) {
       // If cookies() fails, fall back to direct client as backup
@@ -79,17 +81,21 @@ export async function getServerSession() {
       
       // Use direct client as backup
       const directSupabase = createDirectClient();
-      const { data: directSession } = await directSupabase.auth.getSession();
-      session = directSession.session;
       
-      if (session) {
-        await directSupabase.auth.getUser();
+      // First, get the user directly which is more secure
+      const { data: userData } = await directSupabase.auth.getUser();
+      
+      if (userData.user) {
+        user = userData.user;
+        // Get session after verifying user
+        const { data: sessionData } = await directSupabase.auth.getSession();
+        session = sessionData.session;
       }
     }
     
-    // If we have a session, convert it to our app's format
-    if (session) {
-      console.log('Server session found for user:', session.user.email);
+    // If we have a verified user and session, convert it to our app's format
+    if (user && session) {
+      console.log('Server session found for user:', user.email);
       return convertSupabaseSession(session);
     }
     

@@ -1,6 +1,6 @@
 'use client';
 
-import { createBrowserClient } from '@supabase/ssr';
+import { createBrowserSupabaseClient } from '@/utils/supabase';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
@@ -17,21 +17,34 @@ export type AuthContextType = {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Maintain a global reference to the auth context for non-React access
+let globalAuthContext: AuthContextType | null = null;
+
+/**
+ * Get the auth instance outside of React components
+ * Used by auth-helpers.ts for backward compatibility
+ */
+export function getAuthInstance(): AuthContextType {
+  if (!globalAuthContext) {
+    throw new Error('Auth context not initialized. Make sure AuthProvider is rendered.');
+  }
+  return globalAuthContext;
+}
+
 interface AuthProviderProps {
   children: React.ReactNode;
-  supabaseUrl: string;
-  supabaseAnonKey: string;
+  supabaseUrl?: string;
+  supabaseAnonKey?: string;
 }
 
 export function AuthProvider({ 
   children, 
-  supabaseUrl, 
-  supabaseAnonKey 
+  supabaseUrl,
+  supabaseAnonKey
 }: AuthProviderProps) {
-  // Initialize Supabase client directly with the provided URL and anon key
-  const [supabase] = useState(() => 
-    createBrowserClient<Database>(supabaseUrl, supabaseAnonKey)
-  );
+  // Use createBrowserSupabaseClient which now implements singleton pattern
+  // This prevents multiple GoTrueClient instances
+  const [supabase] = useState(() => createBrowserSupabaseClient());
   
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -197,6 +210,19 @@ export function AuthProvider({
     signInWithGoogle,
     signOut,
   };
+  
+  // Update the global context reference whenever the value changes
+  // This allows non-React code to access the current auth state
+  useEffect(() => {
+    globalAuthContext = value;
+    return () => {
+      // Clear the global reference when the component unmounts
+      // This prevents stale references
+      if (globalAuthContext === value) {
+        globalAuthContext = null;
+      }
+    };
+  }, [value]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

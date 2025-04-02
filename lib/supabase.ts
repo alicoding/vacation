@@ -1,5 +1,5 @@
 /**
- * This file provides a Supabase client for server-side operations.
+ * This file provides Supabase clients for server-side operations.
  * It should only be imported from server components, API routes,
  * or server actions. Never import this directly in client components.
  */
@@ -9,16 +9,25 @@ import type { Database } from '@/types/supabase';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { CookieOptions } from '@supabase/ssr';
 
-// Type for consistent Supabase client usage
-type SupabaseClientType = SupabaseClient<Database, 'public', any>;
+// Type for consistent Supabase client usage with specific schema typing
+type SupabaseClientType = SupabaseClient<Database, 'public', Database['public']>;
 
-// Export the client for easy access - wrapped in a function to avoid client-side initialization errors
-export const supabase = typeof window === 'undefined' 
-  ? createDirectClient() 
+// Prevent client-side instantiation with proper error handling for edge environments
+const isServer = typeof window === 'undefined';
+
+// Create singleton server client instance
+export const supabase: SupabaseClientType = isServer
+  ? createDirectClient()
   : (() => {
-      console.warn('Server Supabase client accessed in browser context - using client-safe fallback');
-      return createDirectClient();
-    })();
+    // In development, provide helpful warning and use client-safe fallbacks
+    console.warn(
+      'Server Supabase client accessed in browser context - this is an architecture error. ' +
+      'Use createBrowserSupabaseClient() from utils/supabase instead.',
+    );
+
+    // Return the client-safe version to prevent runtime errors
+    return createDirectClient();
+  })();
 
 /**
  * Helper function for safer database access that verifies
@@ -27,14 +36,14 @@ export const supabase = typeof window === 'undefined'
 export async function fetchFromDB<T>(
   asyncFn: (client: SupabaseClientType) => Promise<T>,
 ): Promise<T> {
-  if (typeof window !== 'undefined') {
+  if (!isServer) {
     throw new Error(
       'Database queries must be run on the server. ' +
       'Use server components, server actions, or API routes.',
     );
   }
-  
-  return asyncFn(supabase as SupabaseClientType);
+
+  return asyncFn(supabase);
 }
 
 /**
@@ -43,7 +52,7 @@ export async function fetchFromDB<T>(
  */
 export async function createEdgeAuthClient(request?: Request) {
   let cookieHandler;
-  
+
   if (request) {
     // If a request object is provided, use its cookies
     const cookieHeader = request.headers.get('cookie') || '';
@@ -54,15 +63,15 @@ export async function createEdgeAuthClient(request?: Request) {
         cookies: {
           get(name) {
             if (!cookieHeader) return undefined;
-            
+
             const match = cookieHeader
               .split(';')
               .find((c) => c.trim().startsWith(`${name}=`));
-            
+
             if (match) {
               return match.split('=')[1];
             }
-            
+
             return undefined;
           },
           set(name, value, options) {
@@ -77,12 +86,12 @@ export async function createEdgeAuthClient(request?: Request) {
       },
     );
   }
-  
+
   // Only import cookies() when needed to avoid static import errors
   try {
     const { cookies } = await import('next/headers');
     const cookieStore = cookies();
-    
+
     return createServerClient<Database>(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -105,12 +114,12 @@ export async function createEdgeAuthClient(request?: Request) {
               // Ensure sameSite is a string value required by cookie API
               if (options?.sameSite === true) options.sameSite = 'strict';
               if (options?.sameSite === false) options.sameSite = 'lax';
-              
+
               // Skip setting if cookieStore is a Promise
               if (!(cookieStore instanceof Promise)) {
                 // Use a more specific type casting for the cookieStore
-                const store = cookieStore as { 
-                  set(name: string, value: string, options?: any): void 
+                const store = cookieStore as {
+                  set(name: string, value: string, options?: Record<string, unknown>): void,
                 };
                 store.set(name, value, options as CookieOptions);
               }
@@ -123,8 +132,8 @@ export async function createEdgeAuthClient(request?: Request) {
               // Skip removing if cookieStore is a Promise
               if (!(cookieStore instanceof Promise)) {
                 // Use a more specific type casting for the cookieStore
-                const store = cookieStore as { 
-                  set(name: string, value: string, options?: any): void 
+                const store = cookieStore as {
+                  set(name: string, value: string, options?: Record<string, unknown>): void,
                 };
                 store.set(name, '', { ...options, maxAge: 0 } as CookieOptions);
               }

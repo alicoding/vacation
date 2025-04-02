@@ -41,6 +41,14 @@ export type Database = {
           calendar_sync_enabled?: boolean
           google_calendar_id?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "users_id_fkey"
+            columns: ["id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       vacation_bookings: {
         Row: {
@@ -88,6 +96,14 @@ export type Database = {
           last_sync_attempt?: string | null
           sync_error?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_bookings_userId_fkey"
+            columns: ["userId"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       holidays: {
         Row: {
@@ -111,6 +127,7 @@ export type Database = {
           province?: string | null
           type?: string
         }
+        Relationships: []
       }
       accounts: {
         Row: {
@@ -155,6 +172,14 @@ export type Database = {
           id_token?: string | null
           session_state?: string | null
         }
+        Relationships: [
+          {
+            foreignKeyName: "accounts_userId_fkey"
+            columns: ["userId"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       sessions: {
         Row: {
@@ -175,6 +200,14 @@ export type Database = {
           userId?: string
           expires?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "sessions_userId_fkey"
+            columns: ["userId"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       verification_tokens: {
         Row: {
@@ -192,6 +225,7 @@ export type Database = {
           token?: string
           expires?: string
         }
+        Relationships: []
       }
       google_tokens: {
         Row: {
@@ -224,7 +258,24 @@ export type Database = {
           expires_at?: string
           created_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "google_tokens_user_id_fkey"
+            columns: ["user_id"]
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
       }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      [_ in never]: never
+    }
+    Enums: {
+      [_ in never]: never
     }
   }
 }

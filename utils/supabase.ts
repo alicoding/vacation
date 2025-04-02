@@ -12,6 +12,9 @@ const SUPABASE_DEFAULTS = {
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jZ2p2b3phZW1wdWd5aXFiZnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NTg3MDcsImV4cCI6MjA1ODUzNDcwN30.cNs2cD2iCZGzzYngBW3MrDAVF-p5nJz4ngyytzmFbUg'
 };
 
+// Global browser client singleton to prevent multiple instances
+let browserClientSingleton: ReturnType<typeof createBrowserClient<Database>> | null = null;
+
 /**
  * Safely retrieves environment variables with fallbacks for browser contexts
  * This approach ensures type safety and edge compatibility
@@ -46,13 +49,26 @@ const getRequiredEnvVar = (name: string): string => {
 /**
  * Creates a Supabase client for browser environments
  * Used in client components within the App Router
+ * Returns a singleton instance to prevent multiple GoTrueClient warnings
  */
 export const createBrowserSupabaseClient = () => {
+  // In browser context, return the singleton if it exists
+  if (typeof window !== 'undefined' && browserClientSingleton) {
+    return browserClientSingleton;
+  }
+  
   try {
     const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
     const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
     
-    return createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+    const client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+    
+    // Store singleton in browser context
+    if (typeof window !== 'undefined') {
+      browserClientSingleton = client;
+    }
+    
+    return client;
   } catch (error) {
     console.error('Error creating browser Supabase client:', error);
     
@@ -66,11 +82,20 @@ export const createBrowserSupabaseClient = () => {
   }
 };
 
+// Global direct client singleton to prevent multiple instances
+let directClientSingleton: ReturnType<typeof createClient<Database>> | null = null;
+
 /**
  * For direct API access with proper cookie handling
  * Works in both client and server environments
+ * Returns a singleton instance in browser contexts
  */
 export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?: string }) => {
+  // In browser context without cookies, return the singleton if it exists
+  if (typeof window !== 'undefined' && !cookies && directClientSingleton) {
+    return directClientSingleton;
+  }
+  
   // Extract cookie string from various possible formats
   let cookieString = '';
   
@@ -92,7 +117,7 @@ export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?:
     const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
     const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
     
-    return createClient<Database>(
+    const client = createClient<Database>(
       supabaseUrl,
       supabaseAnonKey,
       {
@@ -104,13 +129,20 @@ export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?:
         },
       },
     );
+    
+    // Store singleton in browser context if no custom cookies
+    if (typeof window !== 'undefined' && !cookies) {
+      directClientSingleton = client;
+    }
+    
+    return client;
   } catch (error) {
     if (typeof window !== 'undefined') {
       // In client-side context, log the error but continue with fallbacks
       console.error('Error creating direct Supabase client:', error);
       
       // Create client with fallback values
-      return createClient<Database>(
+      const client = createClient<Database>(
         SUPABASE_DEFAULTS.url,
         SUPABASE_DEFAULTS.anonKey,
         {
@@ -122,6 +154,13 @@ export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?:
           },
         }
       );
+      
+      // Store singleton in browser context if no custom cookies
+      if (typeof window !== 'undefined' && !cookies && !directClientSingleton) {
+        directClientSingleton = client;
+      }
+      
+      return client;
     }
     
     // Re-throw in server context
