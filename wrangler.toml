@@ -1,6 +1,3 @@
 name = "vacation"
 compatibility_date = "2025-04-02"
 pages_build_output_dir = ".vercel/output"
-
-[build.environment]
-NODE_VERSION = "20"
