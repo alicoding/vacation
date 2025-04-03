@@ -45,6 +45,7 @@ export async function createVacation(data: {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
+    credentials: 'include', // <- critical for cookie-based auth
   });
   
   if (!res.ok) {
@@ -86,6 +87,7 @@ export async function syncHolidays(year: number): Promise<{ success: boolean; me
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ year }),
+    credentials: 'include', // <- critical for cookie-based auth
   });
   
   if (!res.ok) {
