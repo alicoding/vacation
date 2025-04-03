@@ -2,10 +2,5 @@ name = "vacation"
 compatibility_date = "2025-04-02"
 pages_build_output_dir = ".vercel/output"
 
-# Environment variables should be set in the Cloudflare Pages dashboard
-# These are just placeholders to document what variables are needed
-# [env.production.vars]
-# NEXT_PUBLIC_SUPABASE_URL = ""
-# NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
-# NEXTAUTH_URL = ""
-# NEXTAUTH_SECRET = ""
+[build]
+command = "npm run pages:build"

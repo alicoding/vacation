@@ -1,28 +1,13 @@
 {
   "version": 1,
-  "include": [
-    "/*"
-  ],
+  "include": ["/*"],
   "exclude": [
     "/_next/static/*",
     "/static/*",
-    "/*.ico",
-    "/*.png",
-    "/*.svg",
-    "/*.jpg",
-    "/*.jpeg",
-    "/*.gif",
-    "/*.webp",
+    "/*.{ico,png,jpg,jpeg,svg,gif,webp}",
+    "/favicon.ico",
     "/robots.txt",
     "/sitemap*.xml",
     "/manifest.json"
-  ],
-  "proxies": {
-    "/": {
-      "origin": "https://vacation.alicoding.com"
-    }
-  },
-  "rewrites": [
-    { "source": "/((?!api|_next/static|_next/image|favicon.ico|public).*)", "destination": "/index.html" }
   ]
 }

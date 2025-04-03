@@ -1,4 +1,4 @@
-// Custom Cloudflare Worker for Next.js routing
+// Custom Cloudflare Worker for edge-compatible routing
 export default {
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
@@ -12,20 +12,40 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    // Check if this is an API route
+    // For API routes, pass through to the Functions handler
     if (url.pathname.startsWith('/api/')) {
       return env.ASSETS.fetch(request);
     }
 
-    // For all other routes, try to fetch the specific route first
-    let response = await env.ASSETS.fetch(request);
-    
-    // If not found (404), serve the index.html for client-side routing
-    if (response.status === 404) {
-      const indexRequest = new Request(`${url.origin}/index.html`, request);
-      response = await env.ASSETS.fetch(indexRequest);
+    try {
+      // Try to fetch the specific route first
+      const response = await env.ASSETS.fetch(request);
+      
+      // If successful, return the response
+      if (response.status === 200) {
+        return response;
+      }
+      
+      // For 404s, try to serve the index HTML if it's a route that should be handled by client-side routing
+      if (response.status === 404) {
+        // Check if this looks like a route that should be handled by the app
+        if (!url.pathname.match(/\.\w+$/)) {
+          // Fetch the index HTML
+          const indexUrl = new URL('/', url);
+          const indexResponse = await env.ASSETS.fetch(new Request(indexUrl, request));
+          
+          // Return the index HTML with a 200 status
+          return new Response(indexResponse.body, {
+            status: 200,
+            headers: indexResponse.headers
+          });
+        }
+      }
+      
+      return response;
+    } catch (error) {
+      // If anything goes wrong, return a 500 error
+      return new Response('Internal Server Error', { status: 500 });
     }
-    
-    return response;
   }
 }

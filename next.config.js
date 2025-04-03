@@ -23,10 +23,8 @@ const nextConfig = {
       enabled: true,
     },
   },
-  // Add Cloudflare Pages specific configurations
   transpilePackages: ['@cloudflare/next-on-pages'],
   reactStrictMode: true,
-  swcMinify: true,
   images: {
     domains: ['vacation.alicoding.com'],
     unoptimized: true,
@@ -37,9 +35,8 @@ const nextConfig = {
       },
     ],
   },
-  // Explicitly configure trailing slash behavior to be consistent
-  trailingSlash: false,
   // Critical for edge compatibility
+  trailingSlash: false,
   skipTrailingSlashRedirect: true,
   // Custom webpack configuration for Cloudflare compatibility
   webpack: (config, { isServer }) => {
@@ -54,7 +51,6 @@ const nextConfig = {
     }
     return config;
   },
-  // Enable async components for better code splitting
   async headers() {
     return [
       {
@@ -71,7 +67,6 @@ const nextConfig = {
     ];
   },
   poweredByHeader: false,
-  // Not using 'export' mode as it strips server functionality
-};
+}
 
 export default nextConfig;
