@@ -34,7 +34,7 @@ export const db = {
   findFirst: <T>(table: TableNames, where?: Record<string, any>) => 
     supabaseUtils.findFirst<T>(supabase as SupabaseClientType, table, where),
   
-  findMany: <T>(table: TableNames, options?: Parameters<typeof supabaseUtils.findMany>[2]) => 
+  findMany: <T extends Record<string, unknown>>(table: TableNames, options?: Parameters<typeof supabaseUtils.findMany>[2]) => 
     supabaseUtils.findMany<T>(supabase as SupabaseClientType, table, options),
   
   create: <T>(table: TableNames, data: Record<string, any>) => 

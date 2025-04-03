@@ -3,6 +3,7 @@
  */
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
+import camelcaseKeys from 'camelcase-keys';
 
 type SupabaseClientType = SupabaseClient<Database>;
 // Define valid table names type from the Database type
@@ -38,13 +39,13 @@ export async function findFirst<T = unknown>(
     throw error;
   }
   
-  return data as T;
+  return data ? (camelcaseKeys(data, { deep: true }) as T) : null;
 }
 
 /**
  * Helper to handle Prisma-like findMany operations with Supabase
  */
-export async function findMany<T = unknown>(
+export async function findMany<T extends Record<string, unknown> = any>(
   supabase: SupabaseClientType,
   table: TableNames,
   options: {
@@ -96,7 +97,7 @@ export async function findMany<T = unknown>(
     throw error;
   }
   
-  return (data || []) as T[];
+  return camelcaseKeys((data ?? []) as unknown as Record<string, unknown>[], { deep: true }) as T[];
 }
 
 /**
@@ -117,7 +118,7 @@ export async function create<T = unknown>(
     throw error;
   }
   
-  return result as T;
+  return camelcaseKeys(result, { deep: true }) as T;
 }
 
 /**
@@ -146,7 +147,7 @@ export async function update<T = unknown>(
     throw error;
   }
   
-  return result as T;
+  return camelcaseKeys(result, { deep: true }) as T;
 }
 
 /**
@@ -170,5 +171,5 @@ export async function remove<T = unknown>(
     throw error;
   }
   
-  return result as T;
+  return camelcaseKeys(result, { deep: true }) as T;
 }

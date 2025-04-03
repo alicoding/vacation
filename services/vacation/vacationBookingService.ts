@@ -2,7 +2,7 @@
 import { DateTime } from 'luxon';
 import { cookies } from 'next/headers';
 import { createServerClient, createServiceClient } from '@/utils/supabase-server';
-import { VacationBooking, VacationServiceError } from './vacationTypes';
+import { VacationBooking, VacationServiceError, VacationBookingDb } from './vacationTypes';
 import { checkOverlappingBookings } from './vacationOverlapService';
 import { syncVacationToCalendar } from '@/utils/googleCalendar';
 
@@ -71,19 +71,22 @@ export async function createVacationBooking(
       );
     }
     
+    const insertPayload = {
+      user_id: userId,
+      start_date: startDate.toISOString(),
+      end_date: endDate.toISOString(),
+      note,
+      is_half_day: isHalfDay,
+      half_day_portion: halfDayPortion,
+      created_at: new Date().toISOString(),
+      sync_status: calendarSyncEnabled ? 'pending' : 'disabled',
+      id: ''
+    } as unknown as Record<string, unknown>;
+
     // Create the booking using the authenticated client
     const { data: dbBooking, error } = await supabaseServer
       .from('vacation_bookings')
-      .insert({
-        userId: userId, // Updated from user_id to userId
-        start_date: startDate.toISOString(),
-        end_date: endDate.toISOString(),
-        note,
-        is_half_day: isHalfDay,
-        half_day_portion: halfDayPortion,
-        created_at: new Date().toISOString(),
-        sync_status: calendarSyncEnabled ? 'pending' : 'disabled',
-      })
+      .insert(insertPayload as any)
       .select()
       .single();
     
@@ -119,7 +122,7 @@ export async function createVacationBooking(
     // Transform the DB response to match the VacationBooking interface
     const vacation: VacationBooking = {
       id: dbBooking?.id,
-      userId: dbBooking?.userId, // Updated from userId to user_id
+      userId: (dbBooking as any)?.user_id,
       startDate: new Date(dbBooking?.start_date),
       endDate: new Date(dbBooking?.end_date),
       note: dbBooking?.note,
@@ -250,7 +253,7 @@ export async function updateVacationBooking(
     // Transform the DB response to match the VacationBooking interface
     const vacation: VacationBooking = {
       id: dbBooking?.id,
-      userId: dbBooking?.userId, // Updated from userId to user_id
+      userId: (dbBooking as any)?.user_id,
       startDate: new Date(dbBooking?.start_date),
       endDate: new Date(dbBooking?.end_date),
       note: dbBooking?.note,
