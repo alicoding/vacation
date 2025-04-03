@@ -2,7 +2,7 @@
   "version": 1,
   "include": ["/*"],
   "exclude": [
-    "/_next/static/*",
+    "/_next/*",
     "/static/*",
     "/*.ico",
     "/*.png",
@@ -13,6 +13,16 @@
     "/*.webp",
     "/robots.txt",
     "/sitemap*.xml",
-    "/manifest.json"
+    "/manifest.json",
+    "/_headers",
+    "/__next_data_catchall.json",
+    "/_app.rsc.json",
+    "/_document.rsc.json",
+    "/_error.rsc.json",
+    "/404.html",
+    "/404.rsc.json",
+    "/500.html",
+    "/index.html",
+    "/index.rsc"
   ]
 }

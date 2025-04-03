@@ -66,8 +66,9 @@ const nextConfig = {
   trailingSlash: false,
   skipTrailingSlashRedirect: true,
   allowedDevOrigins: ['vacation.alicoding.com'],
-  // Use 'standalone' output for Cloudflare Pages compatibility
-  output: 'standalone',
+  // Configure output specifically for Cloudflare Pages
+  output: 'export',
+  distDir: '.vercel/output/static',
 };
 
 export default nextConfig;
