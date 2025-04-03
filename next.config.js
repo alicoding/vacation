@@ -56,8 +56,17 @@ const nextConfig = {
   images: {
     domains: ['vacation.alicoding.com'],
     unoptimized: true,
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '**',
+      },
+    ],
   },
+  trailingSlash: false,
+  skipTrailingSlashRedirect: true,
   allowedDevOrigins: ['vacation.alicoding.com'],
+  // Use 'standalone' output for Cloudflare Pages compatibility
   output: 'standalone',
 };
 

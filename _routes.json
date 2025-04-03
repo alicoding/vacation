@@ -3,11 +3,16 @@
   "include": ["/*"],
   "exclude": [
     "/_next/static/*",
-    "/favicon.ico",
+    "/static/*",
+    "/*.ico",
+    "/*.png",
+    "/*.svg",
+    "/*.jpg",
+    "/*.jpeg",
+    "/*.gif",
+    "/*.webp",
     "/robots.txt",
-    "/sitemap.xml",
-    "/manifest.json",
-    "/images/*",
-    "/assets/*"
+    "/sitemap*.xml",
+    "/manifest.json"
   ]
 }

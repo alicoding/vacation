@@ -3,16 +3,12 @@ import { createServerClient } from '@supabase/ssr';
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - images/* (image files stored in the public folder)
-     * - public/* (public files)
-     * - /api/* (API routes)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|images|public|api).*)',
+    // Only match dashboard and other protected routes
+    '/dashboard/:path*',
+    '/api/user/:path*', 
+    '/api/vacations/:path*',
+    // Exclude auth routes and public resources
+    '/((?!_next/static|_next/image|favicon.ico|images|public|api/auth|auth).*)',
   ],
 };
 
