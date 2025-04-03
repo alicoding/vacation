@@ -1,15 +1,14 @@
 name = "vacation"
-compatibility_date = "2025-03-20" # Adjusted to match the supported runtime version
+compatibility_date = "2025-03-20"
 compatibility_flags = ["nodejs_compat"]
 
 # Pages-specific configuration
 pages_build_output_dir = ".vercel/output/static"
 
-# Define variables but don't set values in the main configuration file
-# These will be provided through .dev.vars for local development
-# or through the Cloudflare Pages/Workers environment for production
+# Define variables but use actual values for build process
+# These will be overridden by Cloudflare's environment variables at runtime
 [vars]
-NEXT_PUBLIC_SUPABASE_URL = ""
-NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
-NEXTAUTH_URL = ""
-NEXTAUTH_SECRET = ""
+NEXT_PUBLIC_SUPABASE_URL = "https://ncgjvozaempugyiqbfxo.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5jZ2p2b3phZW1wdWd5aXFiZnhvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDI5NTg3MDcsImV4cCI6MjA1ODUzNDcwN30.cNs2cD2iCZGzzYngBW3MrDAVF-p5nJz4ngyytzmFbUg"
+NEXTAUTH_URL = "https://vacation.alicoding.com"
+NEXTAUTH_SECRET = "temporarysecretchangethisinproduction"
