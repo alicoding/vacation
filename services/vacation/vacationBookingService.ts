@@ -79,8 +79,8 @@ export async function createVacationBooking(
       is_half_day: isHalfDay,
       half_day_portion: halfDayPortion,
       created_at: new Date().toISOString(),
-      sync_status: calendarSyncEnabled ? 'pending' : 'disabled',
-      id: ''
+      sync_status: calendarSyncEnabled ? 'pending' : 'disabled'
+      // Removed explicit id field to let Supabase generate a UUID automatically
     } as unknown as Record<string, unknown>;
 
     // Create the booking using the authenticated client
