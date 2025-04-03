@@ -6,6 +6,32 @@ import { calculateBusinessDays } from './vacationCalculationService';
 import { DateTime } from 'luxon';
 
 /**
+ * Maps database vacation booking result to the VacationBooking interface
+ * Following project type safety guidelines with proper checks
+ */
+function mapDbToVacationBooking(booking: any): VacationBooking | null {
+  // Check if booking exists and has all required properties
+  if (!booking || 
+      !('id' in booking) || 
+      !('user_id' in booking) || 
+      !('start_date' in booking) || 
+      !('end_date' in booking)) {
+    return null;
+  }
+  
+  return {
+    id: booking.id,
+    userId: booking.user_id,
+    startDate: new Date(booking.start_date),
+    endDate: new Date(booking.end_date),
+    note: booking.note,
+    createdAt: booking.created_at ? new Date(booking.created_at) : undefined,
+    isHalfDay: booking.is_half_day ?? false,
+    halfDayPortion: booking.half_day_portion,
+  };
+}
+
+/**
  * Get all vacation bookings for a user
  */
 export async function getVacationBookings(userId: string): Promise<VacationBooking[]> {
@@ -17,7 +43,7 @@ export async function getVacationBookings(userId: string): Promise<VacationBooki
     const { data: dbBookings, error } = await supabaseServer
       .from('vacation_bookings')
       .select('*')
-      .eq('userId', userId) // Changed from user_id to userId to match schema
+      .eq('user_id', userId) // Using user_id to match the database schema
       .order('start_date', { ascending: false });
     
     if (error) {
@@ -25,16 +51,10 @@ export async function getVacationBookings(userId: string): Promise<VacationBooki
     }
     
     // Transform the DB response to match the VacationBooking interface
-    const bookings: VacationBooking[] = (dbBookings || []).map(booking => ({
-      id: booking.id,
-      userId: booking.userId,
-      startDate: new Date(booking.start_date),
-      endDate: new Date(booking.end_date),
-      note: booking.note,
-      createdAt: booking.created_at ? new Date(booking.created_at) : undefined,
-      isHalfDay: booking.is_half_day,
-      halfDayPortion: booking.half_day_portion
-    }));
+    // Using proper type guards and null checks as per project guidelines
+    const bookings: VacationBooking[] = (dbBookings || [])
+      .map(mapDbToVacationBooking)
+      .filter((booking): booking is VacationBooking => booking !== null);
     
     return bookings;
   } catch (error) {
@@ -94,11 +114,11 @@ export async function getVacationDaysUsed(
       throw new VacationServiceError('Failed to create date range', 'DATE_ERROR');
     }
     
-    // Note: Using camelCase column names to match the database schema
+    // Note: Using the correct column name to match the database schema
     const { data: vacations, error } = await supabaseServer
       .from('vacation_bookings')
       .select('*')
-      .eq('userId', userId)
+      .eq('user_id', userId) // This is correct as it matches DB schema
       .gte('start_date', startOfYear)
       .lte('end_date', endOfYear);
     

@@ -31,6 +31,25 @@ export class NotFoundError extends VacationServiceError {
   }
 }
 
+/**
+ * Database schema type that matches the actual Supabase table structure
+ * Uses snake_case to match PostgreSQL column naming convention
+ */
+export interface VacationBookingDb {
+  id: string;
+  user_id: string;
+  start_date: string;
+  end_date: string;
+  note?: string | null;
+  created_at?: string;
+  is_half_day?: boolean;
+  half_day_portion?: string | null;
+  google_event_id?: string | null;
+  sync_status?: string | null;
+  sync_error?: string | null;
+  last_sync_attempt?: string | null;
+}
+
 export interface VacationBooking {
   id?: string;
   userId: string;

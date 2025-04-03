@@ -75,7 +75,7 @@ export async function createVacationBooking(
     const { data: dbBooking, error } = await supabaseServer
       .from('vacation_bookings')
       .insert({
-        userId: userId,
+        userId: userId, // Updated from user_id to userId
         start_date: startDate.toISOString(),
         end_date: endDate.toISOString(),
         note,
@@ -119,7 +119,7 @@ export async function createVacationBooking(
     // Transform the DB response to match the VacationBooking interface
     const vacation: VacationBooking = {
       id: dbBooking?.id,
-      userId: dbBooking?.userId,
+      userId: dbBooking?.userId, // Updated from userId to user_id
       startDate: new Date(dbBooking?.start_date),
       endDate: new Date(dbBooking?.end_date),
       note: dbBooking?.note,
@@ -172,7 +172,7 @@ export async function updateVacationBooking(
       .from('vacation_bookings')
       .select('*')
       .eq('id', id)
-      .eq('userId', userId)
+      .eq('user_id', userId) // Updated from userId to user_id
       .single();
     
     if (findError || !existingBooking) {
@@ -207,7 +207,7 @@ export async function updateVacationBooking(
         } : {}),
       })
       .eq('id', id)
-      .eq('userId', userId)
+      .eq('user_id', userId)
       .select()
       .single();
     
@@ -250,7 +250,7 @@ export async function updateVacationBooking(
     // Transform the DB response to match the VacationBooking interface
     const vacation: VacationBooking = {
       id: dbBooking?.id,
-      userId: dbBooking?.userId,
+      userId: dbBooking?.userId, // Updated from userId to user_id
       startDate: new Date(dbBooking?.start_date),
       endDate: new Date(dbBooking?.end_date),
       note: dbBooking?.note,
@@ -288,7 +288,7 @@ export async function deleteVacationBooking(
       .from('vacation_bookings')
       .delete()
       .eq('id', id)
-      .eq('userId', userId);
+      .eq('user_id', userId); // Updated from userId to user_id
     
     if (error) {
       throw new VacationServiceError(error.message, 'DATABASE_ERROR');
