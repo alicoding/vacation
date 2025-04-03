@@ -2,9 +2,6 @@ name = "vacation"
 compatibility_date = "2025-04-02"
 pages_build_output_dir = ".vercel/output"
 
-# Use Node.js compatibility for edge functions
-node_compat = true
-
 # Environment variables should be set in the Cloudflare Pages dashboard
 # These are just placeholders to document what variables are needed
 # [env.production.vars]
