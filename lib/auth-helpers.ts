@@ -109,7 +109,7 @@ export async function ensureUserRecord(userId: string, userEmail: string, metada
           email: userEmail,
           province: province,
           created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
+          // Remove the updated_at field as it doesn't exist in the users table
         } as any);
       
       if (insertError) {
