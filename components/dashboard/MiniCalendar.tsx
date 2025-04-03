@@ -171,10 +171,11 @@ export default function MiniCalendar({
     const monthStart = currentMonth.startOf('month');
     const monthEnd = currentMonth.endOf('month');
     
-    // Get the start of the first week and end of the last week
-    const calendarStart = monthStart.startOf('week');
-    const calendarEnd = monthEnd.endOf('week');
-    
+    const startOffset = (monthStart.weekday % 7);
+    const endOffset = (7 - (monthEnd.weekday % 7)) % 7;
+    const calendarStart = monthStart.minus({ days: startOffset });
+    const calendarEnd = monthEnd.plus({ days: endOffset });
+        
     // Get all days in this range
     return eachDayOfInterval(calendarStart, calendarEnd);
   };
