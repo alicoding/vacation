@@ -4,6 +4,7 @@ import reactHooksPlugin from 'eslint-plugin-react-hooks';
 import typescriptEslint from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
 import nextPlugin from '@next/eslint-plugin-next';
+import nextOnPagesPlugin from 'eslint-plugin-next-on-pages';
 
 export default [
   js.configs.recommended,
@@ -59,6 +60,7 @@ export default [
       '@typescript-eslint': typescriptEslint,
       'react-hooks': reactHooksPlugin,
       '@next/next': nextPlugin,
+      'next-on-pages': nextOnPagesPlugin,
     },
     rules: {
       // TypeScript specific rules
@@ -88,6 +90,13 @@ export default [
       
       // Next.js specific
       '@next/next/no-img-element': 'off',
+      
+      // Cloudflare Pages & Next.js compatibility rules
+      'next-on-pages/no-unsupported-configs': 'error',
+      
+      // Remove the problematic rules
+      // 'next-on-pages/no-unsupported-edge-api': 'error',
+      // 'next-on-pages/no-node-apis': 'error',
       
       // Override core rules that conflict with TypeScript
       'no-unused-vars': 'off', // Use TypeScript's version instead

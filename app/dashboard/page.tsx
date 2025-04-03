@@ -3,16 +3,16 @@ export const runtime = 'edge';
 import { supabase } from '@/lib/supabase';
 import VacationStatsCard from '@/components/dashboard/VacationStatsCard';
 import UpcomingVacationsCard from '@/components/dashboard/UpcomingVacationsCard';
-import Link from 'next/dist/client/app-dir/link';
+import Link from 'next/link';
 import { 
   Box, Typography, Grid, Paper, Container, Button, 
 } from '@mui/material';
 import { VacationBooking } from '@/types';
 import { getVacationDaysUsed } from '@/services/vacation/vacationService';
 import { getServerSession } from '@/lib/auth-helpers';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
 import type { Database } from '@/types/supabase';
+import { DateTime } from 'luxon';
+import { createServerClient } from '@supabase/ssr';
 
 interface UserData {
   name: string | null;
@@ -22,27 +22,56 @@ interface UserData {
   vacationBookings: VacationBooking[];
 }
 
-async function getUserData(userId: string): Promise<UserData | null> {
-  try {
-    // Create a Supabase client that can be used server-side
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
+// Centralized function to handle cookie-based server client creation
+// This avoids multiple implementations of cookie handling logic
+async function getEdgeCompatibleServerClient<T = any>() {
+  // Using dynamic import with an IIFE pattern for better edge compatibility
+  const cookieStore = await (async () => {
+    try {
+      const { cookies } = await import('next/headers');
+      return cookies();
+    } catch (e) {
+      console.error('Error importing cookies:', e);
+      throw new Error('Failed to initialize cookies for edge compatibility');
+    }
+  })();
+  
+  return createServerClient<T>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name) {
+          try {
             return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
+          } catch (e) {
+            console.warn('Error getting cookie in dashboard page:', e);
+            return undefined;
+          }
+        },
+        set(name, value, options) {
+          try {
             cookieStore.set(name, value, options);
-          },
-          remove(name, options) {
+          } catch (e) {
+            console.warn('Error setting cookie in dashboard page:', e);
+          }
+        },
+        remove(name, options) {
+          try {
             cookieStore.set(name, '', { ...options, maxAge: 0 });
-          },
+          } catch (e) {
+            console.warn('Error removing cookie in dashboard page:', e);
+          }
         },
       },
-    );
+    },
+  );
+}
+
+async function getUserData(userId: string): Promise<UserData | null> {
+  try {
+    // Use the centralized function for edge-compatible Supabase client
+    const supabase = await getEdgeCompatibleServerClient<Database>();
 
     // Get user data directly from the authenticated user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -92,28 +121,11 @@ async function getUserData(userId: string): Promise<UserData | null> {
 // Update the getVacationBalance function to match the table structure
 async function getVacationBalance(userId: string, province: string) {
   try {
-    // Create a Supabase client that can be used server-side
-    const cookieStore = await cookies();
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
-            cookieStore.set(name, value, options);
-          },
-          remove(name, options) {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          },
-        },
-      },
-    );
+    // Use the centralized function for edge-compatible Supabase client
+    const supabase = await getEdgeCompatibleServerClient<Database>();
     
-    // Get current year
-    const currentYear = new Date().getFullYear();
+    // Get current year using Luxon instead of native Date
+    const currentYear = DateTime.now().year;
     
     // Get used vacation days for current year
     const usedDays = await getVacationDaysUsed(userId, currentYear);
@@ -189,8 +201,12 @@ export default async function DashboardPage() {
   const upcomingVacations = user.vacationBookings
     .filter((vacation: VacationBooking) => {
       try {
-        const endDate = new Date(vacation.end_date);
-        return endDate >= new Date();
+        // Use Luxon for date manipulation with proper type handling
+        const endDate = typeof vacation.end_date === 'string' 
+          ? DateTime.fromISO(vacation.end_date) 
+          : DateTime.fromJSDate(vacation.end_date);
+        const now = DateTime.now();
+        return endDate >= now;
       } catch (error) {
         console.error('Error parsing vacation end date:', error);
         return false; // Exclude vacations with invalid dates
@@ -198,7 +214,16 @@ export default async function DashboardPage() {
     })
     .sort((a: VacationBooking, b: VacationBooking) => { 
       try {
-        return new Date(a.start_date).getTime() - new Date(b.start_date).getTime();
+        // Use Luxon for date comparison with proper type checking
+        const aStartDate = typeof a.start_date === 'string'
+          ? DateTime.fromISO(a.start_date)
+          : DateTime.fromJSDate(a.start_date);
+        
+        const bStartDate = typeof b.start_date === 'string'
+          ? DateTime.fromISO(b.start_date)
+          : DateTime.fromJSDate(b.start_date);
+        
+        return aStartDate.toMillis() - bStartDate.toMillis();
       } catch (error) {
         console.error('Error sorting vacation dates:', error);
         return 0; // Keep original order if date parsing fails

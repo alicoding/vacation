@@ -1,11 +1,15 @@
 name = "vacation"
-compatibility_date = "2025-04-02"
-pages_build_output_dir = ".vercel/output"
+compatibility_date = "2025-03-20" # Adjusted to match the supported runtime version
+compatibility_flags = ["nodejs_compat"]
 
-# Environment variables should be set in the Cloudflare Pages dashboard
-# These are just placeholders to document what variables are needed
-# [env.production.vars]
-# NEXT_PUBLIC_SUPABASE_URL = ""
-# NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
-# NEXTAUTH_URL = ""
-# NEXTAUTH_SECRET = ""
+# Pages-specific configuration
+pages_build_output_dir = ".vercel/output/static"
+
+# Define variables but don't set values in the main configuration file
+# These will be provided through .dev.vars for local development
+# or through the Cloudflare Pages/Workers environment for production
+[vars]
+NEXT_PUBLIC_SUPABASE_URL = ""
+NEXT_PUBLIC_SUPABASE_ANON_KEY = ""
+NEXTAUTH_URL = ""
+NEXTAUTH_SECRET = ""

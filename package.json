@@ -14,8 +14,9 @@
     "start": "next start",
     "type-check": "tsc --noEmit",
     "validate": "npm run lint && npm run type-check",
-    "pages:build": "next-on-pages",
-    "pages:deploy": "npx wrangler pages deploy .vercel/output",
+    "pages:build": "npx @cloudflare/next-on-pages",
+    "preview": "npm run pages:build && wrangler pages dev",
+    "deploy": "npm run pages:build && wrangler pages deploy",
     "test": "jest"
   },
   "keywords": [],
@@ -52,7 +53,7 @@
     "typescript": "^5.8.2"
   },
   "devDependencies": {
-    "@cloudflare/next-on-pages": "^1.9.0",
+    "@cloudflare/next-on-pages": "^1.13.12",
     "@eslint/eslintrc": "^3.0.0",
     "@eslint/js": "^9.23.0",
     "@next/eslint-plugin-next": "^15.2.4",
@@ -64,6 +65,7 @@
     "autoprefixer": "^10.4.16",
     "eslint": "^9.23.0",
     "eslint-config-next": "^15.2.3",
+    "eslint-plugin-next-on-pages": "^1.13.12",
     "eslint-plugin-react": "^7.37.4",
     "eslint-plugin-react-hooks": "^5.2.0-canary-4280563b-20250326",
     "tailwindcss": "^3.4.1",

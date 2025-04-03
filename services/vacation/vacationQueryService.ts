@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { createServerClient } from '@/utils/supabase-server';
 import { VacationBooking, VacationServiceError } from './vacationTypes';
 import { calculateBusinessDays } from './vacationCalculationService';
+import { DateTime } from 'luxon';
 
 /**
  * Get all vacation bookings for a user
@@ -85,15 +86,19 @@ export async function getVacationDaysUsed(
       province = user.province;
     }
     
-    // Get all vacation bookings for the year
-    const startOfYear = new Date(year, 0, 1).toISOString();
-    const endOfYear = new Date(year, 11, 31).toISOString();
+    // Get all vacation bookings for the year using Luxon for edge compatibility
+    const startOfYear = DateTime.fromObject({ year }, { zone: 'utc' }).startOf('year').toISO();
+    const endOfYear = DateTime.fromObject({ year }, { zone: 'utc' }).endOf('year').toISO();
+    
+    if (!startOfYear || !endOfYear) {
+      throw new VacationServiceError('Failed to create date range', 'DATE_ERROR');
+    }
     
     // Note: Using camelCase column names to match the database schema
     const { data: vacations, error } = await supabaseServer
       .from('vacation_bookings')
       .select('*')
-      .eq('userId', userId) // Changed from user_id to userId
+      .eq('userId', userId)
       .gte('start_date', startOfYear)
       .lte('end_date', endOfYear);
     
@@ -105,9 +110,13 @@ export async function getVacationDaysUsed(
     let totalDays = 0;
     
     for (const vacation of vacations || []) {
+      // Use Luxon DateTime for better edge compatibility
+      const startDate = DateTime.fromISO(vacation.start_date).toJSDate();
+      const endDate = DateTime.fromISO(vacation.end_date).toJSDate();
+      
       const businessDays = await calculateBusinessDays(
-        new Date(vacation.start_date),
-        new Date(vacation.end_date),
+        startDate,
+        endDate,
         province,
         vacation.is_half_day,
       );
