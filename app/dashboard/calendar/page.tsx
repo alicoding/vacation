@@ -1,7 +1,9 @@
 'use client';
 
+export const runtime = 'edge';
+
 import { useState, useEffect, Suspense } from 'react';
-import { useSession } from '@/lib/auth-helpers';
+import { useSession } from '@/lib/auth-helpers.client';
 import { Container, Box, Typography, Paper, Divider, CircularProgress } from '@mui/material';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';

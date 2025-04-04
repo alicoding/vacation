@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useSession } from '@/lib/auth-helpers';
+import { useSession } from '@/lib/auth-helpers.client';
 import { Box, Typography, List, ListItem, ListItemText, Divider, CircularProgress } from '@mui/material';
 import useHolidays from '@/lib/hooks/useHolidays';
 import { DateTime } from 'luxon';

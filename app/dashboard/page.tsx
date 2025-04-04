@@ -1,6 +1,6 @@
 export const runtime = 'edge';
 
-import { supabase } from '@/lib/supabase';
+// Remove import of server-side Supabase client
 import VacationStatsCard from '@/components/dashboard/VacationStatsCard';
 import UpcomingVacationsCard from '@/components/dashboard/UpcomingVacationsCard';
 import Link from 'next/link';
@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import { VacationBooking } from '@/types';
 import { getVacationDaysUsed } from '@/services/vacation/vacationService';
-import { getServerSession } from '@/lib/auth-helpers';
+import { getServerSession } from '@/lib/auth-helpers.server';
 import type { Database } from '@/types/supabase';
 import { DateTime } from 'luxon';
 import { createServerClient } from '@supabase/ssr';

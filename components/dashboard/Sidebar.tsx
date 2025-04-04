@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { usePathname } from 'next/navigation';
-import { useSession } from '@/lib/auth-helpers';
+import { useSession } from '@/lib/auth-helpers.client';
 import Link from 'next/dist/client/app-dir/link';
 import { 
   Box, List, ListItem, ListItemIcon, ListItemText, ListItemButton, 

@@ -2,18 +2,20 @@
 
 import React from 'react';
 import { useState } from 'react';
-import { useSession, signOut } from '@/lib/auth-helpers';
+import { useAuth } from '@/components/auth/AuthProvider';
 import Link from 'next/dist/client/app-dir/link';
-import Image from 'next/image';
 import { 
   AppBar, Toolbar, Box, Button, Avatar, Menu, MenuItem, IconButton,
-  Typography, Container,
+  Typography, Container, CircularProgress,
 } from '@mui/material';
 import { User } from '@/types';
 
 export default function Header() {
-  const { data: session, status } = useSession();
+  const { user, isAuthenticated, isLoading, signOut: authSignOut } = useAuth();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
+  
+  // Add debug logging to understand the auth state
+  console.log('Header auth state:', { user, isAuthenticated, isLoading });
   
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -24,19 +26,14 @@ export default function Header() {
   };
 
   const handleSignOut = async () => {
-    await signOut();
+    await authSignOut();
   };
-
-  // Get typed user
-  const user = session?.user as User | undefined;
 
   return (
     <AppBar position="static" color="transparent" elevation={0} sx={{ borderBottom: 1, borderColor: 'divider' }}>
       <Container maxWidth="xl">
         <Toolbar disableGutters sx={{ justifyContent: 'space-between' }}>
-          {/* Fix: Remove passHref and let Link properly handle the navigation */}
           <Link href="/" style={{ display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-            {/* Removed component="a" to prevent nested anchor tags */}
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <Typography variant="h6" noWrap sx={{ fontWeight: 700 }}>
                 Vacation App
@@ -45,14 +42,16 @@ export default function Header() {
           </Link>
           
           <Box>
-            {session ? (
+            {isLoading ? (
+              <CircularProgress size={24} />
+            ) : isAuthenticated && user ? (
               <>
                 <IconButton onClick={handleOpenMenu} size="small">
-                  {user?.image ? (
-                    <Avatar src={user.image} alt={user.name || ''} />
+                  {user.user_metadata?.avatar_url ? (
+                    <Avatar src={user.user_metadata.avatar_url} alt={user.user_metadata?.name || ''} />
                   ) : (
                     <Avatar>
-                      {user?.name?.charAt(0) || 'U'}
+                      {user.user_metadata?.name?.charAt(0) || user.email?.charAt(0) || 'U'}
                     </Avatar>
                   )}
                 </IconButton>
@@ -64,7 +63,7 @@ export default function Header() {
                   anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
                 >
                   <MenuItem disabled>
-                    <Typography variant="body2">{user?.email}</Typography>
+                    <Typography variant="body2">{user.email}</Typography>
                   </MenuItem>
                   <MenuItem onClick={handleCloseMenu}>
                     <Link href="/dashboard" style={{ textDecoration: 'none', color: 'inherit', display: 'block', width: '100%' }}>
@@ -72,8 +71,8 @@ export default function Header() {
                     </Link>
                   </MenuItem>
                   <MenuItem onClick={handleCloseMenu}>
-                    <Link href="/profile" style={{ textDecoration: 'none', color: 'inherit', display: 'block', width: '100%' }}>
-                      Profile
+                    <Link href="/dashboard/settings" style={{ textDecoration: 'none', color: 'inherit', display: 'block', width: '100%' }}>
+                      Settings
                     </Link>
                   </MenuItem>
                   <MenuItem onClick={handleSignOut}>

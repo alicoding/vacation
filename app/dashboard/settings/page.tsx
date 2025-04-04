@@ -1,6 +1,6 @@
 export const runtime = 'edge';
 import React from 'react';
-import { getServerSession } from '@/lib/auth-helpers';
+import { getServerSession } from '@/lib/auth-helpers.server';
 import { Box, Container, Typography, Paper } from '@mui/material';
 import UserSettings from '@/features/auth/UserSettings';
 

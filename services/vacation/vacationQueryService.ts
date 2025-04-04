@@ -1,6 +1,6 @@
 'use server';
 import { cookies } from 'next/headers';
-import { createServerClient } from '@/utils/supabase-server';
+import { createSupabaseServerClient } from '@/lib/supabase.server';
 import { VacationBooking, VacationServiceError } from './vacationTypes';
 import { calculateBusinessDays } from './vacationCalculationService';
 import { DateTime } from 'luxon';
@@ -37,8 +37,7 @@ function mapDbToVacationBooking(booking: any): VacationBooking | null {
 export async function getVacationBookings(userId: string): Promise<VacationBooking[]> {
   try {
     // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookies());
     
     const { data: dbBookings, error } = await supabaseServer
       .from('vacation_bookings')
@@ -75,8 +74,7 @@ export async function getVacationDaysUsed(
 ): Promise<number> {
   try {
     // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookies());
     
     // First try to get user from users table
     const { data: user, error: userError } = await supabaseServer
@@ -165,8 +163,7 @@ export async function getRemainingVacationDays(
   year: number,
 ): Promise<number> {
   try {
-    const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookies());
     
     // Get user's total vacation allocation
     const { data: user, error: userError } = await supabaseServer

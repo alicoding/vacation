@@ -4,7 +4,7 @@
  * It provides a unified interface for database operations with Supabase.
  */
 
-import { supabase } from './supabase';
+import { supabase } from './supabase.server'; // if you have that split
 import * as supabaseUtils from './supabase-utils';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';

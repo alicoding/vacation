@@ -1,5 +1,7 @@
 'use client';
 
+export const runtime = 'edge';
+
 import { useEffect, useState } from 'react';
 import { Box, Container, Typography, Button, CircularProgress } from '@mui/material';
 import Link from 'next/link';

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Switch, Button, Box, CircularProgress, Typography, Chip, Paper } from '@mui/material';
 import { Snackbar, Alert } from '@mui/material';
-import { useSession } from '@/lib/auth-helpers';
+import { useSession } from '@/lib/auth-helpers.client';
 import { hasCalendarAuthorization } from '@/utils/googleCalendar';
 import { RefreshRounded, Check, ErrorOutline } from '@mui/icons-material';
 import { useSearchParams } from 'next/navigation';

@@ -1,7 +1,8 @@
 'use server';
-import { DateTime } from 'luxon';
 import { cookies } from 'next/headers';
-import { createServerClient, createServiceClient } from '@/utils/supabase-server';
+import { DateTime } from 'luxon';
+import { createSupabaseServerClient } from '@/lib/supabase.server';
+import { createServiceClient } from '@/lib/supabase.shared';
 import { VacationBooking, VacationServiceError, VacationBookingDb } from './vacationTypes';
 import { checkOverlappingBookings } from './vacationOverlapService';
 import { syncVacationToCalendar } from '@/utils/googleCalendar';
@@ -19,8 +20,7 @@ export async function createVacationBooking(
 ): Promise<VacationBooking> {
   try {
     // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookies());
     
     // First check if the user exists in the users table
     const { data: existingUser, error: userError } = await supabaseServer
@@ -158,8 +158,7 @@ export async function updateVacationBooking(
 ): Promise<VacationBooking> {
   try {
     // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookies());
     
     // Check if calendar sync is enabled for this user
     const { data: userData } = await supabaseServer
@@ -284,8 +283,7 @@ export async function deleteVacationBooking(
 ): Promise<void> {
   try {
     // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookies());
     
     const { error } = await supabaseServer
       .from('vacation_bookings')

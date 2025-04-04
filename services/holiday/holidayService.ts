@@ -1,7 +1,8 @@
 'use server';
 
 import { DateTime } from 'luxon';
-import { createServerClient, createServiceClient } from '@/utils/supabase-server';
+import { createSupabaseServerClient } from '@/lib/supabase.server';
+import { createServiceClient } from '@/lib/supabase.shared';
 import { cookies } from 'next/headers';
 
 export interface HolidayInfo {
@@ -173,7 +174,7 @@ export async function isHoliday(
   try {
     // Create a server client with proper authentication
     const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookieStore);
     
     const dateStr = DateTime.fromJSDate(date).toISODate();
     
@@ -223,7 +224,7 @@ export async function getHolidaysInRange(
   try {
     // Create a server client with proper authentication
     const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookieStore);
     
     const startDateStr = DateTime.fromJSDate(startDate).toISODate();
     const endDateStr = DateTime.fromJSDate(endDate).toISODate();
@@ -257,7 +258,7 @@ export async function getHolidaysByYear(
   try {
     // Create a server client with proper authentication
     const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookieStore);
     
     const startDate = DateTime.local(year, 1, 1).toISODate();
     const endDate = DateTime.local(year, 12, 31).toISODate();
@@ -292,7 +293,7 @@ export async function importHolidays(
   try {
     // Create a server client with proper authentication
     const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookieStore);
     
     // First, delete existing holidays for this year and province
     const startDate = DateTime.local(year, 1, 1).toISODate();
@@ -385,7 +386,7 @@ export async function holidayExists(
   try {
     // Create a server client with proper authentication
     const cookieStore = cookies();
-    const supabaseServer = createServerClient(cookieStore);
+    const supabaseServer = createSupabaseServerClient(cookieStore);
     
     const dateStr = DateTime.fromJSDate(date).toISODate();
     

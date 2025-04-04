@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextResponse, type NextRequest } from 'next/server';
-import { ensureUserRecord } from '@/lib/auth-helpers';
+import { ensureUserRecord } from '@/lib/auth-helpers.server';
 
 export const runtime = 'edge';
 

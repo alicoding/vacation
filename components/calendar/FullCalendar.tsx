@@ -10,7 +10,7 @@ import { styled } from '@mui/material/styles';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
-import { useSession } from '@/lib/auth-helpers';
+import { useSession } from '@/lib/auth-helpers.client';
 import type { Session } from '@/types/auth';
 
 // Extend the Session user type to include week_starts_on

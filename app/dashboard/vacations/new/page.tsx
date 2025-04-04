@@ -1,6 +1,6 @@
 export const runtime = 'edge';
 import React from 'react';
-import { getServerSession } from '@/lib/auth-helpers';
+import { getServerSession } from '@/lib/auth-helpers.server';
 import { Box, Container, Typography, Paper, Card } from '@mui/material';
 import { redirect } from 'next/navigation';
 import { createDirectClient } from '@/utils/supabase';

@@ -1,6 +1,6 @@
 'use client';
 
-import { createBrowserSupabaseClient } from '@/utils/supabase';
+import { createSupabaseClient } from '@/lib/supabase.client';
 import { Session, User } from '@supabase/supabase-js';
 import { useRouter } from 'next/navigation';
 import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
@@ -42,9 +42,9 @@ export function AuthProvider({
   supabaseUrl,
   supabaseAnonKey,
 }: AuthProviderProps) {
-  // Use createBrowserSupabaseClient which now implements singleton pattern
+  // Use createSupabaseClient which now implements singleton pattern
   // This prevents multiple GoTrueClient instances
-  const [supabase] = useState(() => createBrowserSupabaseClient());
+  const [supabase] = useState(() => createSupabaseClient());
   
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -56,25 +56,48 @@ export function AuthProvider({
   const lastAuthTime = useRef<number>(0);
   const authInitialized = useRef(false);
   
-  // Initialize auth state - use a consistent approach with getUser
+  // Initialize auth state using getUser first, then getSession
   const initializeAuth = useCallback(async () => {
     if (authInitialized.current) return;
     
     try {
       setIsLoading(true);
+      console.log('Initializing auth state'); // Debugging
       
-      // Always use getUser() first for security as recommended by Supabase
-      const { data: { user: userData }, error: userError } = await supabase.auth.getUser();
+      // First check if we have a server-provided session
+      const serverSession = (window as any).__INITIAL_AUTH_SESSION__;
+      if (serverSession?.user) {
+        console.log('Found server-provided session for:', serverSession.user.email);
+      }
       
-      if (!userError && userData) {
-        setUser(userData);
+      // Get session first - this is safer for client components
+      const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (!sessionError && sessionData?.user) {
+        // We have a session with user, set auth state
+        console.log('Session found with user:', sessionData.user.email);
+        setUser(sessionData.user);
+        setSession(sessionData);
         setIsAuthenticated(true);
         
-        // Then get session for access tokens
-        const { data: { session: sessionData } } = await supabase.auth.getSession();
-        setSession(sessionData);
-        
-        console.log('Initial session found for user:', userData?.email);
+        // Still verify with getUser for security, but don't block UI
+        try {
+          const { data: { user: verifiedUser } } = await supabase.auth.getUser();
+          if (verifiedUser) {
+            // Update with verified user data
+            console.log('User verified with getUser:', verifiedUser.email);
+            setUser(verifiedUser);
+          }
+        } catch (verifyError) {
+          console.warn('Non-blocking verification error:', verifyError);
+          // Continue with session user data
+        }
+      } else if (serverSession?.user) {
+        // Fallback to server-provided session
+        console.log('Using server session as fallback for:', serverSession.user.email);
+        setUser(serverSession.user);
+        setSession(serverSession);
+        setIsAuthenticated(true);
       } else {
         console.log('No authenticated user found');
         setUser(null);
@@ -85,13 +108,16 @@ export function AuthProvider({
       authInitialized.current = true;
     } catch (error) {
       console.error('Error initializing auth state:', error);
-      setUser(null);
-      setSession(null);
-      setIsAuthenticated(false);
+      // Don't reset state if we already have a user (helps prevent flickering)
+      if (!user) {
+        setUser(null);
+        setSession(null);
+        setIsAuthenticated(false);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [supabase]);
+  }, [supabase, user]);
   
   useEffect(() => {
     // Initialize auth state on mount
@@ -125,25 +151,69 @@ export function AuthProvider({
           setIsAuthenticated(false);
           setIsLoading(false);
         } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          // For significant auth events with a session, verify with getUser
+          // For significant auth events with a session, verify the user first
           try {
+            setIsLoading(true);
+            
+            // Always verify the user with getUser() first for security
+            const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
+            
+            if (!userError && verifiedUser) {
+              // Get session for access tokens after verifying user
+              const { data: { session: verifiedSession } } = await supabase.auth.getSession();
+              
+              setUser(verifiedUser);
+              setSession(verifiedSession || newSession);
+              setIsAuthenticated(true);
+              console.log('Auth event verified user:', verifiedUser.email);
+            } else if (newSession?.user) {
+              // Fall back to session from event only if verification fails
+              console.warn('Using unverified session user as fallback');
+              setUser(newSession.user);
+              setSession(newSession);
+              setIsAuthenticated(true);
+            } else {
+              console.warn('Auth event had no verifiable user');
+              // Only reset if we don't already have a user
+              if (!user) {
+                setUser(null);
+                setSession(null);
+                setIsAuthenticated(false);
+              }
+            }
+          } catch (error) {
+            console.error('Error handling auth state change:', error);
+            // Don't reset user state on error if we already have data
+            if (!user && !session) {
+              setUser(null);
+              setSession(null);
+              setIsAuthenticated(false);
+            }
+          } finally {
+            setIsLoading(false);
+          }
+        } else if (newSession?.user) {
+          // For any other event with a user, verify the user first
+          try {
+            // Always verify user credentials securely
             const { data: { user: verifiedUser } } = await supabase.auth.getUser();
             if (verifiedUser) {
               setUser(verifiedUser);
               setSession(newSession);
               setIsAuthenticated(true);
+            } else {
+              // Use session user as fallback
+              setUser(newSession.user);
+              setSession(newSession);
+              setIsAuthenticated(true);
             }
           } catch (error) {
-            console.error('Error getting verified user:', error);
-            setUser(null);
-            setSession(null);
-            setIsAuthenticated(false);
-          } finally {
-            setIsLoading(false);
+            console.error('Error verifying user for event:', event, error);
+            // Still use the session user as a fallback
+            setUser(newSession.user);
+            setSession(newSession);
+            setIsAuthenticated(true);
           }
-        } else if (newSession) {
-          // For any other event with a session, just update the session
-          setSession(newSession);
         }
         
         // Only refresh the router for significant auth state changes
@@ -177,11 +247,17 @@ export function AuthProvider({
 
   const signInWithGoogle = async (callbackUrl?: string) => {
     try {
+      // Get the current origin for more flexible redirect URLs
+      const origin = typeof window !== 'undefined' ? window.location.origin : '';
+      const redirectUrl = `${origin}/auth/callback${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`;
+      
+      console.log('Signing in with Google, redirect URL:', redirectUrl);
+      
       await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
           scopes: 'email profile https://www.googleapis.com/auth/calendar',
-          redirectTo: `${window.location.origin}/auth/callback${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`,
+          redirectTo: redirectUrl,
         },
       });
     } catch (error) {

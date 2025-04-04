@@ -1,10 +1,9 @@
 export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createDirectClient } from '@/utils/supabase';
-import { createServiceClient } from '@/utils/supabase-server';
+import { createDirectClient, createServiceClient } from '@/lib/supabase.shared';
+import { createSupabaseServerClient } from '@/lib/supabase.server';
 import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
 
 /**
  * Debug endpoint to help identify issues with vacation bookings retrieval
@@ -25,24 +24,7 @@ export async function GET(req: NextRequest) {
     const serviceClient = createServiceClient();
     
     // 3. Create a server client (like in dashboard page)
-    const cookieStore = await cookies();
-    const serverClient = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
-            cookieStore.set(name, value, options);
-          },
-          remove(name, options) {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          },
-        },
-      },
-    );
+    const serverClient = createSupabaseServerClient(cookies());
     
     // 4. Debug responses with different query approaches
     const results = {

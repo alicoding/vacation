@@ -1,7 +1,7 @@
 export const runtime = 'edge';
 
 import React from 'react';
-import { getServerSession } from '@/lib/auth-helpers';
+import { getServerSession } from '@/lib/auth-helpers.server';
 import { Box, Container, Typography, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import Link from 'next/link';

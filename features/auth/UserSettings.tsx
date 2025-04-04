@@ -18,7 +18,7 @@ import {
   Divider,
   Paper,
 } from '@mui/material';
-import { useSession } from '@/lib/auth-helpers';
+import { useSession } from '@/lib/auth-helpers.client';
 import type { Session, User } from '@/types/auth';
 import { createBrowserSupabaseClient } from '@/utils/supabase';
 import GoogleCalendarSync from '@/features/calendar/GoogleCalendarSync';
@@ -75,6 +75,9 @@ export default function UserSettings() {
   // Cast the session to our extended type to access custom fields
   const session = sessionData as ExtendedSession | null;
   const router = useRouter();
+  
+  // Add debug logging to understand what's happening
+  console.log('UserSettings auth state:', { sessionData, sessionStatus });
   
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);

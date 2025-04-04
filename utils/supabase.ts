@@ -23,17 +23,17 @@ const getRequiredEnvVar = (name: string): string => {
   // Check for browser environment
   const isBrowser = typeof window !== 'undefined';
   
-  // Handle environment variables differently in browser vs server
-  let value: string | undefined = process.env[name];
+  // For client-side Next.js, we need to use NEXT_PUBLIC_ prefixed variables
+  const value = isBrowser 
+    ? (window as any).__ENV__?.[name] || process.env[name]
+    : process.env[name];
   
   // In browser context with missing env var, use fallbacks for known variables
   if (!value && isBrowser) {
     if (name === 'NEXT_PUBLIC_SUPABASE_URL') {
-      console.warn(`Using fallback for ${name} - ensure environment variable is properly set`);
       return SUPABASE_DEFAULTS.url;
     }
     if (name === 'NEXT_PUBLIC_SUPABASE_ANON_KEY') {
-      console.warn(`Using fallback for ${name} - ensure environment variable is properly set`);
       return SUPABASE_DEFAULTS.anonKey;
     }
   }
@@ -50,36 +50,67 @@ const getRequiredEnvVar = (name: string): string => {
  * Creates a Supabase client for browser environments
  * Used in client components within the App Router
  * Returns a singleton instance to prevent multiple GoTrueClient warnings
+ * 
+ * Important: This function is intended for client components only.
+ * It will return a safe placeholder in SSR context to prevent errors.
  */
 export const createBrowserSupabaseClient = () => {
-  // In browser context, return the singleton if it exists
-  if (typeof window !== 'undefined' && browserClientSingleton) {
-    return browserClientSingleton;
-  }
+  // Check if we're running in a browser environment
+  const isBrowser = typeof window !== 'undefined';
   
-  try {
-    const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
-    const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    
-    const client = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
-    
-    // Store singleton in browser context
-    if (typeof window !== 'undefined') {
-      browserClientSingleton = client;
+  // Always use the singleton in browser context
+  if (isBrowser) {
+    if (browserClientSingleton) {
+      return browserClientSingleton;
     }
     
-    return client;
-  } catch (error) {
-    console.error('Error creating browser Supabase client:', error);
-    
-    // In development, this helps debug environment variable issues
-    console.warn('Ensure .env.local contains the required Supabase environment variables:');
-    console.warn('- NEXT_PUBLIC_SUPABASE_URL');
-    console.warn('- NEXT_PUBLIC_SUPABASE_ANON_KEY');
-    
-    // Re-throw so the error is visible
-    throw error;
+    try {
+      const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+      const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+      
+      browserClientSingleton = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
+      return browserClientSingleton;
+    } catch (error) {
+      console.error('Error creating browser Supabase client:', error);
+      throw error;
+    }
   }
+  
+  // If we're in a server context, return a placeholder client that will
+  // safely error when used, but won't throw during initialization
+  // This helps with SSR and hydration without disrupting the component lifecycle
+  console.warn('createBrowserSupabaseClient() called during server rendering - returning safe placeholder');
+  
+  // Create a proxy object that looks like a Supabase client but safely errors when methods are called
+  const safeErrorProxy = new Proxy({}, {
+    get: (target, prop) => {
+      // Return auth object with safe methods
+      if (prop === 'auth') {
+        return {
+          getUser: async () => ({ data: { user: null }, error: new Error('Client-side auth method called during SSR') }),
+          getSession: async () => ({ data: { session: null }, error: new Error('Client-side auth method called during SSR') }),
+          signInWithOAuth: async () => ({ data: null, error: new Error('Client-side auth method called during SSR') }),
+          signOut: async () => ({ error: new Error('Client-side auth method called during SSR') }),
+          onAuthStateChange: () => ({ 
+            data: { subscription: { unsubscribe: () => {} } },
+            error: null
+          })
+        };
+      }
+      
+      // For other properties, return a function that safely errors
+      if (typeof prop === 'string' || typeof prop === 'symbol') {
+        return () => {
+          const error = new Error(`Attempted to use Supabase client method '${String(prop)}' during server rendering`);
+          console.error(error);
+          return { data: null, error };
+        };
+      }
+      return undefined;
+    }
+  });
+  
+  return safeErrorProxy as ReturnType<typeof createBrowserClient<Database>>;
 };
 
 // Global direct client singleton to prevent multiple instances
@@ -138,29 +169,8 @@ export const createDirectClient = (cookies?: RequestInit['headers'] | { cookie?:
     return client;
   } catch (error) {
     if (typeof window !== 'undefined') {
-      // In client-side context, log the error but continue with fallbacks
       console.error('Error creating direct Supabase client:', error);
-      
-      // Create client with fallback values
-      const client = createClient<Database>(
-        SUPABASE_DEFAULTS.url,
-        SUPABASE_DEFAULTS.anonKey,
-        {
-          auth: {
-            persistSession: false,
-          },
-          global: {
-            headers
-          },
-        }
-      );
-      
-      // Store singleton in browser context if no custom cookies
-      if (typeof window !== 'undefined' && !cookies && !directClientSingleton) {
-        directClientSingleton = client;
-      }
-      
-      return client;
+      throw error;
     }
     
     // Re-throw in server context

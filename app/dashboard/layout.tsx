@@ -2,13 +2,17 @@ import Header from '@/components/Header';
 import Sidebar from '@/components/dashboard/Sidebar';
 import { Box, Container, Grid, useMediaQuery, useTheme } from '@mui/material';
 import { ReactNode } from 'react';
+import { requireAuth } from '@/lib/auth-helpers.server';
 
-// Middleware will ensure users are authenticated before they can access this layout
-export default function DashboardLayout({
+// Force dashboard to be a server component that checks auth
+export default async function DashboardLayout({
   children,
 }: {
   children: ReactNode;
 }) {
+  // Check authentication server-side, redirect to login if not authenticated
+  await requireAuth();
+  
   return (
     <Box sx={{ 
       minHeight: '100vh', 
