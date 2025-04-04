@@ -15,9 +15,9 @@ interface ClientThemeWrapperProps {
 // Client-side cache shared across the whole user session
 const clientSideEmotionCache = createEmotionCache();
 
-export default function ClientThemeWrapper({ 
-  children, 
-  emotionCache = clientSideEmotionCache 
+export default function ClientThemeWrapper({
+  children,
+  emotionCache = clientSideEmotionCache, // Add trailing comma
 }: ClientThemeWrapperProps) {
   // Use a state to prevent hydration issues with dynamic client-side initialization
   const [mounted, setMounted] = useState(false);

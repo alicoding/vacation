@@ -22,26 +22,27 @@ export async function findFirst<T = unknown>(
 ): Promise<T | null> {
   // Convert nested where conditions to flat conditions
   let query = supabase.from(table).select('*');
-  
+
   // Apply filters
   Object.entries(where).forEach(([key, value]) => {
     if (typeof value === 'object' && value !== null) {
       // Handle nested conditions (e.g., user: { email: ... })
       Object.entries(value).forEach(([nestedKey, nestedValue]) => {
         const columnName = `${key}_${nestedKey}`;
-        query = query.eq(columnName, nestedValue as any); // Type assertion needed for Supabase parameter compatibility
+        query = query.eq(columnName, nestedValue); // Type assertion needed for Supabase parameter compatibility
       });
     } else {
       query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
     }
   });
-  
+
   const { data, error } = await query.limit(1).single();
-  
-  if (error && error.code !== 'PGRST116') { // PGRST116 is "No rows returned"
+
+  if (error && error.code !== 'PGRST116') {
+    // PGRST116 is "No rows returned"
     throw error;
   }
-  
+
   return data ? (camelcaseKeys(data, { deep: true }) as T) : null;
 }
 
@@ -59,10 +60,12 @@ export async function findMany<T extends Record<string, unknown> = any>(
   } = {},
 ): Promise<T[]> {
   const { where = {}, select, orderBy, limit } = options;
-  
+
   // Start building the query with select first
-  let query = supabase.from(table).select(select && select.length > 0 ? select.join(',') : '*');
-  
+  let query = supabase
+    .from(table)
+    .select(select && select.length > 0 ? select.join(',') : '*');
+
   // Add where conditions
   Object.entries(where).forEach(([key, value]) => {
     if (value === null) {
@@ -74,33 +77,35 @@ export async function findMany<T extends Record<string, unknown> = any>(
         if (nestedValue === null) {
           query = query.is(columnName, null);
         } else {
-          query = query.eq(columnName, nestedValue as any); // Type assertion needed for Supabase parameter compatibility
+          query = query.eq(columnName, nestedValue); // Type assertion needed for Supabase parameter compatibility
         }
       });
     } else {
       query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
     }
   });
-  
+
   // Add orderBy
   if (orderBy) {
     Object.entries(orderBy).forEach(([column, direction]) => {
       query = query.order(column, { ascending: direction === 'asc' });
     });
   }
-  
+
   // Add limit
   if (limit) {
     query = query.limit(limit);
   }
-  
+
   const { data, error } = await query;
-  
+
   if (error) {
     throw error;
   }
-  
-  return camelcaseKeys((data ?? []) as unknown as Record<string, unknown>[], { deep: true }) as T[];
+
+  return camelcaseKeys((data ?? []) as unknown as Record<string, unknown>[], {
+    deep: true,
+  }) as T[];
 }
 
 /**
@@ -116,11 +121,11 @@ export async function create<T = unknown>(
     .insert(data as any) // Type assertion needed for Supabase parameter compatibility
     .select()
     .single();
-    
+
   if (error) {
     throw error;
   }
-  
+
   return camelcaseKeys(result, { deep: true }) as T;
 }
 
@@ -136,20 +141,20 @@ export async function update<T = unknown>(
   },
 ): Promise<T> {
   const { where, data } = options;
-  
+
   let query = supabase.from(table).update(data);
-  
+
   // Apply where conditions
   Object.entries(where).forEach(([key, value]) => {
     query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
   });
-  
+
   const { data: result, error } = await query.select().single();
-  
+
   if (error) {
     throw error;
   }
-  
+
   return camelcaseKeys(result, { deep: true }) as T;
 }
 
@@ -162,18 +167,18 @@ export async function remove<T = unknown>(
   where: Record<string, unknown>,
 ): Promise<T> {
   let query = supabase.from(table).delete();
-  
+
   // Apply where conditions
   Object.entries(where).forEach(([key, value]) => {
     query = query.eq(key, value as any); // Type assertion needed for Supabase parameter compatibility
   });
-  
+
   const { data: result, error } = await query.select().single();
-  
+
   if (error) {
     throw error;
   }
-  
+
   return camelcaseKeys(result, { deep: true }) as T;
 }
 
@@ -182,7 +187,8 @@ export async function remove<T = unknown>(
  * Ensures cookies are handled correctly with `getAll`/`setAll` and `path: '/'`.
  * NOTE: This function must be called within an async context.
  */
-export async function createSupabaseServerClient() { // Make async, remove parameter
+export async function createSupabaseServerClient() {
+  // Make async, remove parameter
   const cookieStore = await cookies(); // Await the call
 
   return createServerClient<Database>(
@@ -195,24 +201,35 @@ export async function createSupabaseServerClient() { // Make async, remove param
           return cookieStore.getAll();
         },
         // Define the type for cookiesToSet based on Supabase/Next.js types
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: CookieOptions;
+          }[],
+        ) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
               // Ensure path is always set
               const cookieOptions = { ...options, path: '/' };
               // Handle sameSite boolean conversion if necessary
-              if (cookieOptions.sameSite === true) cookieOptions.sameSite = 'strict';
-              if (cookieOptions.sameSite === false) cookieOptions.sameSite = 'lax';
+              if (cookieOptions.sameSite === true)
+                cookieOptions.sameSite = 'strict';
+              if (cookieOptions.sameSite === false)
+                cookieOptions.sameSite = 'lax';
               // Use the awaited cookieStore's set method
               cookieStore.set(name, value, cookieOptions);
             });
           } catch (error) {
             // The `setAll` method may fail in Server Components.
             // This can be ignored if you have middleware refreshing sessions.
-            console.warn('Error setting cookies via Supabase server client:', error);
+            console.warn(
+              'Error setting cookies via Supabase server client:',
+              error,
+            );
           }
         },
       },
-    }
+    }, // Add trailing comma
   );
 }

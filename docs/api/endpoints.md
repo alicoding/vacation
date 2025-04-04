@@ -13,6 +13,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Fetches all vacation bookings for the authenticated user.
 
 **Response:**
+
 ```json
 [
   {
@@ -35,6 +36,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Creates a new vacation booking for the authenticated user.
 
 **Request Body:**
+
 ```json
 {
   "startDate": "2023-01-01",
@@ -44,11 +46,13 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 ```
 
 **Validation:**
+
 - Start date and end date are required
 - Start date must be before end date
 - Cannot book on weekends or bank holidays
 
 **Response:**
+
 ```json
 {
   "id": "cuid",
@@ -69,6 +73,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Updates an existing vacation booking.
 
 **Request Body:**
+
 ```json
 {
   "startDate": "2023-01-02",
@@ -100,11 +105,13 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Fetches holidays for a specified date range and province.
 
 **Query Parameters:**
+
 - `startDate` (optional): Start date for holiday range (default: Jan 1 of current year)
 - `endDate` (optional): End date for holiday range (default: Dec 31 of current year)
 - `province` (optional): Province code (default: user's province)
 
 **Response:**
+
 ```json
 [
   {
@@ -133,6 +140,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Force synchronizes holidays for a specific year from the holidays data provider.
 
 **Request Body:**
+
 ```json
 {
   "year": 2023
@@ -140,6 +148,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 ```
 
 **Response:**
+
 ```json
 {
   "success": true,
@@ -158,6 +167,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Fetches the authenticated user's profile information.
 
 **Response:**
+
 ```json
 {
   "id": "cuid",
@@ -177,6 +187,7 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 **Description:** Updates the user's preferences.
 
 **Request Body:**
+
 ```json
 {
   "total_vacation_days": 20,
@@ -184,4 +195,4 @@ This document outlines the available API endpoints in the Vacation Tracker appli
 }
 ```
 
-**Response:** Updated user object 
+**Response:** Updated user object

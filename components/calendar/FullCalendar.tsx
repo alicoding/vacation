@@ -1,10 +1,20 @@
 'use client';
 
-import { 
-  Box, Typography, Container, Paper, Grid, 
-  Table, TableBody, TableCell, TableContainer, 
-  TableHead, TableRow, CircularProgress, 
-  Chip, Alert,
+import {
+  Box,
+  Typography,
+  Container,
+  Paper,
+  Grid,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
+  Chip,
+  Alert,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { DateTime } from 'luxon';
@@ -83,15 +93,16 @@ export default function FullCalendar({
   const { user, isLoading, isAuthenticated } = useAuth(); // Use values from useAuth
   // Access week_starts_on directly from the user object provided by useAuth
   const weekStartsOn = user?.week_starts_on === 'monday' ? 1 : 0; // 0 for Sunday, 1 for Monday
-  
+
   // Generate calendar days
   const generateCalendarDays = () => {
     // Get start of the month
     const firstDay = currentDate.startOf('month');
-    
+
     // Find the day that starts the week containing the first of the month
     let startDay;
-    if (weekStartsOn === 0) { // Compare against number 0 (Sunday)
+    if (weekStartsOn === 0) {
+      // Compare against number 0 (Sunday)
       // If week starts on Sunday (Luxon weekday 7), find the Sunday before or on firstDay
       const dayOfWeek = firstDay.weekday;
       const daysToSubtract = dayOfWeek === 7 ? 0 : dayOfWeek;
@@ -102,22 +113,22 @@ export default function FullCalendar({
       const daysToSubtract = dayOfWeek === 1 ? 0 : dayOfWeek - 1;
       startDay = firstDay.minus({ days: daysToSubtract });
     }
-    
+
     // Array to hold all days
     const days = [];
-    
+
     // Generate 6 weeks (42 days) to make sure we cover the whole month
     for (let i = 0; i < 42; i++) {
       const day = startDay.plus({ days: i });
       days.push(day);
     }
-    
+
     // Group days by weeks
     const weeks = [];
     for (let i = 0; i < days.length; i += 7) {
       weeks.push(days.slice(i, i + 7));
     }
-    
+
     return weeks;
   };
 
@@ -161,7 +172,8 @@ export default function FullCalendar({
 
   // Day headers based on user preference
   const getDayHeaders = () => {
-    if (weekStartsOn === 0) { // Compare against number 0 (Sunday)
+    if (weekStartsOn === 0) {
+      // Compare against number 0 (Sunday)
       return (
         <TableRow>
           <TableCell align="center">Sunday</TableCell>
@@ -190,38 +202,40 @@ export default function FullCalendar({
 
   return (
     <>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={3}>
+      <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mb={3}
+      >
         <Typography variant="h4" component="h1">
           Vacation Calendar
         </Typography>
-        
+
         <Box display="flex" gap={1}>
-          <Chip 
-            label="Today" 
-            color="primary" 
-            variant="outlined" 
-            onClick={onCurrentMonth} 
-            clickable 
+          <Chip
+            label="Today"
+            color="primary"
+            variant="outlined"
+            onClick={onCurrentMonth}
+            clickable
           />
-          <Chip 
-            label="Previous" 
-            onClick={onPrevMonth} 
-            clickable 
-          />
-          <Chip 
-            label="Next" 
-            onClick={onNextMonth} 
-            clickable 
-          />
+          <Chip label="Previous" onClick={onPrevMonth} clickable />
+          <Chip label="Next" onClick={onNextMonth} clickable />
         </Box>
       </Box>
-      
+
       <Typography variant="h5" sx={{ mb: 3, textAlign: 'center' }}>
         {currentDate.toFormat('MMMM yyyy')}
       </Typography>
-      
+
       {loading ? (
-        <Box display="flex" justifyContent="center" alignItems="center" height="50vh">
+        <Box
+          display="flex"
+          justifyContent="center"
+          alignItems="center"
+          height="50vh"
+        >
           <CircularProgress />
         </Box>
       ) : error ? (
@@ -231,16 +245,14 @@ export default function FullCalendar({
       ) : (
         <TableContainer component={Paper} variant="outlined">
           <Table>
-            <TableHead>
-              {getDayHeaders()}
-            </TableHead>
+            <TableHead>{getDayHeaders()}</TableHead>
             <TableBody>
               {weeks.map((week, weekIndex) => (
                 <TableRow key={weekIndex}>
                   {week.map((day, dayIndex) => {
                     const dayVacations = getVacationsForDate(day);
                     const holiday = getHolidayForDate(day);
-                    
+
                     // Determine cell classname based on conditions
                     const cellClasses = [
                       isWeekend(day) ? 'weekend' : '',
@@ -248,23 +260,25 @@ export default function FullCalendar({
                       isToday(day) ? 'today' : '',
                       holiday ? 'holiday' : '',
                       dayVacations.length > 0 ? 'vacation' : '',
-                    ].filter(Boolean).join(' ');
-                    
+                    ]
+                      .filter(Boolean)
+                      .join(' ');
+
                     return (
                       <CalendarCell key={dayIndex} className={cellClasses}>
                         <DayNumber variant="body2">
                           {day.toFormat('d')}
                         </DayNumber>
-                        
+
                         {holiday && (
-                          <EventChip 
+                          <EventChip
                             size="small"
                             label={holiday.name}
                             color="warning"
                             variant="outlined"
                           />
                         )}
-                        
+
                         {dayVacations.map((vacation) => (
                           <EventChip
                             key={vacation.id}

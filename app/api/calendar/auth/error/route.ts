@@ -1,17 +1,20 @@
 export const runtime = 'edge';
 
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 
 /**
  * Error handler for Google Calendar authorization issues
  */
-export async function GET(request: NextRequest) {
+export function GET(request: NextRequest) {
+  // Remove async
   const requestUrl = new URL(request.url);
-  const errorMessage = requestUrl.searchParams.get('message') || 'Unknown Google Calendar authorization error';
-  
+  const errorMessage =
+    requestUrl.searchParams.get('message') ||
+    'Unknown Google Calendar authorization error';
+
   // Log the error for server-side debugging
   console.error('Google Calendar Authorization Error:', errorMessage);
-  
+
   // Return a user-friendly error page
   return new Response(
     `

@@ -19,18 +19,21 @@ export async function createApiClient() {
  */
 export async function requireAuth() {
   const supabase = await createApiClient();
-  
+
   // Use getUser() instead of getSession() for better security as recommended by Supabase
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
+
   if (userError) {
     console.error('Error getting authenticated user:', userError);
     throw new Error('Authentication error');
   }
-  
+
   if (!user) {
     throw new Error('Not authenticated');
   }
-  
+
   return { supabase, user };
 }

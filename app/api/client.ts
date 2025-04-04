@@ -6,21 +6,21 @@
  */
 
 // Types
-export type VacationBooking = {
+export interface VacationBooking {
   id: string;
   startDate: Date;
   endDate: Date;
   note: string | null;
   userId: string;
-};
+}
 
-export type Holiday = {
+export interface Holiday {
   id: string;
   date: Date;
   name: string;
   province: string | null;
   type: 'bank' | 'provincial';
-};
+}
 
 // API functions for client components
 export async function fetchVacations(): Promise<VacationBooking[]> {
@@ -47,12 +47,12 @@ export async function createVacation(data: {
     body: JSON.stringify(data),
     credentials: 'include', // <- critical for cookie-based auth
   });
-  
+
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || 'Failed to create vacation');
   }
-  
+
   const vacationData = await res.json();
   return {
     ...vacationData,
@@ -74,7 +74,7 @@ export async function fetchHolidays(): Promise<Holiday[]> {
     const [year, month, day] = dateStr.split('T')[0].split('-').map(Number);
     // Create a date in UTC to prevent timezone offset
     const fixedDate = new Date(Date.UTC(year, month - 1, day));
-    
+
     return {
       ...h,
       date: fixedDate,
@@ -82,18 +82,20 @@ export async function fetchHolidays(): Promise<Holiday[]> {
   });
 }
 
-export async function syncHolidays(year: number): Promise<{ success: boolean; message: string }> {
+export async function syncHolidays(
+  year: number,
+): Promise<{ success: boolean; message: string }> {
   const res = await fetch('/api/holidays', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ year }),
     credentials: 'include', // <- critical for cookie-based auth
   });
-  
+
   if (!res.ok) {
     const error = await res.json();
     throw new Error(error.error || 'Failed to sync holidays');
   }
-  
+
   return res.json();
 }

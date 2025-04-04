@@ -1,19 +1,22 @@
 /**
  * Enhanced fetch function that handles zrok interstitial bypassing
  */
-export async function fetchWithZrok(url: string, options: RequestInit = {}): Promise<Response> {
+export async function fetchWithZrok(
+  url: string,
+  options: RequestInit = {},
+): Promise<Response> {
   // Create default headers if not provided
   if (!options.headers) {
     options.headers = {};
   }
-  
+
   // Add the skip_zrok_interstitial header to bypass the interstitial page
-  const headers = new Headers(options.headers as HeadersInit);
+  const headers = new Headers(options.headers);
   headers.set('skip_zrok_interstitial', 'true');
-  
+
   // Merge the headers back into the options
   options.headers = headers;
-  
+
   // Perform the fetch
   return fetch(url, options);
 }
@@ -22,8 +25,8 @@ export async function fetchWithZrok(url: string, options: RequestInit = {}): Pro
  * Function to handle API requests with proper error handling
  */
 export async function apiRequest<T>(
-  url: string, 
-  method: string = 'GET', 
+  url: string,
+  method = 'GET',
   data?: any,
 ): Promise<T> {
   const options: RequestInit = {
@@ -39,11 +42,11 @@ export async function apiRequest<T>(
   }
 
   const response = await fetchWithZrok(url, options);
-  
+
   if (!response.ok) {
     const error = await response.text();
     throw new Error(error || 'An error occurred while fetching data');
   }
-  
+
   return response.json();
-} 
+}

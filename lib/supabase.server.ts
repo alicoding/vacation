@@ -1,6 +1,6 @@
 /**
  * Supabase Client for Server Environments
- * 
+ *
  * ⚠️ WARNING:
  * This file uses `import { cookies } from 'next/headers'` which is only supported in Server Components.
  * Do NOT import this file in Client Components or files under the `pages/` directory.
@@ -13,10 +13,10 @@ import { cookies } from 'next/headers'; // Keep cookies import, remove ReadonlyR
 
 // Define the resolved type using Awaited
 type ResolvedCookieStore = Awaited<ReturnType<typeof cookies>>;
-import { 
-  getRequiredEnvVar, 
+import {
+  getRequiredEnvVar,
   createDirectClient,
-  SupabaseClientType 
+  SupabaseClientType, // Add trailing comma
 } from './supabase.shared';
 
 /**
@@ -27,39 +27,44 @@ import {
  * @returns A Supabase client configured with cookie handling
  */
 // Use the derived resolved type
-export const createSupabaseServerClient = (cookieStore: ResolvedCookieStore): SupabaseClient<Database> => {
+export const createSupabaseServerClient = (
+  cookieStore: ResolvedCookieStore,
+): SupabaseClient<Database> => {
   const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
   const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  
-  return createServerClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          // Use the passed-in cookieStore (already resolved)
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => {
-              // Ensure path is always set
-              const cookieOptions = { ...options, path: '/' };
-              // Handle sameSite boolean conversion if necessary
-              if (cookieOptions.sameSite === true) cookieOptions.sameSite = 'strict';
-              if (cookieOptions.sameSite === false) cookieOptions.sameSite = 'lax';
-              // Use the passed-in cookieStore's set method
-              cookieStore.set(name, value, cookieOptions);
-            });
-          } catch (error) {
-            // The `setAll` method may fail in Server Components.
-            // This can be ignored if you have middleware refreshing sessions.
-            console.warn('Error setting cookies via Supabase server client (setAll):', error);
-          }
-        },
+
+  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        // Use the passed-in cookieStore (already resolved)
+        return cookieStore.getAll();
+      },
+      setAll(
+        cookiesToSet: { name: string; value: string; options: CookieOptions }[],
+      ) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            // Ensure path is always set
+            const cookieOptions = { ...options, path: '/' };
+            // Handle sameSite boolean conversion if necessary
+            if (cookieOptions.sameSite === true)
+              cookieOptions.sameSite = 'strict';
+            if (cookieOptions.sameSite === false)
+              cookieOptions.sameSite = 'lax';
+            // Use the passed-in cookieStore's set method
+            cookieStore.set(name, value, cookieOptions);
+          });
+        } catch (error) {
+          // The `setAll` method may fail in Server Components.
+          // This can be ignored if you have middleware refreshing sessions.
+          console.warn(
+            'Error setting cookies via Supabase server client (setAll):',
+            error,
+          );
+        }
       },
     },
-  );
+  });
 };
 
 /**
@@ -71,30 +76,29 @@ export const createSupabaseServerClient = (cookieStore: ResolvedCookieStore): Su
 export const createSupabaseMiddlewareClient = (req: any, res: any) => {
   const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
   const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
-  
-  return createServerClient<Database>(
-    supabaseUrl,
-    supabaseAnonKey,
-    {
-      cookies: {
-        getAll() {
-          // Read cookies from the request object
-          return req.cookies.getAll();
-        },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
-          // Set cookies on the response object
-          cookiesToSet.forEach(({ name, value, options }) => {
-            // Ensure path is always set for middleware cookies
-            const cookieOptions = { ...options, path: '/' };
-             // Handle sameSite boolean conversion if necessary
-             if (cookieOptions.sameSite === true) cookieOptions.sameSite = 'strict';
-             if (cookieOptions.sameSite === false) cookieOptions.sameSite = 'lax';
-            res.cookies.set(name, value, cookieOptions);
-          });
-        },
+
+  return createServerClient<Database>(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      getAll() {
+        // Read cookies from the request object
+        return req.cookies.getAll();
+      },
+      setAll(
+        cookiesToSet: { name: string; value: string; options: CookieOptions }[],
+      ) {
+        // Set cookies on the response object
+        cookiesToSet.forEach(({ name, value, options }) => {
+          // Ensure path is always set for middleware cookies
+          const cookieOptions = { ...options, path: '/' };
+          // Handle sameSite boolean conversion if necessary
+          if (cookieOptions.sameSite === true)
+            cookieOptions.sameSite = 'strict';
+          if (cookieOptions.sameSite === false) cookieOptions.sameSite = 'lax';
+          res.cookies.set(name, value, cookieOptions);
+        });
       },
     },
-  );
+  });
 };
 
 /**
@@ -107,7 +111,7 @@ export async function fetchFromDB<T>(
   if (typeof window !== 'undefined') {
     throw new Error(
       'Database queries must be run on the server. ' +
-      'Use server components, server actions, or API routes.',
+        'Use server components, server actions, or API routes.',
     );
   }
 
@@ -119,11 +123,12 @@ export async function fetchFromDB<T>(
  * by automatically handling async cookies.
  * This is the preferred way to get a server client in the App Router.
  */
-export const createAuthedServerClient = async (): Promise<SupabaseClient<Database>> => {
+export const createAuthedServerClient = async (): Promise<
+  SupabaseClient<Database>
+> => {
   const cookieStore = await cookies(); // Await cookies here
   return createSupabaseServerClient(cookieStore); // Pass resolved store
 };
-
 
 // Re-export createDirectClient for convenience
 export { createDirectClient };

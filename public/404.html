@@ -1,35 +1,37 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Redirecting...</title>
-  <script>
-    // This script handles client-side routing for Next.js on Cloudflare Pages
-    // by redirecting all non-file URLs to the root index.html
-    (function() {
-      const pathname = window.location.pathname;
-      
-      // Don't redirect API requests or static files
-      if (pathname.startsWith('/api/') || 
-          pathname.startsWith('/_next/') || 
-          pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|json)$/)) {
-        return;
-      }
-      
-      // Preserve query parameters and hash
-      const queryString = window.location.search || '';
-      const hash = window.location.hash || '';
-      
-      // Store the original path in sessionStorage so the client-side app can retrieve it
-      sessionStorage.setItem('originalPath', pathname + queryString + hash);
-      
-      // Redirect to the root, the client-side router will handle the rest
-      window.location.replace('/' + queryString + hash);
-    })();
-  </script>
-</head>
-<body>
-  <p>Redirecting...</p>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Redirecting...</title>
+    <script>
+      // This script handles client-side routing for Next.js on Cloudflare Pages
+      // by redirecting all non-file URLs to the root index.html
+      (function () {
+        const pathname = window.location.pathname;
+
+        // Don't redirect API requests or static files
+        if (
+          pathname.startsWith('/api/') ||
+          pathname.startsWith('/_next/') ||
+          pathname.match(/\.(ico|png|jpg|jpeg|svg|css|js|json)$/)
+        ) {
+          return;
+        }
+
+        // Preserve query parameters and hash
+        const queryString = window.location.search || '';
+        const hash = window.location.hash || '';
+
+        // Store the original path in sessionStorage so the client-side app can retrieve it
+        sessionStorage.setItem('originalPath', pathname + queryString + hash);
+
+        // Redirect to the root, the client-side router will handle the rest
+        window.location.replace('/' + queryString + hash);
+      })();
+    </script>
+  </head>
+  <body>
+    <p>Redirecting...</p>
+  </body>
 </html>

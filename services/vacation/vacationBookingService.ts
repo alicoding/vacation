@@ -3,7 +3,11 @@
 import { DateTime } from 'luxon';
 import { createAuthedServerClient } from '@/lib/supabase.server'; // Import the correct helper
 import { createServiceClient } from '@/lib/supabase.shared';
-import { VacationBooking, VacationServiceError, VacationBookingDb } from './vacationTypes';
+import {
+  VacationBooking,
+  VacationServiceError,
+  VacationBookingDb,
+} from './vacationTypes';
 import { checkOverlappingBookings } from './vacationOverlapService';
 import { syncVacationToCalendar } from '@/utils/googleCalendar';
 
@@ -15,32 +19,32 @@ export async function createVacationBooking(
   startDate: Date,
   endDate: Date,
   note?: string,
-  isHalfDay: boolean = false,
+  isHalfDay = false,
   halfDayPortion?: string,
 ): Promise<VacationBooking> {
   try {
     // Use the authenticated server client helper
     const supabaseServer = await createAuthedServerClient();
-    
+
     // First check if the user exists in the users table
     const { data: existingUser, error: userError } = await supabaseServer
       .from('users')
       .select('id, calendar_sync_enabled')
       .eq('id', userId)
       .single();
-    
+
     // Default calendar sync setting
     let calendarSyncEnabled = false;
-    
+
     // If user doesn't exist, create a user record first
     if (userError && userError.code === 'PGRST116') {
       // Get user from auth
       const { data: authUser } = await supabaseServer.auth.getUser();
-      
+
       if (authUser?.user) {
         // Use service role client to bypass RLS when creating user record
         const serviceClient = createServiceClient();
-        
+
         // Create user in the users table - only include columns that exist
         const { error: createUserError } = await serviceClient
           .from('users')
@@ -51,26 +55,33 @@ export async function createVacationBooking(
             created_at: new Date().toISOString(),
             calendar_sync_enabled: false,
           });
-        
+
         if (createUserError) {
           console.error('Error creating user record:', createUserError);
-          throw new VacationServiceError('Failed to create user record', 'DATABASE_ERROR');
+          throw new VacationServiceError(
+            'Failed to create user record',
+            'DATABASE_ERROR',
+          );
         }
       }
     } else if (existingUser) {
       calendarSyncEnabled = existingUser.calendar_sync_enabled || false;
     }
-    
+
     // Check for overlapping bookings
-    const hasOverlap = await checkOverlappingBookings(userId, startDate, endDate);
-    
+    const hasOverlap = await checkOverlappingBookings(
+      userId,
+      startDate,
+      endDate,
+    );
+
     if (hasOverlap) {
       throw new VacationServiceError(
         'This vacation overlaps with an existing booking',
         'OVERLAPPING_BOOKING',
       );
     }
-    
+
     const insertPayload = {
       user_id: userId,
       start_date: startDate.toISOString(),
@@ -79,7 +90,7 @@ export async function createVacationBooking(
       is_half_day: isHalfDay,
       half_day_portion: halfDayPortion,
       created_at: new Date().toISOString(),
-      sync_status: calendarSyncEnabled ? 'pending' : 'disabled'
+      sync_status: calendarSyncEnabled ? 'pending' : 'disabled',
       // Removed explicit id field to let Supabase generate a UUID automatically
     } as unknown as Record<string, unknown>;
 
@@ -89,15 +100,16 @@ export async function createVacationBooking(
       .insert(insertPayload as any)
       .select()
       .single();
-    
+
     if (error) {
       throw new VacationServiceError(error.message, 'DATABASE_ERROR');
     }
-    
+
     // If calendar sync is enabled for the user, sync this vacation to Google Calendar
     if (calendarSyncEnabled && dbBooking) {
       try {
-        await syncVacationToCalendar(userId, {
+        await syncVacationToCalendar(supabaseServer, userId, {
+          // Add supabaseServer argument
           id: dbBooking.id,
           title: 'Vacation',
           note: dbBooking.note || undefined, // Convert null to undefined
@@ -118,7 +130,7 @@ export async function createVacationBooking(
           .eq('id', dbBooking.id);
       }
     }
-    
+
     // Transform the DB response to match the VacationBooking interface
     const vacation: VacationBooking = {
       id: dbBooking?.id,
@@ -126,11 +138,13 @@ export async function createVacationBooking(
       startDate: new Date(dbBooking?.start_date),
       endDate: new Date(dbBooking?.end_date),
       note: dbBooking?.note,
-      createdAt: dbBooking?.created_at ? new Date(dbBooking.created_at) : undefined,
-      isHalfDay: dbBooking?.is_half_day,
+      createdAt: dbBooking?.created_at
+        ? new Date(dbBooking.created_at)
+        : undefined,
+      isHalfDay: dbBooking?.is_half_day ?? undefined, // Convert null to undefined
       halfDayPortion: dbBooking?.half_day_portion,
     };
-    
+
     return vacation;
   } catch (error) {
     console.error('Error creating vacation booking:', error);
@@ -153,22 +167,22 @@ export async function updateVacationBooking(
   startDate: Date,
   endDate: Date,
   note?: string,
-  isHalfDay: boolean = false,
+  isHalfDay = false,
   halfDayPortion?: string,
 ): Promise<VacationBooking> {
   try {
     // Use the authenticated server client helper
-    const supabaseServer = await createAuthedServerClient();
-    
+    const supabaseServer = await createAuthedServerClient(); // Keep only one instance
+
     // Check if calendar sync is enabled for this user
     const { data: userData } = await supabaseServer
       .from('users')
       .select('calendar_sync_enabled')
       .eq('id', userId)
       .single();
-      
+
     const calendarSyncEnabled = userData?.calendar_sync_enabled || false;
-    
+
     // Find the existing booking
     const { data: existingBooking, error: findError } = await supabaseServer
       .from('vacation_bookings')
@@ -176,24 +190,26 @@ export async function updateVacationBooking(
       .eq('id', id)
       .eq('user_id', userId) // Updated from userId to user_id
       .single();
-    
+
     if (findError || !existingBooking) {
-      throw new VacationServiceError(
-        'Vacation booking not found',
-        'NOT_FOUND',
-      );
+      throw new VacationServiceError('Vacation booking not found', 'NOT_FOUND');
     }
-    
+
     // Check for overlapping bookings (excluding this booking)
-    const hasOverlap = await checkOverlappingBookings(userId, startDate, endDate, id);
-    
+    const hasOverlap = await checkOverlappingBookings(
+      userId,
+      startDate,
+      endDate,
+      id,
+    );
+
     if (hasOverlap) {
       throw new VacationServiceError(
         'This vacation overlaps with an existing booking',
         'OVERLAPPING_BOOKING',
       );
     }
-    
+
     // Update the booking
     const { data: dbBooking, error: updateError } = await supabaseServer
       .from('vacation_bookings')
@@ -204,29 +220,34 @@ export async function updateVacationBooking(
         is_half_day: isHalfDay,
         half_day_portion: halfDayPortion,
         // If calendar sync is enabled, set sync_status to pending for update
-        ...(calendarSyncEnabled ? {
-          sync_status: existingBooking.google_event_id ? 'pending' : 'disabled',
-        } : {}),
+        ...(calendarSyncEnabled
+          ? {
+              sync_status: existingBooking.google_event_id
+                ? 'pending'
+                : 'disabled',
+            }
+          : {}),
       })
       .eq('id', id)
       .eq('user_id', userId)
       .select()
       .single();
-    
+
     if (updateError) {
       throw new VacationServiceError(updateError.message, 'DATABASE_ERROR');
     }
-    
+
     // If calendar sync is enabled and there's a change in dates or note, update Google Calendar
     if (calendarSyncEnabled && dbBooking) {
-      const datesChanged = 
-        dbBooking.start_date !== existingBooking.start_date || 
+      const datesChanged =
+        dbBooking.start_date !== existingBooking.start_date ||
         dbBooking.end_date !== existingBooking.end_date;
       const noteChanged = dbBooking.note !== existingBooking.note;
-        
+
       if (datesChanged || noteChanged) {
         try {
-          await syncVacationToCalendar(userId, {
+          await syncVacationToCalendar(supabaseServer, userId, {
+            // Add supabaseServer argument
             id: dbBooking.id,
             title: 'Vacation',
             note: dbBooking.note || undefined,
@@ -235,7 +256,10 @@ export async function updateVacationBooking(
             google_event_id: existingBooking.google_event_id,
           });
         } catch (syncError) {
-          console.error('Failed to update vacation in Google Calendar:', syncError);
+          console.error(
+            'Failed to update vacation in Google Calendar:',
+            syncError,
+          );
           // We don't throw here - we'll just record the sync failure in the database
           await supabaseServer
             .from('vacation_bookings')
@@ -248,7 +272,7 @@ export async function updateVacationBooking(
         }
       }
     }
-    
+
     // Transform the DB response to match the VacationBooking interface
     const vacation: VacationBooking = {
       id: dbBooking?.id,
@@ -256,11 +280,13 @@ export async function updateVacationBooking(
       startDate: new Date(dbBooking?.start_date),
       endDate: new Date(dbBooking?.end_date),
       note: dbBooking?.note,
-      createdAt: dbBooking?.created_at ? new Date(dbBooking.created_at) : undefined,
-      isHalfDay: dbBooking?.is_half_day,
+      createdAt: dbBooking?.created_at
+        ? new Date(dbBooking.created_at)
+        : undefined,
+      isHalfDay: dbBooking?.is_half_day ?? undefined, // Convert null to undefined
       halfDayPortion: dbBooking?.half_day_portion,
     };
-    
+
     return vacation;
   } catch (error) {
     console.error('Error updating vacation booking:', error);
@@ -284,13 +310,13 @@ export async function deleteVacationBooking(
   try {
     // Use the authenticated server client helper
     const supabaseServer = await createAuthedServerClient();
-    
+
     const { error } = await supabaseServer
       .from('vacation_bookings')
       .delete()
       .eq('id', id)
       .eq('user_id', userId); // Updated from userId to user_id
-    
+
     if (error) {
       throw new VacationServiceError(error.message, 'DATABASE_ERROR');
     }

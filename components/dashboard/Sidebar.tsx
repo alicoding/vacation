@@ -5,8 +5,20 @@ import { usePathname } from 'next/navigation';
 import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
 import Link from 'next/dist/client/app-dir/link';
 import {
-  Box, List, ListItem, ListItemIcon, ListItemText, ListItemButton,
-  Typography, Divider, IconButton, Paper, Stack, Collapse, Drawer, Chip,
+  Box,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  ListItemButton,
+  Typography,
+  Divider,
+  IconButton,
+  Paper,
+  Stack,
+  Collapse,
+  Drawer,
+  Chip,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import ChevronDoubleLeftIcon from '@heroicons/react/24/outline/ChevronDoubleLeftIcon';
@@ -31,10 +43,12 @@ interface ExtendedUser {
 interface NavLink {
   name: string;
   href: string;
-  icon: React.ForwardRefExoticComponent<React.SVGProps<SVGSVGElement> & {
-    title?: string;
-    titleId?: string;
-  }>;
+  icon: React.ForwardRefExoticComponent<
+    React.SVGProps<SVGSVGElement> & {
+      title?: string;
+      titleId?: string;
+    }
+  >;
 }
 
 export default function DashboardSidebar() {
@@ -52,13 +66,18 @@ export default function DashboardSidebar() {
   // Navigation links for the sidebar - properly typed
   const navLinks: NavLink[] = [
     { name: 'Dashboard', href: '/dashboard', icon: HomeIcon },
-    { name: 'Request Vacation', href: '/dashboard/vacations', icon: CalendarIcon },
+    {
+      name: 'Request Vacation',
+      href: '/dashboard/vacations',
+      icon: CalendarIcon,
+    },
     { name: 'Calendar', href: '/dashboard/calendar', icon: CalendarIcon },
     { name: 'Settings', href: '/dashboard/settings', icon: CogIcon },
   ];
 
   // Function to determine if a nav link is active
-  const isActive = (path: string): boolean => pathname === path ||
+  const isActive = (path: string): boolean =>
+    pathname === path ||
     (path !== '/dashboard' && (pathname || '').startsWith(path));
 
   // Get properly typed user
@@ -93,7 +112,11 @@ export default function DashboardSidebar() {
             vacationsData.forEach((vacation: VacationBooking) => {
               const startDate = new Date(vacation.start_date);
               const endDate = new Date(vacation.end_date);
-              const diff = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+              const diff =
+                Math.ceil(
+                  (endDate.getTime() - startDate.getTime()) /
+                    (1000 * 60 * 60 * 24),
+                ) + 1;
               bookedDays += diff;
             });
 
@@ -109,7 +132,7 @@ export default function DashboardSidebar() {
       }
     }
 
-    fetchData();
+    void fetchData();
   }, [isAuthenticated, user?.id, user?.total_vacation_days]); // Add isAuthenticated dependency
 
   // Fix: Parse holiday dates correctly using UTC
@@ -127,7 +150,10 @@ export default function DashboardSidebar() {
     })
     .sort((a, b) => {
       // Sort by date using Luxon
-      return parseHolidayDate(a.date).toMillis() - parseHolidayDate(b.date).toMillis();
+      return (
+        parseHolidayDate(a.date).toMillis() -
+        parseHolidayDate(b.date).toMillis()
+      );
     })
     .slice(0, 3);
 
@@ -136,10 +162,18 @@ export default function DashboardSidebar() {
     icon: Icon,
     sx,
   }: {
-    icon: React.ForwardRefExoticComponent<React.SVGProps<SVGSVGElement>>,
-    sx?: Record<string, unknown>
+    icon: React.ForwardRefExoticComponent<React.SVGProps<SVGSVGElement>>;
+    sx?: Record<string, unknown>;
   }) => {
-    return <Icon style={{ height: sx?.height as string | number, width: sx?.width as string | number, marginRight: sx?.mr as string | number }} />;
+    return (
+      <Icon
+        style={{
+          height: sx?.height as string | number,
+          width: sx?.width as string | number,
+          marginRight: sx?.mr as string | number,
+        }}
+      />
+    );
   };
 
   return (
@@ -153,17 +187,26 @@ export default function DashboardSidebar() {
         borderColor: 'divider',
       }}
     >
-      <Box display="flex" alignItems="center" justifyContent="space-between" px={2} py={1}>
+      <Box
+        display="flex"
+        alignItems="center"
+        justifyContent="space-between"
+        px={2}
+        py={1}
+      >
         {!collapsed && (
           <Box>
             <Typography variant="h6">Vacation App</Typography>
           </Box>
         )}
         <IconButton onClick={() => setCollapsed(!collapsed)} size="small">
-          {collapsed ?
-            <ChevronDoubleRightIcon style={{ height: 20, width: 20 }} /> :
-            <ChevronDoubleLeftIcon style={{ height: 20, width: 20, color: 'rgba(0, 0, 0, 0.6)' }} />
-          }
+          {collapsed ? (
+            <ChevronDoubleRightIcon style={{ height: 20, width: 20 }} />
+          ) : (
+            <ChevronDoubleLeftIcon
+              style={{ height: 20, width: 20, color: 'rgba(0, 0, 0, 0.6)' }}
+            />
+          )}
         </IconButton>
       </Box>
 
@@ -192,7 +235,9 @@ export default function DashboardSidebar() {
                   sx={{
                     borderRadius: 1,
                     mb: 0.5,
-                    bgcolor: isActive(link.href) ? 'action.selected' : 'transparent',
+                    bgcolor: isActive(link.href)
+                      ? 'action.selected'
+                      : 'transparent',
                   }}
                 >
                   <ListItemIcon sx={{ minWidth: collapsed ? 'auto' : 40 }}>
@@ -201,9 +246,7 @@ export default function DashboardSidebar() {
                       sx={{ height: 20, width: 20, mr: collapsed ? 0 : 1 }}
                     />
                   </ListItemIcon>
-                  {!collapsed && (
-                    <ListItemText primary={link.name} />
-                  )}
+                  {!collapsed && <ListItemText primary={link.name} />}
                 </ListItemButton>
               </ListItem>
             ))}
@@ -222,7 +265,11 @@ export default function DashboardSidebar() {
               <Typography variant="body2" color="text.secondary">
                 Total:
               </Typography>
-              <Typography variant="body2" fontWeight="medium" color="primary.main">
+              <Typography
+                variant="body2"
+                fontWeight="medium"
+                color="primary.main"
+              >
                 {user.total_vacation_days} days
               </Typography>
             </Box>
@@ -231,7 +278,11 @@ export default function DashboardSidebar() {
               <Typography variant="body2" color="text.secondary">
                 Booked:
               </Typography>
-              <Typography variant="body2" fontWeight="medium" color="warning.main">
+              <Typography
+                variant="body2"
+                fontWeight="medium"
+                color="warning.main"
+              >
                 {vacationStats.booked} days
               </Typography>
             </Box>
@@ -240,7 +291,11 @@ export default function DashboardSidebar() {
               <Typography variant="body2" color="text.secondary">
                 Remaining:
               </Typography>
-              <Typography variant="body2" fontWeight="medium" color="success.main">
+              <Typography
+                variant="body2"
+                fontWeight="medium"
+                color="success.main"
+              >
                 {vacationStats.remaining} days
               </Typography>
             </Box>
@@ -296,7 +351,9 @@ export default function DashboardSidebar() {
           )}
 
           {/* Add compact legend */}
-          <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+          <Box
+            sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}
+          >
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
               <Box
                 sx={{

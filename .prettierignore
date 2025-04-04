@@ -1,0 +1,23 @@
+# Ignore build outputs
+.next/
+out/
+dist/
+build/
+
+# Ignore dependency directories
+node_modules/
+venv/
+
+# Ignore configuration and environment files (usually not formatted)
+.env*
+*.lock
+wrangler.toml
+
+# Ignore Git directory
+.git/
+
+# Ignore Husky directory
+.husky/
+
+# Ignore Cloudflare output
+.wrangler/

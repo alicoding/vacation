@@ -1,7 +1,15 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Switch, Button, Box, CircularProgress, Typography, Chip, Paper } from '@mui/material';
+import {
+  Switch,
+  Button,
+  Box,
+  CircularProgress,
+  Typography,
+  Chip,
+  Paper,
+} from '@mui/material';
 import { Snackbar, Alert } from '@mui/material';
 import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
 import { hasCalendarAuthorization } from '@/utils/googleCalendar';
@@ -13,34 +21,42 @@ interface GoogleCalendarSyncProps {
   onToggle: (enabled: boolean) => void;
 }
 
-export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendarSyncProps) {
+export default function GoogleCalendarSync({
+  enabled,
+  onToggle,
+}: GoogleCalendarSyncProps) {
   const [isSyncing, setIsSyncing] = useState(false);
-  const [message, setMessage] = useState<{text: string; type: 'success' | 'error'} | null>(null);
-  const [hasAuthorization, setHasAuthorization] = useState<boolean | null>(null);
+  const [message, setMessage] = useState<{
+    text: string;
+    type: 'success' | 'error';
+  } | null>(null);
+  const [hasAuthorization, setHasAuthorization] = useState<boolean | null>(
+    null,
+  );
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
   const [hasCheckedOnce, setHasCheckedOnce] = useState(false);
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth(); // Use values from useAuth
   const searchParams = useSearchParams();
-  
+
   // Check URL for success/error params
   useEffect(() => {
     if (!searchParams) return;
-    
+
     const success = searchParams.get('success');
     const error = searchParams.get('error');
     const details = searchParams.get('details');
-    
+
     if (success === 'true') {
-      setMessage({ 
-        text: 'Google Calendar authorization successful! You can now sync your vacations.', 
-        type: 'success', 
+      setMessage({
+        text: 'Google Calendar authorization successful! You can now sync your vacations.',
+        type: 'success',
       });
       // Trigger a refresh of the authorization status
-      checkAuthorization();
+      void checkAuthorization();
     } else if (error) {
-      setMessage({ 
-        text: `Google Calendar authorization failed: ${error}${details ? ` (${details})` : ''}`, 
-        type: 'error', 
+      setMessage({
+        text: `Google Calendar authorization failed: ${error}${details ? ` (${details})` : ''}`,
+        type: 'error',
       });
     }
   }, [searchParams]);
@@ -78,20 +94,26 @@ export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendar
   useEffect(() => {
     // Check auth status before initial check
     if (!hasCheckedOnce && isAuthenticated && user?.id) {
-      checkAuthorization();
+      void checkAuthorization();
     }
   }, [checkAuthorization, isAuthenticated, user?.id, hasCheckedOnce]); // Update dependencies
 
-  const handleSync = async (newEnabledState: boolean) => { // Accept new state as argument
+  const handleSync = async (newEnabledState: boolean) => {
+    // Accept new state as argument
     // Prevent concurrent executions if already syncing
     if (isSyncing) {
-      console.warn('[handleSync] Sync already in progress. Ignoring duplicate trigger.');
+      console.warn(
+        '[handleSync] Sync already in progress. Ignoring duplicate trigger.',
+      );
       return;
     }
-    
+
     // Check authentication status
     if (!isAuthenticated) {
-      setMessage({ text: 'Please sign in to sync your calendar', type: 'error' });
+      setMessage({
+        text: 'Please sign in to sync your calendar',
+        type: 'error',
+      });
       return;
     }
 
@@ -113,35 +135,42 @@ export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendar
 
       if (!response.ok) {
         const errorData = await response.json();
-        
-        if (response.status === 401 || errorData.message?.includes('not authorized')) {
+
+        if (
+          response.status === 401 ||
+          errorData.message?.includes('not authorized')
+        ) {
           setHasAuthorization(false);
           throw new Error('Google Calendar access not authorized');
         }
-        
+
         throw new Error('Failed to sync calendar');
       }
 
       const data = await response.json();
-      setMessage({ 
+      setMessage({
         text: newEnabledState // Use new state for message
           ? `Calendar sync enabled. Synced ${data.results?.successful || 0} vacations.`
           : 'Calendar sync disabled',
         type: 'success',
       });
-      
+
       onToggle(newEnabledState); // Call onToggle with the successfully processed state
     } catch (error) {
       console.error('Sync error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to sync calendar';
-      
+      const errorMessage =
+        error instanceof Error ? error.message : 'Failed to sync calendar';
+
       if (errorMessage.includes('not authorized')) {
-        setMessage({ 
-          text: 'Google Calendar access not authorized. Please authorize access first.', 
-          type: 'error', 
+        setMessage({
+          text: 'Google Calendar access not authorized. Please authorize access first.',
+          type: 'error',
         });
       } else {
-        setMessage({ text: `${errorMessage}. Please try again.`, type: 'error' });
+        setMessage({
+          text: `${errorMessage}. Please try again.`,
+          type: 'error',
+        });
       }
     } finally {
       setIsSyncing(false);
@@ -151,7 +180,7 @@ export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendar
   const redirectToGoogleAuth = () => {
     // Store current URL to return after auth
     localStorage.setItem('calendarAuthRedirect', window.location.pathname);
-    
+
     // Redirect to the Google auth endpoint
     window.location.href = '/api/calendar/auth/authorize';
   };
@@ -164,20 +193,24 @@ export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendar
           <p className="text-sm text-gray-500">
             Automatically sync your vacation bookings with Google Calendar
           </p>
-          
+
           {hasCheckedOnce && !isCheckingAuth && (
             <Box mt={1}>
               <Chip
                 size="small"
                 icon={hasAuthorization ? <Check /> : <ErrorOutline />}
-                label={hasAuthorization ? 'Connected to Google Calendar' : 'Not connected'}
+                label={
+                  hasAuthorization
+                    ? 'Connected to Google Calendar'
+                    : 'Not connected'
+                }
                 color={hasAuthorization ? 'success' : 'default'}
                 variant={hasAuthorization ? 'filled' : 'outlined'}
               />
             </Box>
           )}
         </div>
-        
+
         <div className="flex items-center gap-2">
           {!hasCheckedOnce || isCheckingAuth ? (
             <CircularProgress size={24} /> // Show spinner while checking
@@ -186,15 +219,15 @@ export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendar
             // The handleSync function will manage the authorization flow if needed when enabling
             <Switch
               checked={enabled}
-              onChange={(e) => handleSync(e.target.checked)}
-              disabled={isSyncing || (isCheckingAuth)} // Disable while syncing or initial check
+              onChange={(e) => void handleSync(e.target.checked)}
+              disabled={isSyncing || isCheckingAuth} // Disable while syncing or initial check
             />
           )}
-          
+
           {hasCheckedOnce && !isCheckingAuth && (
-            <Button 
-              size="small" 
-              onClick={checkAuthorization} 
+            <Button
+              size="small"
+              onClick={() => void checkAuthorization()}
               disabled={isCheckingAuth}
               startIcon={<RefreshRounded />}
               sx={{ minWidth: 'auto', ml: 1, p: '4px' }}
@@ -204,35 +237,53 @@ export default function GoogleCalendarSync({ enabled, onToggle }: GoogleCalendar
           )}
         </div>
       </div>
-      
+
       <div className="text-sm text-gray-500">
         {/* Status Text Logic */}
-        {!hasCheckedOnce || isCheckingAuth ? (
-          'Checking Google Calendar access...'
-        ) : !hasAuthorization && enabled ? (
-          // User wants sync enabled, but current check shows no authorization
-          <Box sx={{ color: 'warning.main', fontWeight: 'medium' }}>
-            Sync enabled, but Google connection needs refresh or re-authorization.
-          </Box>
-        ) : !hasAuthorization && !enabled ? (
-          // Not authorized, not enabled - standard message
-          <Box sx={{ color: 'error.main', fontWeight: 'medium' }}>
-            Google Calendar access not authorized. Please authorize access first.
-          </Box>
-        ) : hasAuthorization ? ( // Only show simple enabled/disabled if authorized
-          enabled ? 'Calendar sync is enabled' : 'Calendar sync is disabled'
-        ) : null /* Should not happen with above conditions, but good practice */}
+        {
+          !hasCheckedOnce || isCheckingAuth ? (
+            'Checking Google Calendar access...'
+          ) : !hasAuthorization && enabled ? (
+            // User wants sync enabled, but current check shows no authorization
+            <Box sx={{ color: 'warning.main', fontWeight: 'medium' }}>
+              Sync enabled, but Google connection needs refresh or
+              re-authorization.
+            </Box>
+          ) : !hasAuthorization && !enabled ? (
+            // Not authorized, not enabled - standard message
+            <Box sx={{ color: 'error.main', fontWeight: 'medium' }}>
+              Google Calendar access not authorized. Please authorize access
+              first.
+            </Box>
+          ) : hasAuthorization ? ( // Only show simple enabled/disabled if authorized
+            enabled ? (
+              'Calendar sync is enabled'
+            ) : (
+              'Calendar sync is disabled'
+            )
+          ) : null /* Should not happen with above conditions, but good practice */
+        }
       </div>
-      
+
       {isSyncing && (
         <Box display="flex" alignItems="center" gap={1}>
           <CircularProgress size={16} />
-          <Typography variant="body2">Syncing with Google Calendar...</Typography>
+          <Typography variant="body2">
+            Syncing with Google Calendar...
+          </Typography>
         </Box>
       )}
-      
-      <Snackbar open={!!message} autoHideDuration={6000} onClose={() => setMessage(null)}>
-        <Alert onClose={() => setMessage(null)} severity={message?.type} variant="filled">
+
+      <Snackbar
+        open={!!message}
+        autoHideDuration={6000}
+        onClose={() => setMessage(null)}
+      >
+        <Alert
+          onClose={() => setMessage(null)}
+          severity={message?.type}
+          variant="filled"
+        >
           {message?.text}
         </Alert>
       </Snackbar>

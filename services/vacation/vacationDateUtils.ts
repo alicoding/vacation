@@ -6,7 +6,7 @@ import { DateTime } from 'luxon';
 export function calculateTotalDays(startDate: Date, endDate: Date): number {
   const start = DateTime.fromJSDate(startDate).startOf('day');
   const end = DateTime.fromJSDate(endDate).startOf('day');
-  
+
   // Calculate difference in days and add 1 to include both start and end dates
   return end.diff(start, 'days').days + 1;
 }

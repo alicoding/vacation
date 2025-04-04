@@ -15,29 +15,33 @@ import { getHolidays } from '@/services/holiday/holidayService';
 export async function POST(request: Request) {
   try {
     const { startDate, endDate, province } = await request.json();
-    
+
     if (!startDate) {
       return NextResponse.json(
         { error: 'startDate parameter is required' },
         { status: 400 },
       );
     }
-    
+
     if (!endDate) {
       return NextResponse.json(
         { error: 'endDate parameter is required' },
         { status: 400 },
       );
     }
-    
+
     if (!province) {
       return NextResponse.json(
         { error: 'province parameter is required' },
         { status: 400 },
       );
     }
-    
-    const holidays = await getHolidays(new Date(startDate), new Date(endDate), province);
+
+    const holidays = await getHolidays(
+      new Date(startDate),
+      new Date(endDate),
+      province,
+    );
     return NextResponse.json(holidays);
   } catch (error) {
     console.error('Error fetching holidays:', error);

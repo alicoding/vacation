@@ -20,8 +20,8 @@ export interface CalendarEvent {
   colorId?: string;
   // Add extendedProperties to match Google API structure
   extendedProperties?: {
-    private?: { [key: string]: string };
-    shared?: { [key: string]: string };
+    private?: Record<string, string>;
+    shared?: Record<string, string>;
   };
 }
 

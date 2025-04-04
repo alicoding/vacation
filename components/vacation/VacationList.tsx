@@ -9,11 +9,24 @@
  */
 'use client';
 import React, { useState } from 'react';
-import { 
-  Paper, Table, TableBody, TableCell, TableContainer, TableHead, 
-  TableRow, Typography, IconButton, Tooltip, Dialog,
-  DialogTitle, DialogContent, DialogContentText, DialogActions,
-  Button, CircularProgress,
+import {
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+  IconButton,
+  Tooltip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
+  Button,
+  CircularProgress,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
@@ -46,7 +59,7 @@ function getStatusText(vacation: Vacation) {
   const now = DateTime.now();
   const startDate = DateTime.fromISO(vacation.start_date);
   const endDate = DateTime.fromISO(vacation.end_date);
-  
+
   if (endDate < now) {
     return 'Completed';
   } else if (startDate <= now && endDate >= now) {
@@ -58,7 +71,9 @@ function getStatusText(vacation: Vacation) {
 
 export default function VacationList({ vacations }: { vacations: Vacation[] }) {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [vacationToDelete, setVacationToDelete] = useState<Vacation | null>(null);
+  const [vacationToDelete, setVacationToDelete] = useState<Vacation | null>(
+    null,
+  );
   const [isDeleting, setIsDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -73,27 +88,29 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
 
   const handleDeleteConfirm = async () => {
     if (!vacationToDelete) return;
-    
+
     setIsDeleting(true);
     setErrorMessage(null);
-    
+
     try {
       const response = await fetch(`/api/vacations/${vacationToDelete.id}`, {
         method: 'DELETE',
         credentials: 'include', // Include credentials to send cookies with the request
       });
-      
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to delete vacation');
       }
-      
+
       // Close dialog and refresh data
       setDeleteDialogOpen(false);
       router.refresh();
     } catch (error) {
       console.error('Error deleting vacation:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'An unknown error occurred');
+      setErrorMessage(
+        error instanceof Error ? error.message : 'An unknown error occurred',
+      );
     } finally {
       setIsDeleting(false);
     }
@@ -138,12 +155,24 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
             {vacations.length > 0 ? (
               vacations.map((vacation) => (
                 <TableRow key={vacation.id} hover>
-                  <TableCell>{DateTime.fromISO(vacation.start_date).toFormat('MMM d, yyyy')}</TableCell>
-                  <TableCell>{DateTime.fromISO(vacation.end_date).toFormat('MMM d, yyyy')}</TableCell>
+                  <TableCell>
+                    {DateTime.fromISO(vacation.start_date).toFormat(
+                      'MMM d, yyyy',
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {DateTime.fromISO(vacation.end_date).toFormat(
+                      'MMM d, yyyy',
+                    )}
+                  </TableCell>
                   <TableCell>
                     {calculateDuration(vacation.start_date, vacation.end_date)}
                     {vacation.is_half_day && (
-                      <Typography variant="caption" display="block" color="text.secondary">
+                      <Typography
+                        variant="caption"
+                        display="block"
+                        color="text.secondary"
+                      >
                         (Half-day {vacation.half_day_portion})
                       </Typography>
                     )}
@@ -152,8 +181,8 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
                   <TableCell>{getStatusText(vacation)}</TableCell>
                   <TableCell align="right">
                     <Tooltip title="Edit">
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         color="primary"
                         onClick={() => handleEditClick(vacation)}
                       >
@@ -161,8 +190,8 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
                       </IconButton>
                     </Tooltip>
                     <Tooltip title="Delete">
-                      <IconButton 
-                        size="small" 
+                      <IconButton
+                        size="small"
                         color="error"
                         onClick={() => handleDeleteClick(vacation)}
                       >
@@ -178,8 +207,12 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
                   <Typography variant="body1" color="text.secondary">
                     No vacation bookings found
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Click "Request Vacation" to create your first booking
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 1 }}
+                  >
+                    {'Click "Request Vacation" to create your first booking'}
                   </Typography>
                 </TableCell>
               </TableRow>
@@ -201,9 +234,16 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
         <DialogContent>
           <DialogContentText id="alert-dialog-description">
             Are you sure you want to cancel your vacation from{' '}
-            {vacationToDelete && DateTime.fromISO(vacationToDelete.start_date).toFormat('MMM d, yyyy')}{' '}
+            {vacationToDelete &&
+              DateTime.fromISO(vacationToDelete.start_date).toFormat(
+                'MMM d, yyyy',
+              )}{' '}
             to{' '}
-            {vacationToDelete && DateTime.fromISO(vacationToDelete.end_date).toFormat('MMM d, yyyy')}?
+            {vacationToDelete &&
+              DateTime.fromISO(vacationToDelete.end_date).toFormat(
+                'MMM d, yyyy',
+              )}
+            ?
             {vacationToDelete?.google_event_id && (
               <Typography variant="body2" color="warning.main" sx={{ mt: 1 }}>
                 This will also remove the event from your Google Calendar.
@@ -220,12 +260,14 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
           <Button onClick={handleCloseDialog} disabled={isDeleting}>
             Cancel
           </Button>
-          <Button 
-            onClick={handleDeleteConfirm} 
-            color="error" 
+          <Button
+            onClick={() => void handleDeleteConfirm()}
+            color="error"
             variant="contained"
             disabled={isDeleting}
-            startIcon={isDeleting ? <CircularProgress size={20} color="inherit" /> : null}
+            startIcon={
+              isDeleting ? <CircularProgress size={20} color="inherit" /> : null
+            }
           >
             {isDeleting ? 'Deleting...' : 'Delete Vacation'}
           </Button>

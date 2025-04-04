@@ -4,7 +4,15 @@ import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
-import { Box, Typography, List, ListItem, ListItemText, Divider, CircularProgress } from '@mui/material';
+import {
+  Box,
+  Typography,
+  List,
+  ListItem,
+  ListItemText,
+  Divider,
+  CircularProgress,
+} from '@mui/material';
 import useHolidays from '@/lib/hooks/useHolidays';
 import { DateTime } from 'luxon';
 
@@ -20,30 +28,31 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { user, isLoading, isAuthenticated } = useAuth(); // Use values from useAuth
   const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([]);
-  
+
   // Get current year for holiday fetching
   const currentYear = new Date().getFullYear();
   const province = user?.province || 'ON'; // Access province directly from user object
-  
+
   // Use our useHolidays hook to fetch holidays
-  const { 
-    holidays: allHolidays, 
-    loading: holidaysLoading, 
-    error: holidaysError, 
+  const {
+    holidays: allHolidays,
+    loading: holidaysLoading,
+    error: holidaysError,
   } = useHolidays(currentYear, province);
-  
+
   // Filter to only show upcoming holidays
   useEffect(() => {
     if (allHolidays && allHolidays.length > 0) {
       const today = DateTime.now().startOf('day');
-      
+
       // Filter holidays that are today or in the future
       const upcoming = allHolidays
         .map((holiday) => {
-          const holidayDate = typeof holiday.date === 'string'
-            ? DateTime.fromISO(holiday.date)
-            : DateTime.fromJSDate(holiday.date as Date);
-          
+          const holidayDate =
+            typeof holiday.date === 'string'
+              ? DateTime.fromISO(holiday.date)
+              : DateTime.fromJSDate(holiday.date as Date);
+
           return {
             ...holiday,
             luxonDate: holidayDate,
@@ -52,12 +61,13 @@ export default function Sidebar() {
         .filter((holiday) => holiday.luxonDate >= today)
         .sort((a, b) => a.luxonDate.toMillis() - b.luxonDate.toMillis())
         .slice(0, 3); // Only show next 3 holidays
-      
+
       setUpcomingHolidays(upcoming);
     }
   }, [allHolidays]);
-  
-  if (!isAuthenticated || !user) { // Check authentication status and user object
+
+  if (!isAuthenticated || !user) {
+    // Check authentication status and user object
     return null;
   }
 
@@ -66,9 +76,10 @@ export default function Sidebar() {
       <div className="p-4">
         <div className="space-y-1">
           {navigation.map((item) => {
-            const isActive = pathname === item.href || 
+            const isActive =
+              pathname === item.href ||
               (item.href !== '/dashboard' && pathname?.startsWith(item.href));
-              
+
             return (
               <Link
                 key={item.name}
@@ -84,7 +95,7 @@ export default function Sidebar() {
           })}
         </div>
       </div>
-      
+
       {/* Vacation Summary */}
       <div className="border-t border-gray-200 p-4">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
@@ -106,28 +117,34 @@ export default function Sidebar() {
         <div className="mt-1 flex justify-between">
           <span className="text-sm font-medium text-gray-500">Booked:</span>
           <span className="text-sm font-semibold text-vacation-holiday">
-            {/* This will be calculated dynamically */}
-            0 days
+            {/* This will be calculated dynamically */}0 days
           </span>
         </div>
       </div>
-      
+
       {/* Upcoming Holidays List */}
       <div className="border-t border-gray-200 p-4">
         <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
           Upcoming Holidays
         </h3>
-        
+
         {holidaysLoading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
             <CircularProgress size={24} />
           </Box>
         ) : holidaysError ? (
-          <Typography variant="body2" color="error" sx={{ fontSize: '0.875rem' }}>
+          <Typography
+            variant="body2"
+            color="error"
+            sx={{ fontSize: '0.875rem' }}
+          >
             Could not load holidays
           </Typography>
         ) : upcomingHolidays.length === 0 ? (
-          <Typography variant="body2" sx={{ fontSize: '0.875rem', color: 'text.secondary' }}>
+          <Typography
+            variant="body2"
+            sx={{ fontSize: '0.875rem', color: 'text.secondary' }}
+          >
             No upcoming holidays
           </Typography>
         ) : (
@@ -136,18 +153,18 @@ export default function Sidebar() {
               <ListItem key={index} disableGutters sx={{ px: 0, py: 0.5 }}>
                 <ListItemText
                   primary={holiday.name}
-                  secondary={holiday.luxonDate.toLocaleString({ 
+                  secondary={holiday.luxonDate.toLocaleString({
                     weekday: 'short',
-                    month: 'short', 
+                    month: 'short',
                     day: 'numeric',
                   })}
-                  primaryTypographyProps={{ 
+                  primaryTypographyProps={{
                     variant: 'body2',
                     sx: { fontWeight: 'medium', fontSize: '0.875rem' },
                   }}
-                  secondaryTypographyProps={{ 
+                  secondaryTypographyProps={{
                     variant: 'caption',
-                    sx: { fontSize: '0.75rem' }, 
+                    sx: { fontSize: '0.75rem' },
                   }}
                 />
               </ListItem>

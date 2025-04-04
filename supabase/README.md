@@ -27,6 +27,7 @@ supabase db push
 ## Data Model
 
 ### holidays
+
 - `id`: UUID (Primary Key)
 - `name`: Text (Name of the holiday)
 - `date`: Date (Date of the holiday)
@@ -38,6 +39,7 @@ supabase db push
 - `updated_at`: Timestamp
 
 ### vacation_bookings
+
 - `id`: UUID (Primary Key)
 - `user_id`: UUID (Foreign Key to auth.users)
 - `start_date`: Date (Start date of the vacation)
@@ -50,6 +52,7 @@ supabase db push
 - `updated_at`: Timestamp
 
 ### google_tokens
+
 - `id`: UUID (Primary Key)
 - `user_id`: UUID (Foreign Key to auth.users)
 - `access_token`: Text (OAuth access token)

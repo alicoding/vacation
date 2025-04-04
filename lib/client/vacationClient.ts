@@ -3,7 +3,9 @@
  */
 import type { VacationBookingInput } from '@/services/vacation/vacationTypes';
 
-export async function createVacationBooking(data: VacationBookingInput): Promise<any> {
+export async function createVacationBooking(
+  data: VacationBookingInput,
+): Promise<any> {
   if (!data.userId || !data.startDate || !data.endDate) {
     throw new Error('User ID, start date, and end date are required');
   }
@@ -15,27 +17,35 @@ export async function createVacationBooking(data: VacationBookingInput): Promise
     },
     body: JSON.stringify(data),
   });
-  
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: response.statusText }));
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: response.statusText }));
     // If it's a 400 status, it's likely a validation error (overlapping bookings)
     if (response.status === 400 && errorData.error) {
       throw new Error(errorData.error);
     }
-    throw new Error(`Failed to create vacation booking: ${errorData.error || response.statusText}`);
+    throw new Error(
+      `Failed to create vacation booking: ${errorData.error || response.statusText}`,
+    );
   }
-  
+
   return response.json();
 }
 
 export async function getVacationBookings(): Promise<any[]> {
   const response = await fetch('/api/vacations');
-  
+
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({ error: response.statusText }));
-    throw new Error(`Failed to fetch vacation bookings: ${errorData.error || response.statusText}`);
+    const errorData = await response
+      .json()
+      .catch(() => ({ error: response.statusText }));
+    throw new Error(
+      `Failed to fetch vacation bookings: ${errorData.error || response.statusText}`,
+    );
   }
-  
+
   const bookings = await response.json();
   return bookings.map((booking: any) => ({
     ...booking,

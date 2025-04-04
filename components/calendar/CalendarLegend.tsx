@@ -9,13 +9,13 @@ interface LegendItemProps {
 
 const LegendItem = ({ color, label }: LegendItemProps) => (
   <Box display="flex" alignItems="center" gap={1}>
-    <Box 
-      sx={{ 
-        width: 16, 
-        height: 16, 
-        backgroundColor: color, 
-        borderRadius: '50%', 
-      }} 
+    <Box
+      sx={{
+        width: 16,
+        height: 16,
+        backgroundColor: color,
+        borderRadius: '50%',
+      }}
     />
     <Typography variant="body2">{label}</Typography>
   </Box>
@@ -30,4 +30,4 @@ export default function CalendarLegend() {
       <LegendItem color="primary.light" label="Today" />
     </Box>
   );
-} 
+}

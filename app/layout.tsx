@@ -24,9 +24,7 @@ export default function RootLayout({
       </head>
       <body className={inter.className}>
         <Providers>
-          <ThemeRegistry>
-            {children}
-          </ThemeRegistry>
+          <ThemeRegistry>{children}</ThemeRegistry>
         </Providers>
       </body>
     </html>

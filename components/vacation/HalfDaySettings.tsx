@@ -55,15 +55,15 @@ export function HalfDaySettings({
   shouldDisableDate = () => false,
 }: HalfDaySettingsProps) {
   const { isHalfDay, halfDayPortion, halfDayDate, halfDayDates } = halfDayData;
-  
+
   // Generate the list of working days for half-day selection
   const getWorkingDays = (): DateTime[] => {
     if (!startDate || !endDate) {
       return [];
     }
-    
+
     const workingDays = [];
-    
+
     // Iterate through each day in the interval
     let currentDate = startDate.startOf('day');
     while (currentDate <= endDate) {
@@ -72,15 +72,15 @@ export function HalfDaySettings({
       }
       currentDate = currentDate.plus({ days: 1 });
     }
-    
+
     return workingDays;
   };
-  
+
   // Use this to determine if multiple working days are selected
   const workingDays = getWorkingDays();
   const hasMultipleWorkingDays = workingDays.length > 1;
   const isSingleDay = startDate && endDate && startDate.hasSame(endDate, 'day');
-  
+
   return (
     <Box sx={{ mt: 2 }}>
       <FormControlLabel
@@ -92,7 +92,7 @@ export function HalfDaySettings({
         }
         label="Enable half-day vacation(s)"
       />
-      
+
       {isHalfDay && (
         <Box sx={{ mt: 1, ml: 4 }}>
           {isSingleDay ? (
@@ -101,23 +101,36 @@ export function HalfDaySettings({
               value={halfDayPortion}
               onChange={(e) => onHalfDayPortionChange(e.target.value)}
             >
-              <FormControlLabel value="AM" control={<Radio />} label="Morning (AM)" />
-              <FormControlLabel value="PM" control={<Radio />} label="Afternoon (PM)" />
+              <FormControlLabel
+                value="AM"
+                control={<Radio />}
+                label="Morning (AM)"
+              />
+              <FormControlLabel
+                value="PM"
+                control={<Radio />}
+                label="Afternoon (PM)"
+              />
             </RadioGroup>
           ) : hasMultipleWorkingDays ? (
             <Stack spacing={2}>
               <Typography variant="subtitle2">
                 Select which days will be half days:
               </Typography>
-              
+
               <Paper variant="outlined" sx={{ p: 2 }}>
                 {workingDays.map((day, index) => {
                   const dateKey = day.toISODate() || '';
-                  const settings = halfDayDates[dateKey] || { isHalfDay: false, portion: 'AM' };
+                  const settings = halfDayDates[dateKey] || {
+                    isHalfDay: false,
+                    portion: 'AM',
+                  };
                   const marginBottom = index < workingDays.length - 1 ? 2 : 0;
                   return (
                     <Box key={dateKey} sx={{ mb: marginBottom }}>
-                      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
+                      <Box
+                        sx={{ display: 'flex', alignItems: 'center', mb: 1 }}
+                      >
                         <FormControlLabel
                           control={
                             <Checkbox
@@ -127,30 +140,46 @@ export function HalfDaySettings({
                           }
                           label={day.toFormat('EEEE, MMM d, yyyy')}
                         />
-                        
+
                         {settings.isHalfDay && (
-                          <Chip 
-                            label={settings.portion === 'AM' ? 'Morning' : 'Afternoon'} 
-                            size="small" 
-                            color="primary" 
+                          <Chip
+                            label={
+                              settings.portion === 'AM'
+                                ? 'Morning'
+                                : 'Afternoon'
+                            }
+                            size="small"
+                            color="primary"
                             variant="outlined"
                           />
                         )}
                       </Box>
-                      
+
                       {settings.isHalfDay && (
                         <RadioGroup
                           row
                           value={settings.portion}
-                          onChange={(e) => onDatePortionChange(dateKey, e.target.value)}
+                          onChange={(e) =>
+                            onDatePortionChange(dateKey, e.target.value)
+                          }
                           sx={{ ml: 4, mb: 1 }}
                         >
-                          <FormControlLabel value="AM" control={<Radio size="small" />} label="Morning (AM)" />
-                          <FormControlLabel value="PM" control={<Radio size="small" />} label="Afternoon (PM)" />
+                          <FormControlLabel
+                            value="AM"
+                            control={<Radio size="small" />}
+                            label="Morning (AM)"
+                          />
+                          <FormControlLabel
+                            value="PM"
+                            control={<Radio size="small" />}
+                            label="Afternoon (PM)"
+                          />
                         </RadioGroup>
                       )}
-                      
-                      {index < workingDays.length - 1 && <Divider sx={{ my: 1 }} />}
+
+                      {index < workingDays.length - 1 && (
+                        <Divider sx={{ my: 1 }} />
+                      )}
                     </Box>
                   );
                 })}

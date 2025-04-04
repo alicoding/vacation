@@ -1,4 +1,7 @@
-import type { Session as SupabaseSession, User as SupabaseUser } from '@supabase/supabase-js';
+import type {
+  Session as SupabaseSession,
+  User as SupabaseUser,
+} from '@supabase/supabase-js';
 
 /**
  * Session interface compatible with components that expect next-auth-like sessions
@@ -26,34 +29,40 @@ export interface User {
 /**
  * Converts a Supabase session to our application's Session format
  */
-export function convertSupabaseSession(supabaseSession: SupabaseSession | null): Session | null {
+export function convertSupabaseSession(
+  supabaseSession: SupabaseSession | null,
+): Session | null {
   if (!supabaseSession) return null;
-  
+
   // Ensure we have a valid user object
   if (!supabaseSession.user) {
     console.error('Session has no user object');
     return null;
   }
-  
+
   // Extract expiry time safely
-  const expiresAt = supabaseSession.expires_at 
+  const expiresAt = supabaseSession.expires_at
     ? new Date(supabaseSession.expires_at * 1000).toISOString()
     : new Date(Date.now() + 3600 * 1000).toISOString(); // Default to 1 hour from now
-  
+
   return {
     user: {
       id: supabaseSession.user.id,
-      name: supabaseSession.user.user_metadata?.full_name || 
-            supabaseSession.user.user_metadata?.name || 
-            supabaseSession.user.email?.split('@')[0] || 
-            null,
+      name:
+        supabaseSession.user.user_metadata?.full_name ||
+        supabaseSession.user.user_metadata?.name ||
+        supabaseSession.user.email?.split('@')[0] ||
+        null,
       email: supabaseSession.user.email || null,
       image: supabaseSession.user.user_metadata?.avatar_url || null,
       // Include any custom fields from user metadata, with fallbacks
-      total_vacation_days: supabaseSession.user.user_metadata?.total_vacation_days || 20,
+      total_vacation_days:
+        supabaseSession.user.user_metadata?.total_vacation_days || 20,
       province: supabaseSession.user.user_metadata?.province || 'ON',
-      employment_type: supabaseSession.user.user_metadata?.employment_type || 'standard',
-      week_starts_on: supabaseSession.user.user_metadata?.week_starts_on || 'sunday',
+      employment_type:
+        supabaseSession.user.user_metadata?.employment_type || 'standard',
+      week_starts_on:
+        supabaseSession.user.user_metadata?.week_starts_on || 'sunday',
     },
     expires: expiresAt,
   };
@@ -79,13 +88,19 @@ interface UseSessionReturn {
 /**
  * Creates a useSession hook compatible with components expecting next-auth's useSession
  */
-export function createSessionHook(useAuth: () => UseAuthReturn): () => UseSessionReturn {
+export function createSessionHook(
+  useAuth: () => UseAuthReturn,
+): () => UseSessionReturn {
   return function useSession() {
     const { session, isLoading } = useAuth();
-    
+
     return {
       data: session ? convertSupabaseSession(session) : null,
-      status: isLoading ? 'loading' : session ? 'authenticated' : 'unauthenticated',
+      status: isLoading
+        ? 'loading'
+        : session
+          ? 'authenticated'
+          : 'unauthenticated',
     };
   };
 }

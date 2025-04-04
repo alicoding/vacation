@@ -21,15 +21,25 @@ export async function GET(request: NextRequest) {
           // Now using the resolved cookieStore
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: CookieOptions;
+          }[],
+        ) {
           // Now using the resolved cookieStore
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
-        }
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
+        }, // Add trailing comma
       },
-    }
+    }, // Add trailing comma
   );
 
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -46,7 +56,10 @@ export async function GET(request: NextRequest) {
     if (error) {
       console.error('Error fetching user settings (GET):', error);
       if (error.code === 'PGRST116') {
-         return NextResponse.json({ error: 'User settings not found' }, { status: 404 });
+        return NextResponse.json(
+          { error: 'User settings not found' },
+          { status: 404 },
+        );
       }
       throw error;
     }
@@ -54,7 +67,10 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(data);
   } catch (error) {
     console.error('Error fetching user settings (GET Catch):', error);
-    return NextResponse.json({ error: 'Failed to fetch user settings' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch user settings' },
+      { status: 500 },
+    );
   }
 }
 
@@ -73,16 +89,26 @@ export async function PUT(request: NextRequest) {
           // Now using the resolved cookieStore
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+        setAll(
+          cookiesToSet: {
+            name: string;
+            value: string;
+            options: CookieOptions;
+          }[],
+        ) {
           // Now using the resolved cookieStore
-          cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
         },
       },
-    }
+    }, // Add trailing comma
   );
 
   // Now getSession should work correctly
-  const { data: { session } } = await supabase.auth.getSession();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
 
   if (!session) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
@@ -100,7 +126,10 @@ export async function PUT(request: NextRequest) {
 
     if (updateAuthError) {
       console.error('Error updating Supabase auth user:', updateAuthError);
-      return NextResponse.json({ error: `Failed to update auth user: ${updateAuthError.message}` }, { status: 500 });
+      return NextResponse.json(
+        { error: `Failed to update auth user: ${updateAuthError.message}` },
+        { status: 500 },
+      );
     }
 
     // Also update in our application database
@@ -110,18 +139,28 @@ export async function PUT(request: NextRequest) {
       .eq('id', session.user.id);
 
     if (updateDbError) {
-       console.error('Error updating user table:', updateDbError);
-       return NextResponse.json({ error: `Failed to update user settings in DB: ${updateDbError.message}` }, { status: 500 });
+      console.error('Error updating user table:', updateDbError);
+      return NextResponse.json(
+        {
+          error: `Failed to update user settings in DB: ${updateDbError.message}`,
+        },
+        { status: 500 },
+      );
     }
 
     // Return success response
     return NextResponse.json({ message: 'Settings updated successfully' });
-
   } catch (error: any) {
     console.error('Error updating user settings (PUT Catch):', error);
-     if (error instanceof SyntaxError) {
-       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 });
-     }
-    return NextResponse.json({ error: 'Failed to update settings' }, { status: 500 });
+    if (error instanceof SyntaxError) {
+      return NextResponse.json(
+        { error: 'Invalid request body' },
+        { status: 400 },
+      );
+    }
+    return NextResponse.json(
+      { error: 'Failed to update settings' },
+      { status: 500 },
+    );
   }
 }

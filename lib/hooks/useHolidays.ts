@@ -11,11 +11,18 @@ export interface UseHolidaysResult {
   loading: boolean;
   error: string | null;
   refreshHolidays: () => Promise<void>;
-  isHoliday: (dateString: string) => { isHoliday: boolean; name?: string; type?: 'bank' | 'provincial' };
+  isHoliday: (dateString: string) => {
+    isHoliday: boolean;
+    name?: string;
+    type?: 'bank' | 'provincial';
+  };
   getHoliday: (dateString: string) => Holiday | undefined;
 }
 
-export function useHolidays(year: number, province?: string): UseHolidaysResult {
+export function useHolidays(
+  year: number,
+  province?: string,
+): UseHolidaysResult {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,34 +37,41 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
 
     setLoading(true);
     setError(null);
-    
+
     try {
-      console.log(`[useHolidays] Fetching holidays for year ${year} and province ${province || 'default'}`);
-      
+      console.log(
+        `[useHolidays] Fetching holidays for year ${year} and province ${province || 'default'}`,
+      );
+
       // Use direct API call to /api/holidays
       const url = `/api/holidays?year=${year}${province ? `&province=${province}` : ''}`;
       console.log(`[useHolidays] API URL: ${url}`);
-      
+
       const response = await fetch(url, {
         // Include credentials and cache settings
         credentials: 'include',
         cache: 'no-cache',
         headers: {
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
       });
 
       if (!response.ok) {
         const errorText = await response.text();
-        console.error(`[useHolidays] HTTP error ${response.status}: ${errorText}`);
+        console.error(
+          `[useHolidays] HTTP error ${response.status}: ${errorText}`,
+        );
         throw new Error(`HTTP error ${response.status}`);
       }
-      
+
       const holidayData = await response.json();
       console.log('[useHolidays] Raw holiday data:', holidayData);
-      
+
       if (!Array.isArray(holidayData)) {
-        console.error('[useHolidays] Expected array of holidays but got:', typeof holidayData);
+        console.error(
+          '[useHolidays] Expected array of holidays but got:',
+          typeof holidayData,
+        );
         setHolidays([]);
         return;
       }
@@ -65,7 +79,7 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
       // Check if we got any holidays
       if (holidayData.length === 0) {
         console.warn('[useHolidays] No holidays returned from API');
-        
+
         // Force a sync if no holidays found
         try {
           console.log('[useHolidays] Attempting to force sync holidays');
@@ -78,7 +92,9 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
           });
 
           if (syncResponse.ok) {
-            console.log('[useHolidays] Holiday sync successful, fetching again');
+            console.log(
+              '[useHolidays] Holiday sync successful, fetching again',
+            );
             // Fetch holidays again after successful sync
             const refetchResponse = await fetch(url);
             if (refetchResponse.ok) {
@@ -92,43 +108,51 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
           console.error('[useHolidays] Error syncing holidays:', syncError);
         }
       }
-      
-      // Transform dates into consistent ISO format
-      const formattedHolidays = holidayData.map((h: any) => {
-        if (!h) {
-          console.error('[useHolidays] Null or undefined holiday in data');
-          return null;
-        }
 
-        // Ensure the date is properly formatted
-        let formattedDate: string;
-        
-        try {
-          if (typeof h.date === 'string') {
-            // Handle ISO string
-            formattedDate = DateTime.fromISO(h.date).toISO() || h.date;
-          } else if (typeof h.date === 'object' && h.date !== null) {
-            // Handle Date object
-            formattedDate = DateTime.fromJSDate(new Date(h.date)).toISO() || new Date(h.date).toISOString();
-          } else {
-            console.error('[useHolidays] Invalid date format:', h.date);
+      // Transform dates into consistent ISO format
+      const formattedHolidays = holidayData
+        .map((h: any) => {
+          if (!h) {
+            console.error('[useHolidays] Null or undefined holiday in data');
+            return null;
+          }
+
+          // Ensure the date is properly formatted
+          let formattedDate: string;
+
+          try {
+            if (typeof h.date === 'string') {
+              // Handle ISO string
+              formattedDate = DateTime.fromISO(h.date).toISO() || h.date;
+            } else if (typeof h.date === 'object' && h.date !== null) {
+              // Handle Date object
+              formattedDate =
+                DateTime.fromJSDate(new Date(h.date)).toISO() ||
+                new Date(h.date).toISOString();
+            } else {
+              console.error('[useHolidays] Invalid date format:', h.date);
+              formattedDate = new Date().toISOString(); // Default to today as fallback
+            }
+          } catch (dateError) {
+            console.error(
+              '[useHolidays] Error parsing date:',
+              h.date,
+              dateError,
+            );
             formattedDate = new Date().toISOString(); // Default to today as fallback
           }
-        } catch (dateError) {
-          console.error('[useHolidays] Error parsing date:', h.date, dateError);
-          formattedDate = new Date().toISOString(); // Default to today as fallback
-        }
-        
-        return {
-          ...h,
-          date: formattedDate,
-          // Ensure all required fields are present
-          id: h.id || `holiday-${h.name}-${formattedDate}`,
-          type: h.type || 'bank',
-          name: h.name || 'Unknown Holiday',
-        };
-      }).filter(Boolean); // Remove any null entries
-      
+
+          return {
+            ...h,
+            date: formattedDate,
+            // Ensure all required fields are present
+            id: h.id || `holiday-${h.name}-${formattedDate}`,
+            type: h.type || 'bank',
+            name: h.name || 'Unknown Holiday',
+          };
+        })
+        .filter(Boolean); // Remove any null entries
+
       console.log('[useHolidays] Formatted holidays:', formattedHolidays);
       setHolidays(formattedHolidays);
     } catch (err) {
@@ -142,8 +166,13 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
 
   // Add year and province to dependencies to ensure refetch when they change
   useEffect(() => {
-    console.log('[useHolidays] useEffect triggered with year:', year, 'province:', province);
-    fetchHolidays();
+    console.log(
+      '[useHolidays] useEffect triggered with year:',
+      year,
+      'province:',
+      province,
+    );
+    void fetchHolidays();
   }, [year, province]); // Properly depend on both year and province
 
   // Check if a date is a holiday
@@ -156,19 +185,24 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
     try {
       normalizedDate = DateTime.fromISO(dateString).toISODate() || '';
     } catch (e) {
-      console.error(`[useHolidays] Error parsing date string: ${dateString}`, e);
+      console.error(
+        `[useHolidays] Error parsing date string: ${dateString}`,
+        e,
+      );
       return { isHoliday: false };
     }
-    
+
     if (holidays.length === 0) {
-      console.log(`[useHolidays] No holidays available when checking ${normalizedDate}`);
+      console.log(
+        `[useHolidays] No holidays available when checking ${normalizedDate}`,
+      );
       return { isHoliday: false };
     }
-    
+
     const holiday = holidays.find((h) => {
       // Handle different date formats but standardize to ISO date string
       let holidayDate: string | null = null;
-      
+
       try {
         if (typeof h.date === 'string') {
           holidayDate = DateTime.fromISO(h.date).toISODate();
@@ -176,31 +210,35 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
           // Use type checking without instanceof for better TypeScript support
           // Create a DateTime from whatever the date is
           const dateObj = typeof h.date === 'object' ? h.date : new Date();
-          holidayDate = DateTime.fromJSDate(new Date(dateObj as any)).toISODate();
+          holidayDate = DateTime.fromJSDate(
+            new Date(dateObj as any),
+          ).toISODate();
         }
       } catch (e) {
         console.error(`[useHolidays] Error parsing holiday date: ${h.date}`, e);
         return false;
       }
-      
+
       const match = holidayDate === normalizedDate;
       if (match) {
-        console.log(`[useHolidays] Holiday match found for ${normalizedDate}: ${h.name}`);
+        console.log(
+          `[useHolidays] Holiday match found for ${normalizedDate}: ${h.name}`,
+        );
       }
       return match;
     });
-    
+
     if (!holiday) {
       return { isHoliday: false };
     }
-    
+
     return {
       isHoliday: true,
       name: holiday.name,
       type: holiday.type,
     };
   };
-  
+
   // Get holiday information for a specific date
   const getHoliday = (dateString: string) => {
     if (!dateString) return undefined;
@@ -209,26 +247,31 @@ export function useHolidays(year: number, province?: string): UseHolidaysResult 
     try {
       normalizedDate = DateTime.fromISO(dateString).toISODate() || '';
     } catch (e) {
-      console.error(`[useHolidays] Error parsing date string: ${dateString}`, e);
+      console.error(
+        `[useHolidays] Error parsing date string: ${dateString}`,
+        e,
+      );
       return undefined;
     }
-    
+
     return holidays.find((h) => {
       let holidayDate: string | null = null;
-      
+
       try {
         if (typeof h.date === 'string') {
           holidayDate = DateTime.fromISO(h.date).toISODate();
         } else {
           // Use type checking without instanceof for better TypeScript support
           const dateObj = typeof h.date === 'object' ? h.date : new Date();
-          holidayDate = DateTime.fromJSDate(new Date(dateObj as any)).toISODate();
+          holidayDate = DateTime.fromJSDate(
+            new Date(dateObj as any),
+          ).toISODate();
         }
       } catch (e) {
         console.error(`[useHolidays] Error parsing holiday date: ${h.date}`, e);
         return false;
       }
-      
+
       return holidayDate === normalizedDate;
     });
   };

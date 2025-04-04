@@ -11,11 +11,24 @@
 'use client';
 
 import { useMemo } from 'react';
-import { format, differenceInBusinessDays, isWeekend, eachDayOfInterval } from 'date-fns';
-import { 
-  Box, Typography, Paper, Divider, 
-  Table, TableBody, TableCell, TableContainer, 
-  TableRow, Chip, Alert,
+import {
+  format,
+  differenceInBusinessDays,
+  isWeekend,
+  eachDayOfInterval,
+} from 'date-fns';
+import {
+  Box,
+  Typography,
+  Paper,
+  Divider,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableRow,
+  Chip,
+  Alert,
 } from '@mui/material';
 
 interface VacationSummaryProps {
@@ -24,34 +37,46 @@ interface VacationSummaryProps {
   isHalfDay?: boolean;
   halfDayPortion?: string | null;
   halfDayDate?: Date | null;
-  halfDayDates?: Array<{
+  halfDayDates?: {
     date: Date;
     portion: string;
-  }>;
+  }[];
   workingDays?: number;
-  holidays: Array<{
+  holidays: {
     date: Date;
     name: string;
     province: string | null;
     type: 'bank' | 'provincial';
-  }>;
+  }[];
 }
 
-export default function VacationSummary({ startDate, endDate, isHalfDay, halfDayPortion, halfDayDate, halfDayDates, workingDays, holidays }: VacationSummaryProps) {
+export default function VacationSummary({
+  startDate,
+  endDate,
+  isHalfDay,
+  halfDayPortion,
+  halfDayDate,
+  halfDayDates,
+  workingDays,
+  holidays,
+}: VacationSummaryProps) {
   const summary = useMemo(() => {
     const allDays = eachDayOfInterval({ start: startDate, end: endDate });
     const totalDays = allDays.length;
-    
+
     const weekendDays = allDays.filter((day) => isWeekend(day)).length;
-    const holidayDays = allDays.filter((day) => 
-      holidays.some((holiday) => 
-        format(holiday.date, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'),
+    const holidayDays = allDays.filter((day) =>
+      holidays.some(
+        (holiday) =>
+          format(holiday.date, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'),
       ),
     ).length;
 
     const businessDays = differenceInBusinessDays(endDate, startDate) + 1;
     const workingDaysCalculated = businessDays - holidayDays;
-    const actualVacationDays = isHalfDay ? workingDaysCalculated - 0.5 : workingDaysCalculated;
+    const actualVacationDays = isHalfDay
+      ? workingDaysCalculated - 0.5
+      : workingDaysCalculated;
 
     return {
       totalDays,
@@ -65,8 +90,10 @@ export default function VacationSummary({ startDate, endDate, isHalfDay, halfDay
   const holidaysInRange = useMemo(() => {
     return holidays.filter((holiday) => {
       const holidayDate = format(holiday.date, 'yyyy-MM-dd');
-      return holidayDate >= format(startDate, 'yyyy-MM-dd') && 
-             holidayDate <= format(endDate, 'yyyy-MM-dd');
+      return (
+        holidayDate >= format(startDate, 'yyyy-MM-dd') &&
+        holidayDate <= format(endDate, 'yyyy-MM-dd')
+      );
     });
   }, [startDate, endDate, holidays]);
 
@@ -75,9 +102,9 @@ export default function VacationSummary({ startDate, endDate, isHalfDay, halfDay
       <Typography variant="h6" gutterBottom>
         Vacation Summary
       </Typography>
-      
+
       <Divider sx={{ mb: 2 }} />
-      
+
       <Box sx={{ mb: 3 }}>
         <Typography variant="body2" color="text.secondary" gutterBottom>
           Date Range
@@ -95,7 +122,9 @@ export default function VacationSummary({ startDate, endDate, isHalfDay, halfDay
                 <Typography variant="body2">Total Days</Typography>
               </TableCell>
               <TableCell align="right">
-                <Typography variant="body2">{summary.totalDays} days</Typography>
+                <Typography variant="body2">
+                  {summary.totalDays} days
+                </Typography>
               </TableCell>
             </TableRow>
             <TableRow>
@@ -155,11 +184,13 @@ export default function VacationSummary({ startDate, endDate, isHalfDay, halfDay
 
       {summary.weekendDays > 0 && (
         <Alert severity="info" sx={{ mt: 2 }}>
-          Your vacation includes {summary.weekendDays} weekend {summary.weekendDays === 1 ? 'day' : 'days'} 
-          and {summary.holidayDays} holiday {summary.holidayDays === 1 ? 'day' : 'days'}, 
-          giving you a total of {summary.totalDays} consecutive days off.
+          Your vacation includes {summary.weekendDays} weekend{' '}
+          {summary.weekendDays === 1 ? 'day' : 'days'}
+          and {summary.holidayDays} holiday{' '}
+          {summary.holidayDays === 1 ? 'day' : 'days'}, giving you a total of{' '}
+          {summary.totalDays} consecutive days off.
         </Alert>
       )}
     </Paper>
   );
-} 
+}

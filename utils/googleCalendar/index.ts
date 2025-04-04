@@ -1,6 +1,6 @@
 /**
  * Google Calendar Integration
- * 
+ *
  * This module provides a complete solution for syncing vacation bookings
  * with Google Calendar, including authentication, event management,
  * and syncing operations.

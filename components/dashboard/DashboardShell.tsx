@@ -9,20 +9,24 @@ import ClientThemeWrapper from '@/components/theme/ClientThemeWrapper';
 export default function DashboardShell({ children }: { children: ReactNode }) {
   return (
     <ClientThemeWrapper>
-      <Box sx={{ 
-        minHeight: '100vh', 
-        backgroundColor: '#f3f4f6',
-        overflow: 'hidden',
-      }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          backgroundColor: '#f3f4f6',
+          overflow: 'hidden',
+        }}
+      >
         <Header />
-        <Box sx={{ 
-          display: 'flex', 
-          flexDirection: { xs: 'column', md: 'row' },
-          minHeight: 'calc(100vh - 64px)',
-        }}>
-          <Box 
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: { xs: 'column', md: 'row' },
+            minHeight: 'calc(100vh - 64px)',
+          }}
+        >
+          <Box
             component="nav"
-            sx={{ 
+            sx={{
               width: { xs: '100%', md: 240 },
               height: { xs: 'auto', md: '100%' },
               position: { xs: 'static', md: 'sticky' },
@@ -35,9 +39,9 @@ export default function DashboardShell({ children }: { children: ReactNode }) {
           >
             <Sidebar />
           </Box>
-          <Box 
-            component="main" 
-            sx={{ 
+          <Box
+            component="main"
+            sx={{
               flex: 1,
               p: { xs: 2, sm: 3, md: 4 },
               width: { xs: '100%', md: 'calc(100% - 240px)' },

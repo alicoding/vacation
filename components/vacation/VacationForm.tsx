@@ -8,10 +8,20 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { 
-  TextField, Button, Alert, Box, Container, 
-  FormHelperText, Grid, Paper, Typography,
-  InputAdornment, IconButton, Popover, CircularProgress,
+import {
+  TextField,
+  Button,
+  Alert,
+  Box,
+  Container,
+  FormHelperText,
+  Grid,
+  Paper,
+  Typography,
+  InputAdornment,
+  IconButton,
+  Popover,
+  CircularProgress,
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterLuxon } from '@mui/x-date-pickers/AdapterLuxon';
@@ -24,8 +34,8 @@ import HalfDaySettings, { HalfDayOption } from './HalfDaySettings';
 import HolidayDisplay from './HolidayDisplay';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
-import { 
-  generateBankHolidayMap, 
+import {
+  generateBankHolidayMap,
   createShouldDisableDate,
 } from './VacationDateUtils';
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
@@ -34,17 +44,17 @@ import { Holiday, VacationBooking } from '@/types';
 interface VacationFormProps {
   userId: string;
   province: string;
-  holidays: Array<{
+  holidays: {
     date: Date | string;
     name: string;
     province: string | null;
     type: 'bank' | 'provincial';
-  }>;
-  existingVacations?: Array<{
+  }[];
+  existingVacations?: {
     start_date: Date | string;
     end_date: Date | string;
     is_half_day?: boolean;
-  }>;
+  }[];
   onSuccess?: () => void;
 }
 
@@ -58,27 +68,31 @@ interface FormValues {
   halfDayDates: Record<string, HalfDayOption>;
 }
 
-export default function VacationForm({ 
-  userId, 
-  province, 
-  holidays = [], 
-  existingVacations: initialVacations = [], 
-  onSuccess, 
+export default function VacationForm({
+  userId,
+  province,
+  holidays = [],
+  existingVacations: initialVacations = [],
+  onSuccess,
 }: VacationFormProps) {
   // Refs for date input fields for proper popover positioning
   const startDateRef = useRef<HTMLDivElement>(null);
   const endDateRef = useRef<HTMLDivElement>(null);
-  
+
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(null);
+  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(
+    null,
+  );
   const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
   const [normalizedHolidays, setNormalizedHolidays] = useState<Holiday[]>([]);
-  const [existingVacations, setExistingVacations] = useState<VacationBooking[]>(initialVacations as VacationBooking[]);
+  const [existingVacations, setExistingVacations] = useState<VacationBooking[]>(
+    initialVacations as VacationBooking[],
+  );
   const [isLoadingVacations, setIsLoadingVacations] = useState(false);
-  
+
   // Fetch existing vacations from the API
   useEffect(() => {
     async function fetchVacations() {
@@ -87,13 +101,21 @@ export default function VacationForm({
         const response = await fetch('/api/vacations');
         if (response.ok) {
           const vacationsData = await response.json();
-          console.log('Fetched vacations from API:', vacationsData.length, 'entries');
+          console.log(
+            'Fetched vacations from API:',
+            vacationsData.length,
+            'entries',
+          );
           setExistingVacations(vacationsData);
         } else {
           console.error('Failed to fetch vacations:', response.status);
           // Fall back to any vacations passed as props
           if (initialVacations.length > 0) {
-            console.log('Using prop-provided vacations:', initialVacations.length, 'entries');
+            console.log(
+              'Using prop-provided vacations:',
+              initialVacations.length,
+              'entries',
+            );
             setExistingVacations(initialVacations as VacationBooking[]);
           }
         }
@@ -101,29 +123,41 @@ export default function VacationForm({
         console.error('Error fetching vacations:', error);
         // Fall back to any vacations passed as props
         if (initialVacations.length > 0) {
-          console.log('Using prop-provided vacations after error:', initialVacations.length, 'entries');
+          console.log(
+            'Using prop-provided vacations after error:',
+            initialVacations.length,
+            'entries',
+          );
           setExistingVacations(initialVacations as VacationBooking[]);
         }
       } finally {
         setIsLoadingVacations(false);
       }
     }
-    
-    fetchVacations();
+
+    void fetchVacations();
   }, [initialVacations]);
-  
+
   // Get current year for holiday fetching
   const currentYear = new Date().getFullYear();
-  
+
   // Use our useHolidays hook to fetch holidays from the client side
-  const { 
-    holidays: clientHolidays, 
-    loading: holidaysLoading, 
-    error: holidaysError, 
+  const {
+    holidays: clientHolidays,
+    loading: holidaysLoading,
+    error: holidaysError,
   } = useHolidays(currentYear, province);
-  
+
   // Form setup
-  const { register, handleSubmit, control, formState: { errors }, watch, reset, setValue } = useForm<FormValues>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    watch,
+    reset,
+    setValue,
+  } = useForm<FormValues>({
     defaultValues: {
       startDate: null,
       endDate: null,
@@ -134,7 +168,7 @@ export default function VacationForm({
       halfDayDates: {},
     },
   });
-  
+
   // Watch form fields
   const watchIsHalfDay = watch('isHalfDay');
   const watchHalfDayPortion = watch('halfDayPortion');
@@ -142,32 +176,34 @@ export default function VacationForm({
   const watchEndDate = watch('endDate');
   const watchHalfDayDate = watch('halfDayDate');
   const watchHalfDayDates = watch('halfDayDates');
-  
+
   // Combine holidays from both sources to ensure we have data
   useEffect(() => {
     const combinedHolidays = [...holidays].map((holiday, index) => ({
       ...holiday,
-      id: `holiday-${index}-${typeof holiday.date === 'string' ? holiday.date : DateTime.fromJSDate(holiday.date as Date).toISODate()}`,
+      id: `holiday-${index}-${typeof holiday.date === 'string' ? holiday.date : DateTime.fromJSDate(holiday.date).toISODate()}`,
       // Ensure province is string | null, not string | undefined
       province: holiday.province || null,
     }));
-    
+
     // Add client holidays if they're not duplicates
     if (clientHolidays && clientHolidays.length > 0) {
       clientHolidays.forEach((clientHoliday) => {
         // Check if this holiday already exists in the combined list
         const exists = combinedHolidays.some((h) => {
-          const hDate = typeof h.date === 'string' 
-            ? DateTime.fromISO(h.date).toISODate() 
-            : DateTime.fromJSDate(h.date as Date).toISODate();
-            
-          const clientDate = typeof clientHoliday.date === 'string'
-            ? DateTime.fromISO(clientHoliday.date).toISODate()
-            : DateTime.fromJSDate(clientHoliday.date as Date).toISODate();
-            
+          const hDate =
+            typeof h.date === 'string'
+              ? DateTime.fromISO(h.date).toISODate()
+              : DateTime.fromJSDate(h.date).toISODate();
+
+          const clientDate =
+            typeof clientHoliday.date === 'string'
+              ? DateTime.fromISO(clientHoliday.date).toISODate()
+              : DateTime.fromJSDate(clientHoliday.date as Date).toISODate();
+
           return hDate === clientDate && h.name === clientHoliday.name;
         });
-        
+
         if (!exists) {
           // Add the client holiday with an id
           combinedHolidays.push({
@@ -179,28 +215,32 @@ export default function VacationForm({
         }
       });
     }
-    
+
     // Update the normalized holidays state
     setNormalizedHolidays(combinedHolidays as Holiday[]);
   }, [holidays, clientHolidays]);
-  
+
   // Create a map of bank holiday dates for efficient lookup
   const bankHolidayMap = generateBankHolidayMap(normalizedHolidays);
-  
+
   // Create shouldDisableDate function using the fetched vacations
-  const shouldDisableDate = useMemo(() => createShouldDisableDate(
-    bankHolidayMap,
-    existingVacations,
-  ), [bankHolidayMap, existingVacations]);
-  
+  const shouldDisableDate = useMemo(
+    () => createShouldDisableDate(bankHolidayMap, existingVacations),
+    [bankHolidayMap, existingVacations],
+  );
+
   // Convert existingVacations to VacationBooking type for MiniCalendar
   const formattedVacations: VacationBooking[] = useMemo(() => {
     // Add debug logging for existingVacations
-    console.log('VacationForm received existingVacations:', existingVacations.length, 'entries');
+    console.log(
+      'VacationForm received existingVacations:',
+      existingVacations.length,
+      'entries',
+    );
     if (existingVacations.length > 0) {
       console.log('First vacation:', existingVacations[0]);
     }
-    
+
     return existingVacations.map((vacation, index) => {
       // Format vacation with proper date handling
       const formattedVacation = {
@@ -211,7 +251,7 @@ export default function VacationForm({
         created_at: new Date().toISOString(),
         userId: userId,
       };
-      
+
       // Verify the date conversion for the first item
       if (index === 0) {
         console.log('Formatted vacation dates:', {
@@ -220,7 +260,7 @@ export default function VacationForm({
           formatted: formattedVacation,
         });
       }
-      
+
       return formattedVacation;
     });
   }, [existingVacations, userId]);
@@ -252,13 +292,13 @@ export default function VacationForm({
   const handleMiniCalendarDateSelect = (date: DateTime) => {
     if (activeField === 'start') {
       setValue('startDate', date);
-      
+
       // If end date is before start date, reset it
       if (watchEndDate && watchEndDate < date) {
         setValue('endDate', null);
       }
-      
-      // If selecting start date and we don't have an end date yet, 
+
+      // If selecting start date and we don't have an end date yet,
       // switch to end date selection automatically
       if (!watchEndDate || watchEndDate < date) {
         setActiveField('end');
@@ -274,32 +314,35 @@ export default function VacationForm({
       }
     }
   };
-  
+
   // Initialize halfDayDates when workingDays change
   useEffect(() => {
     if (watchStartDate && watchEndDate) {
       // Get the working days
       const workingDays = getWorkingDays();
-      
+
       if (workingDays.length > 0) {
         // Create default half-day settings for each working day
         const halfDaySettings: Record<string, HalfDayOption> = {};
-        
+
         workingDays.forEach((day) => {
           const dateKey = day.toISODate();
           if (dateKey && !watchHalfDayDates[dateKey]) {
             halfDaySettings[dateKey] = { isHalfDay: false, portion: 'AM' };
           }
         });
-        
+
         // Only update if there are new days
         if (Object.keys(halfDaySettings).length > 0) {
-          setValue('halfDayDates', { ...watchHalfDayDates, ...halfDaySettings });
+          setValue('halfDayDates', {
+            ...watchHalfDayDates,
+            ...halfDaySettings,
+          });
         }
       }
     }
   }, [watchStartDate, watchEndDate, setValue, watchHalfDayDates]);
-  
+
   // Generate the list of working days
   const getWorkingDays = (): DateTime[] => {
     const startDate = watchStartDate;
@@ -307,9 +350,9 @@ export default function VacationForm({
     if (!startDate || !endDate) {
       return [];
     }
-    
+
     const workingDays = [];
-    
+
     // Iterate through each day in the interval
     let currentDate = startDate.startOf('day');
     while (currentDate <= endDate) {
@@ -318,7 +361,7 @@ export default function VacationForm({
       }
       currentDate = currentDate.plus({ days: 1 });
     }
-    
+
     return workingDays;
   };
 
@@ -327,27 +370,27 @@ export default function VacationForm({
     const currentSettings = watchHalfDayDates[dateKey];
     if (currentSettings) {
       const newHalfDayDates = { ...watchHalfDayDates };
-      newHalfDayDates[dateKey] = { 
+      newHalfDayDates[dateKey] = {
         ...currentSettings,
-        isHalfDay: !currentSettings.isHalfDay, 
+        isHalfDay: !currentSettings.isHalfDay,
       };
       setValue('halfDayDates', newHalfDayDates);
     }
   };
-  
+
   // Set half-day portion for a specific date
   const setHalfDayPortion = (dateKey: string, portion: string) => {
     const currentSettings = watchHalfDayDates[dateKey];
     if (currentSettings) {
       const newHalfDayDates = { ...watchHalfDayDates };
-      newHalfDayDates[dateKey] = { 
+      newHalfDayDates[dateKey] = {
         ...currentSettings,
-        portion, 
+        portion,
       };
       setValue('halfDayDates', newHalfDayDates);
     }
   };
-  
+
   // Calculate vacation duration (excluding weekends and holidays)
   const calculateWorkingDays = () => {
     const startDate = watchStartDate;
@@ -355,12 +398,15 @@ export default function VacationForm({
     if (!startDate || !endDate) {
       return 0;
     }
-    
+
     let days = 0;
-    
+
     // Create an interval between the dates
-    const interval = Interval.fromDateTimes(startDate.startOf('day'), endDate.endOf('day'));
-    
+    const interval = Interval.fromDateTimes(
+      startDate.startOf('day'),
+      endDate.endOf('day'),
+    );
+
     // Iterate through each day in the interval
     let currentDate = startDate.startOf('day');
     while (currentDate <= endDate) {
@@ -370,11 +416,13 @@ export default function VacationForm({
       }
       currentDate = currentDate.plus({ days: 1 });
     }
-    
+
     // Adjust for multiple half days if applicable
     if (watchIsHalfDay) {
       // Count how many half days are selected
-      const halfDayCount = Object.values(watchHalfDayDates).filter((day) => day.isHalfDay).length;
+      const halfDayCount = Object.values(watchHalfDayDates).filter(
+        (day) => day.isHalfDay,
+      ).length;
       if (halfDayCount > 0) {
         days -= halfDayCount * 0.5;
       } else {
@@ -382,34 +430,34 @@ export default function VacationForm({
         days -= 0.5;
       }
     }
-    
+
     return days;
   };
-  
+
   // Form submission handler
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     setError(null);
-    
+
     const { startDate, endDate } = data;
-    
+
     if (!startDate || !endDate) {
       setError('Please select both start and end dates.');
       setIsSubmitting(false);
       return;
     }
-    
+
     try {
       // Prepare half-day dates for submission
-      const halfDayDates = data.isHalfDay 
+      const halfDayDates = data.isHalfDay
         ? Object.entries(data.halfDayDates)
-          .filter(([_, settings]) => settings.isHalfDay)
-          .map(([dateStr, settings]) => ({
-            date: DateTime.fromISO(dateStr).toJSDate(),
-            portion: settings.portion,
-          }))
+            .filter(([_, settings]) => settings.isHalfDay)
+            .map(([dateStr, settings]) => ({
+              date: DateTime.fromISO(dateStr).toJSDate(),
+              portion: settings.portion,
+            }))
         : [];
-      
+
       await createVacationBooking({
         userId,
         startDate: startDate.toJSDate(),
@@ -417,13 +465,16 @@ export default function VacationForm({
         note: data.note || null,
         isHalfDay: data.isHalfDay || false,
         halfDayPortion: data.isHalfDay ? data.halfDayPortion : null,
-        halfDayDate: data.isHalfDay && data.halfDayDate ? data.halfDayDate.toJSDate() : null,
+        halfDayDate:
+          data.isHalfDay && data.halfDayDate
+            ? data.halfDayDate.toJSDate()
+            : null,
         halfDayDates: halfDayDates,
       });
-      
+
       setSuccess(true);
       reset();
-      
+
       if (onSuccess) {
         onSuccess();
       } else {
@@ -442,12 +493,13 @@ export default function VacationForm({
       setIsSubmitting(false);
     }
   };
-  
+
   // Determine if it's a single day vacation
-  const isSingleDay = watchStartDate && 
-                      watchEndDate && 
-                      watchStartDate.hasSame(watchEndDate, 'day');
-  
+  const isSingleDay =
+    watchStartDate &&
+    watchEndDate &&
+    watchStartDate.hasSame(watchEndDate, 'day');
+
   const workingDays = getWorkingDays();
   const hasMultipleWorkingDays = workingDays.length > 1;
 
@@ -456,35 +508,43 @@ export default function VacationForm({
     return holidays.map((holiday) => ({
       ...holiday,
       // Convert any string dates to Date objects
-      date: typeof holiday.date === 'string' 
-        ? new Date(holiday.date) 
-        : holiday.date,
+      date:
+        typeof holiday.date === 'string'
+          ? new Date(holiday.date)
+          : holiday.date,
     }));
   }, [holidays]);
 
   // Is calendar popover open
   const isCalendarOpen = Boolean(calendarAnchorEl);
-  
+
   // Get active date for MiniCalendar
   const getActiveDate = () => {
     if (activeField === 'start') {
       return watchStartDate || DateTime.now();
     } else if (activeField === 'end') {
-      return watchEndDate || (watchStartDate ? watchStartDate.plus({ days: 1 }) : DateTime.now());
+      return (
+        watchEndDate ||
+        (watchStartDate ? watchStartDate.plus({ days: 1 }) : DateTime.now())
+      );
     }
     return DateTime.now();
   };
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
+    <form
+      onSubmit={(e) => {
+        void handleSubmit(onSubmit)(e);
+      }}
+    >
       <div className="space-y-4">
         {/* Holiday information display */}
-        <HolidayDisplay 
+        <HolidayDisplay
           holidays={normalizedHolidays}
           loading={holidaysLoading}
           error={holidaysError}
         />
-        
+
         <Grid container spacing={2}>
           <Grid item xs={12} md={6}>
             <Controller
@@ -502,7 +562,10 @@ export default function VacationForm({
                     readOnly: true,
                     endAdornment: (
                       <InputAdornment position="end">
-                        <IconButton edge="end" onClick={(e) => handleOpenStartDate(e as any)}>
+                        <IconButton
+                          edge="end"
+                          onClick={(e) => handleOpenStartDate(e as any)}
+                        >
                           <CalendarTodayIcon />
                         </IconButton>
                       </InputAdornment>
@@ -520,7 +583,7 @@ export default function VacationForm({
               )}
             />
           </Grid>
-          
+
           <Grid item xs={12} md={6}>
             <Controller
               name="endDate"
@@ -537,7 +600,10 @@ export default function VacationForm({
                     readOnly: true,
                     endAdornment: (
                       <InputAdornment position="end">
-                        <IconButton edge="end" onClick={(e) => handleOpenEndDate(e as any)}>
+                        <IconButton
+                          edge="end"
+                          onClick={(e) => handleOpenEndDate(e as any)}
+                        >
                           <CalendarTodayIcon />
                         </IconButton>
                       </InputAdornment>
@@ -580,9 +646,11 @@ export default function VacationForm({
         >
           <Box sx={{ p: 1, width: 280 }}>
             <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              {activeField === 'start' ? 'Select Start Date' : 'Select End Date'}
+              {activeField === 'start'
+                ? 'Select Start Date'
+                : 'Select End Date'}
             </Typography>
-            
+
             {isLoadingVacations ? (
               <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                 <CircularProgress size={24} />
@@ -596,31 +664,33 @@ export default function VacationForm({
                 selectedDate={getActiveDate()}
               />
             )}
-            
-            <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+
+            <Box
+              sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}
+            >
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box 
-                  sx={{ 
-                    width: 12, 
-                    height: 12, 
-                    borderRadius: '50%', 
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
                     bgcolor: CALENDAR_COLORS.VACATION.FULL_DAY,
                     border: `1px solid ${CALENDAR_COLORS.VACATION.TEXT}`,
-                  }} 
+                  }}
                 />
                 <Typography variant="caption" color="text.secondary">
                   Already booked vacation (not selectable)
                 </Typography>
               </Box>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box 
-                  sx={{ 
-                    width: 12, 
-                    height: 12, 
-                    borderRadius: '50%', 
+                <Box
+                  sx={{
+                    width: 12,
+                    height: 12,
+                    borderRadius: '50%',
                     bgcolor: CALENDAR_COLORS.HOLIDAY.BANK,
                     border: `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT}`,
-                  }} 
+                  }}
                 />
                 <Typography variant="caption" color="text.secondary">
                   Holiday
@@ -629,7 +699,7 @@ export default function VacationForm({
             </Box>
           </Box>
         </Popover>
-        
+
         {/* Half-day vacation settings */}
         <HalfDaySettings
           startDate={watchStartDate}
@@ -641,18 +711,21 @@ export default function VacationForm({
             halfDayDates: watchHalfDayDates,
           }}
           onToggleHalfDay={(enabled) => setValue('isHalfDay', enabled)}
-          onHalfDayPortionChange={(portion) => setValue('halfDayPortion', portion)}
+          onHalfDayPortionChange={(portion) =>
+            setValue('halfDayPortion', portion)
+          }
           onToggleDateHalfDay={toggleHalfDay}
           onDatePortionChange={setHalfDayPortion}
           shouldDisableDate={shouldDisableDate}
         />
-        
+
         {isSingleDay && !watchIsHalfDay && (
           <FormHelperText>
-            For a single day, consider selecting the "Enable half-day vacation(s)" option if you're only taking half a day off.
+            For a single day, consider selecting the &quot;Enable half-day
+            vacation(s)&quot; option if you&apos;re only taking half a day off.
           </FormHelperText>
         )}
-        
+
         <TextField
           label="Note (Optional)"
           fullWidth
@@ -661,16 +734,18 @@ export default function VacationForm({
           placeholder="Add any details about your vacation..."
           {...register('note')}
         />
-        
+
         {/* Display summary of selected dates */}
-        {(watchStartDate && watchEndDate) && (
-          <VacationSummary 
-            startDate={watchStartDate.toJSDate()} 
-            endDate={watchEndDate.toJSDate()} 
+        {watchStartDate && watchEndDate && (
+          <VacationSummary
+            startDate={watchStartDate.toJSDate()}
+            endDate={watchEndDate.toJSDate()}
             workingDays={calculateWorkingDays()}
             isHalfDay={watchIsHalfDay}
             halfDayPortion={watchHalfDayPortion}
-            halfDayDate={watchHalfDayDate ? watchHalfDayDate.toJSDate() : undefined}
+            halfDayDate={
+              watchHalfDayDate ? watchHalfDayDate.toJSDate() : undefined
+            }
             halfDayDates={Object.entries(watchHalfDayDates)
               .filter(([_, settings]) => settings.isHalfDay)
               .map(([dateStr, settings]) => ({
@@ -680,30 +755,32 @@ export default function VacationForm({
             holidays={processedHolidays}
           />
         )}
-        
+
         {/* Error and success messages */}
         {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>{error}</Alert>
+          <Alert severity="error" sx={{ mt: 2 }}>
+            {error}
+          </Alert>
         )}
-        
+
         {success && (
           <Alert severity="success" sx={{ mt: 2 }}>
             Vacation booked successfully!
           </Alert>
         )}
-        
+
         <Box sx={{ mt: 3 }}>
-          <Button 
-            type="submit" 
-            variant="contained" 
+          <Button
+            type="submit"
+            variant="contained"
             disabled={isSubmitting || !watchStartDate || !watchEndDate}
             sx={{ mr: 2 }}
           >
             {isSubmitting ? 'Booking...' : 'Book Vacation'}
           </Button>
-          
-          <Button 
-            type="button" 
+
+          <Button
+            type="button"
             onClick={() => {
               reset();
             }}

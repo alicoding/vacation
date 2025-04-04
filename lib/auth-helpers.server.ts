@@ -1,6 +1,6 @@
 /**
  * Server-side authentication helpers
- * 
+ *
  * ⚠️ WARNING:
  * This file uses `cookies` from 'next/headers', which is only supported in Server Components (App Router).
  * Do NOT import or use this file inside Client Components or `pages/` directory files.
@@ -10,7 +10,10 @@
 // import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 // Import the new helper (and keep the old one if needed elsewhere, though likely not)
-import { createAuthedServerClient, createSupabaseServerClient } from '@/lib/supabase.server';
+import {
+  createAuthedServerClient,
+  createSupabaseServerClient,
+} from '@/lib/supabase.server';
 import { createDirectClient } from '@/lib/supabase.shared';
 import type { Database } from '@/types/supabase';
 import type { User } from '@/types/auth';
@@ -23,8 +26,10 @@ import { getServerSession as originalGetServerSession } from './auth-server';
 export async function getCurrentSession() {
   // Replace the old pattern with the new helper
   const supabase = await createAuthedServerClient(); // Use the new async helper
-  
-  const { data: { session } } = await supabase.auth.getSession();
+
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
   return session;
 }
 
@@ -45,11 +50,11 @@ export async function getCurrentUser() {
  */
 export async function requireAuth(redirectTo = '/auth/signin') {
   const session = await getCurrentSession();
-  
+
   if (!session) {
     redirect(redirectTo);
   }
-  
+
   return session.user;
 }
 
@@ -75,7 +80,11 @@ export const getServerSession = originalGetServerSession;
  * @param userEmail The user's email
  * @param metadata Optional additional metadata for the user
  */
-export async function ensureUserRecord(userId: string, userEmail: string, metadata?: Record<string, unknown>): Promise<void> {
+export async function ensureUserRecord(
+  userId: string,
+  userEmail: string,
+  metadata?: Record<string, unknown>,
+): Promise<void> {
   try {
     const supabase = createDirectClient();
     // Check if the user already exists in our users table
@@ -84,26 +93,23 @@ export async function ensureUserRecord(userId: string, userEmail: string, metada
       .select('id')
       .eq('id', userId as any)
       .single();
-    
+
     if (checkError && checkError.code === 'PGRST116') {
       // User doesn't exist, create a new record
       console.warn(`Creating new user record for ${userEmail}`);
-      
+
       // Extract province from metadata if available or use default
       // Ensure province is a string
-      const province = typeof metadata?.province === 'string' 
-        ? metadata.province 
-        : 'ON';
-      
-      const { error: insertError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          email: userEmail,
-          province: province,
-          created_at: new Date().toISOString(),
-        } as any);
-      
+      const province =
+        typeof metadata?.province === 'string' ? metadata.province : 'ON';
+
+      const { error: insertError } = await supabase.from('users').insert({
+        id: userId,
+        email: userEmail,
+        province: province,
+        created_at: new Date().toISOString(),
+      } as any);
+
       if (insertError) {
         console.error('Error creating user record:', insertError);
       }

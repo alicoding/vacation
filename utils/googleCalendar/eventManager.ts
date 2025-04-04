@@ -12,23 +12,23 @@ export async function createCalendarEvent(
   vacation: VacationEventData, // Includes vacation.id
 ): Promise<{ id: string } | null> {
   const token = await getGoogleToken(userId);
-  
+
   if (!token) {
     throw new Error('No valid Google token found');
   }
-  
+
   // Format the dates correctly for an all-day event
   // Use Luxon for date handling per project guidelines
   const startDateTime = DateTime.fromISO(vacation.start_date);
   const endDateTime = DateTime.fromISO(vacation.end_date);
-  
+
   if (!startDateTime.isValid || !endDateTime.isValid) {
     throw new Error('Invalid vacation dates');
   }
 
   const startDate = startDateTime.toISODate();
   const endDate = endDateTime.toISODate();
-  
+
   if (!startDate || !endDate) {
     throw new Error('Invalid vacation dates');
   }
@@ -36,11 +36,11 @@ export async function createCalendarEvent(
   // For all-day events in Google Calendar, the end date needs to be the day AFTER
   // the actual end date because Google Calendar uses exclusive end dates
   const endDateAdjusted = endDateTime.plus({ days: 1 }).toISODate();
-  
+
   if (!endDateAdjusted) {
     throw new Error('Invalid end date calculation');
   }
-  
+
   const event: CalendarEvent = {
     summary: vacation.title || 'Vacation',
     description: vacation.note || 'Time off from work',
@@ -58,25 +58,27 @@ export async function createCalendarEvent(
       private: { vacationId: vacation.id },
     },
   };
-  
+
   try {
     const response = await fetch(
       'https://www.googleapis.com/calendar/v3/calendars/primary/events',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(event),
       },
     );
-    
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`Google Calendar API error: ${errorData.error?.message || response.statusText}`);
+      throw new Error(
+        `Google Calendar API error: ${errorData.error?.message || response.statusText}`,
+      );
     }
-    
+
     return response.json();
   } catch (error) {
     console.error('Failed to create calendar event:', error);
@@ -93,22 +95,22 @@ export async function updateCalendarEvent(
   vacation: VacationEventData, // Change to full VacationEventData to access vacation.id
 ): Promise<{ id: string } | null> {
   const token = await getGoogleToken(userId);
-  
+
   if (!token) {
     throw new Error('No valid Google token found');
   }
-  
+
   // Format the dates correctly for an all-day event
   const startDateTime = DateTime.fromISO(vacation.start_date);
   const endDateTime = DateTime.fromISO(vacation.end_date);
-  
+
   if (!startDateTime.isValid || !endDateTime.isValid) {
     throw new Error('Invalid vacation dates');
   }
 
   const startDate = startDateTime.toISODate();
   const endDate = endDateTime.toISODate();
-  
+
   if (!startDate || !endDate) {
     throw new Error('Invalid vacation dates');
   }
@@ -116,11 +118,11 @@ export async function updateCalendarEvent(
   // For all-day events in Google Calendar, the end date needs to be the day AFTER
   // the actual end date because Google Calendar uses exclusive end dates
   const endDateAdjusted = endDateTime.plus({ days: 1 }).toISODate();
-  
+
   if (!endDateAdjusted) {
     throw new Error('Invalid end date calculation');
   }
-  
+
   const event: CalendarEvent = {
     summary: vacation.title || 'Vacation',
     description: vacation.note || 'Time off from work',
@@ -138,25 +140,27 @@ export async function updateCalendarEvent(
       private: { vacationId: vacation.id },
     },
   };
-  
+
   try {
     const response = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(googleEventId)}`,
       {
         method: 'PATCH',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(event),
       },
     );
-    
+
     if (!response.ok) {
       const errorData = await response.json();
-      throw new Error(`Google Calendar API error: ${errorData.error?.message || response.statusText}`);
+      throw new Error(
+        `Google Calendar API error: ${errorData.error?.message || response.statusText}`,
+      );
     }
-    
+
     return response.json();
   } catch (error) {
     console.error('Failed to update calendar event:', error);
@@ -167,34 +171,39 @@ export async function updateCalendarEvent(
 /**
  * Deletes a calendar event for a vacation
  */
-export async function deleteCalendarEvent(userId: string, googleEventId: string): Promise<boolean> {
+export async function deleteCalendarEvent(
+  userId: string,
+  googleEventId: string,
+): Promise<boolean> {
   const token = await getGoogleToken(userId);
-  
+
   if (!token) {
     throw new Error('No valid Google token found');
   }
-  
+
   try {
     const response = await fetch(
       `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(googleEventId)}`,
       {
         method: 'DELETE',
         headers: {
-          'Authorization': `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
         },
       },
     );
-    
+
     if (!response.ok) {
       // If the error is 404, the event was already deleted or doesn't exist
       if (response.status === 404) {
         return true;
       }
-      
+
       const errorData = await response.json();
-      throw new Error(`Google Calendar API error: ${errorData.error?.message || response.statusText}`);
+      throw new Error(
+        `Google Calendar API error: ${errorData.error?.message || response.statusText}`,
+      );
     }
-    
+
     return true;
   } catch (error) {
     console.error('Failed to delete calendar event:', error);
@@ -213,7 +222,9 @@ export async function findCalendarEventByVacationId(
 ): Promise<string | null> {
   const token = await getGoogleToken(userId);
   if (!token) {
-    console.error(`[findCalendarEventByVacationId] No valid Google token for user ${userId}`);
+    console.error(
+      `[findCalendarEventByVacationId] No valid Google token for user ${userId}`,
+    );
     // Decide if throwing or returning null is better. Returning null might be safer.
     return null;
   }
@@ -231,22 +242,28 @@ export async function findCalendarEventByVacationId(
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${token}`,
-        'Accept': 'application/json',
+        Authorization: `Bearer ${token}`,
+        Accept: 'application/json',
       },
     });
 
     if (!response.ok) {
-      throw new Error(`Google Calendar API error: ${response.status} ${response.statusText}`);
+      throw new Error(
+        `Google Calendar API error: ${response.status} ${response.statusText}`,
+      );
     }
 
     const data = await response.json();
 
     if (data.items && data.items.length > 0 && data.items[0].id) {
-      console.log(`[findCalendarEventByVacationId] Found existing event for vacation ${vacationId}: ${data.items[0].id}`);
+      console.log(
+        `[findCalendarEventByVacationId] Found existing event for vacation ${vacationId}: ${data.items[0].id}`,
+      );
       return data.items[0].id;
     } else {
-      console.log(`[findCalendarEventByVacationId] No existing event found for vacation ${vacationId}`);
+      console.log(
+        `[findCalendarEventByVacationId] No existing event found for vacation ${vacationId}`,
+      );
       return null;
     }
   } catch (error: any) {

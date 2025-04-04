@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiClient } from '@/utils/supabase-api';
-import { getHolidays, getHolidaysForYear, syncHolidaysForYear } from '@/services/holiday/holidayService';
+import {
+  getHolidays,
+  getHolidaysForYear,
+  syncHolidaysForYear,
+} from '@/services/holiday/holidayService';
 
 export const runtime = 'edge';
 
@@ -69,10 +73,13 @@ export const runtime = 'edge';
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createApiClient();
-    
+
     // Use getUser() for better security
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -81,54 +88,58 @@ export async function GET(request: NextRequest) {
     const url = new URL(request.url);
     const yearParam = url.searchParams.get('year');
     const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
-    
+
     // Get user's province from user metadata instead of the users table
     const userProvince = user.user_metadata?.province || 'ON'; // Default to Ontario if not set
-    
+
     try {
       // Use the service function instead of direct database query
       const holidays = await getHolidaysForYear(year, userProvince);
-      
+
       // Log the retrieved holidays for debugging
-      console.log(`Retrieved ${holidays.length} holidays for year ${year} and province ${userProvince}`);
-      
+      console.log(
+        `Retrieved ${holidays.length} holidays for year ${year} and province ${userProvince}`,
+      );
+
       // If no holidays found, try to sync from external API
       if (!holidays || holidays.length === 0) {
         console.log(`No holidays found, syncing for year ${year}`);
         await syncHolidaysForYear(year);
-        
+
         // Try fetching again after sync
         const syncedHolidays = await getHolidaysForYear(year, userProvince);
         return NextResponse.json(syncedHolidays || []);
       }
-      
+
       // Return the holidays
       return NextResponse.json(holidays || []);
     } catch (serviceError: unknown) {
       console.error('Service error fetching holidays:', serviceError);
-      
+
       // Fallback to direct database query if the service fails
       try {
         const startDate = new Date(year, 0, 1); // January 1st
         const endDate = new Date(year, 11, 31); // December 31st
-        
+
         let holidaysQuery = supabase
           .from('holidays')
           .select('*')
           .gte('date', startDate.toISOString().split('T')[0])
           .lte('date', endDate.toISOString().split('T')[0]);
-          
+
         if (userProvince !== 'ALL') {
-          holidaysQuery = holidaysQuery.or(`province.eq.${userProvince},province.is.null`);
+          holidaysQuery = holidaysQuery.or(
+            `province.eq.${userProvince},province.is.null`,
+          );
         }
-        
+
         const { data: holidays, error } = await holidaysQuery;
-        
+
         if (error) {
           console.error('Error in fallback holiday fetch:', error);
           return NextResponse.json([]);
         }
-        
+
         return NextResponse.json(holidays || []);
       } catch (dbError: unknown) {
         console.error('Database error fetching holidays:', dbError);
@@ -138,7 +149,10 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error fetching holidays:', error);
-    return NextResponse.json({ error: 'Failed to fetch holidays' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Failed to fetch holidays' },
+      { status: 500 },
+    );
   }
 }
 
@@ -149,32 +163,35 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createApiClient();
-    
+
     // Use getUser() for better security
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    
+
     // Get year from request body
     const { year } = await request.json();
-    
+
     if (!year) {
       return NextResponse.json({ error: 'Year is required' }, { status: 400 });
     }
-    
+
     // Actually perform the sync operation from external API
     try {
       await syncHolidaysForYear(year);
-      
+
       // Return success response with count of synced holidays
       const province = user.user_metadata?.province || 'ON';
       const holidays = await getHolidaysForYear(year, province);
-      
-      return NextResponse.json({ 
-        success: true, 
-        message: `${holidays.length} holidays for ${year} synced successfully`, 
+
+      return NextResponse.json({
+        success: true,
+        message: `${holidays.length} holidays for ${year} synced successfully`,
       });
     } catch (syncError) {
       console.error('Error syncing holidays:', syncError);

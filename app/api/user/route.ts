@@ -11,17 +11,20 @@ export async function GET(request: NextRequest) {
     // Use the new utility function to create the Supabase client
     // This handles cookies correctly (getAll/setAll, path: '/')
     const supabase = await createSupabaseServerClient(); // Await the async function
-    
+
     // Get the authenticated user
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
-    
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
     if (authError || !user) {
       console.error('Authentication error in /api/user:', authError);
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
-    
+
     console.log('User authenticated in API route:', user.id);
-    
+
     // First, check if we need to sync values from auth metadata to users table
     // This creates an "eventually consistent" approach where auth metadata is the source of truth
     if (user.user_metadata) {
@@ -29,103 +32,122 @@ export async function GET(request: NextRequest) {
       const adminClient = createClient<Database>(
         process.env.NEXT_PUBLIC_SUPABASE_URL!,
         process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { 
-          auth: { 
-            persistSession: false, 
-          }, 
+        {
+          auth: {
+            persistSession: false,
+          },
         },
       );
-      
+
       // Get current user record
       const { data: currentUserData } = await adminClient
         .from('users')
         .select('*')
         .eq('id', user.id)
         .single();
-        
+
       // Only update if the user exists and values are different
       if (currentUserData) {
         const updates: any = {};
         let needsUpdate = false;
-        
+
         // Check each field to see if it needs updating
-        if (user.user_metadata.total_vacation_days !== undefined && 
-            currentUserData.total_vacation_days !== user.user_metadata.total_vacation_days) {
+        if (
+          user.user_metadata.total_vacation_days !== undefined &&
+          currentUserData.total_vacation_days !==
+            user.user_metadata.total_vacation_days
+        ) {
           updates.total_vacation_days = user.user_metadata.total_vacation_days;
           needsUpdate = true;
         }
-        
-        if (user.user_metadata.province !== undefined && 
-            currentUserData.province !== user.user_metadata.province) {
+
+        if (
+          user.user_metadata.province !== undefined &&
+          currentUserData.province !== user.user_metadata.province
+        ) {
           updates.province = user.user_metadata.province;
           needsUpdate = true;
         }
-        
-        if (user.user_metadata.employment_type !== undefined && 
-            currentUserData.employment_type !== user.user_metadata.employment_type) {
+
+        if (
+          user.user_metadata.employment_type !== undefined &&
+          currentUserData.employment_type !== user.user_metadata.employment_type
+        ) {
           updates.employment_type = user.user_metadata.employment_type;
           needsUpdate = true;
         }
-        
-        if (user.user_metadata.week_starts_on !== undefined && 
-            currentUserData.week_starts_on !== user.user_metadata.week_starts_on) {
+
+        if (
+          user.user_metadata.week_starts_on !== undefined &&
+          currentUserData.week_starts_on !== user.user_metadata.week_starts_on
+        ) {
           updates.week_starts_on = user.user_metadata.week_starts_on;
           needsUpdate = true;
         }
-        
-        if (user.user_metadata.calendar_sync_enabled !== undefined && 
-            currentUserData.calendar_sync_enabled !== user.user_metadata.calendar_sync_enabled) {
-          updates.calendar_sync_enabled = user.user_metadata.calendar_sync_enabled;
+
+        if (
+          user.user_metadata.calendar_sync_enabled !== undefined &&
+          currentUserData.calendar_sync_enabled !==
+            user.user_metadata.calendar_sync_enabled
+        ) {
+          updates.calendar_sync_enabled =
+            user.user_metadata.calendar_sync_enabled;
           needsUpdate = true;
         }
-        
+
         // Perform update if needed
         if (needsUpdate) {
-          console.log('Syncing user data from auth metadata to users table:', updates);
-          await adminClient
-            .from('users')
-            .update(updates)
-            .eq('id', user.id);
+          console.log(
+            'Syncing user data from auth metadata to users table:',
+            updates,
+          );
+          await adminClient.from('users').update(updates).eq('id', user.id);
         }
       }
     }
-    
+
     // Query the users table to get user settings including calendar sync preferences
     const { data: userData, error: userError } = await supabase
       .from('users')
       .select('*')
       .eq('id', user.id)
       .single();
-    
+
     if (userError) {
       console.log(`User data error for ${user.id}:`, userError);
-      
+
       // If the user doesn't exist in the users table yet, create a default record
       if (userError.code === 'PGRST116') {
         console.log('Creating new user record with defaults');
-        
+
         // Create a supabase admin client with service role to bypass RLS
         // This is necessary because the user may not have permission to insert into the users table
         const adminClient = createClient<Database>(
           process.env.NEXT_PUBLIC_SUPABASE_URL!,
           process.env.SUPABASE_SERVICE_ROLE_KEY!,
-          { 
-            auth: { 
-              persistSession: false, 
-            }, 
+          {
+            auth: {
+              persistSession: false,
+            },
           },
         );
-        
+
         // Get the user's metadata from auth to use for defaults
-        const { data: { user: authUser } } = await adminClient.auth.admin.getUserById(user.id);
-        
+        const {
+          data: { user: authUser },
+        } = await adminClient.auth.admin.getUserById(user.id);
+
         // Use values from auth metadata if available, otherwise use defaults
-        const total_vacation_days = authUser?.user_metadata?.total_vacation_days || 2;
+        const total_vacation_days =
+          authUser?.user_metadata?.total_vacation_days || 2;
         const province = authUser?.user_metadata?.province || 'ON';
-        const employment_type = authUser?.user_metadata?.employment_type || 'standard';
-        const week_starts_on = authUser?.user_metadata?.week_starts_on || 'sunday';
-        const calendar_sync_enabled = authUser?.user_metadata?.calendar_sync_enabled || false;
-        
+        const employment_type =
+          authUser?.user_metadata?.employment_type || 'standard';
+        const week_starts_on =
+          authUser?.user_metadata?.week_starts_on || 'sunday';
+        const calendar_sync_enabled =
+          authUser?.user_metadata?.calendar_sync_enabled || false;
+
         const { data: newUser, error: createError } = await adminClient
           .from('users')
           .insert({
@@ -140,20 +162,20 @@ export async function GET(request: NextRequest) {
           })
           .select()
           .single();
-          
+
         if (createError) {
           console.error('Error creating user record:', createError);
           throw createError;
         }
-        
+
         return NextResponse.json(newUser);
       }
-      
+
       throw userError;
     }
-    
+
     console.log('Fetched user data successfully:', userData);
-    
+
     // Return user data with any missing fields set to defaults
     return NextResponse.json({
       ...userData,

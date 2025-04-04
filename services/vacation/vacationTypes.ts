@@ -1,8 +1,8 @@
 // Custom error classes for better error handling
 export class VacationServiceError extends Error {
   code: string;
-  
-  constructor(message: string, code: string = 'UNKNOWN_ERROR') {
+
+  constructor(message: string, code = 'UNKNOWN_ERROR') {
     super(message);
     this.name = 'VacationServiceError';
     this.code = code;
@@ -68,7 +68,7 @@ export interface VacationWithDetails extends VacationBooking {
   workingDaysOff: number;
 }
 
-export type VacationBookingInput = {
+export interface VacationBookingInput {
   userId: string;
   startDate: Date;
   endDate: Date;
@@ -76,8 +76,8 @@ export type VacationBookingInput = {
   isHalfDay?: boolean;
   halfDayPortion?: string | null;
   halfDayDate?: Date | null;
-  halfDayDates?: Array<{
+  halfDayDates?: {
     date: Date;
     portion: string;
-  }>;
-};
+  }[];
+}

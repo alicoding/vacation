@@ -1,19 +1,15 @@
 'use server';
 
 // Import and re-export async functions explicitly
-import { 
+import {
   createVacationBooking,
   updateVacationBooking,
   deleteVacationBooking,
 } from './vacationBookingService';
 
-import { 
-  calculateBusinessDays,
-} from './vacationCalculationService';
+import { calculateBusinessDays } from './vacationCalculationService';
 
-import {
-  checkOverlappingBookings,
-} from './vacationOverlapService';
+import { checkOverlappingBookings } from './vacationOverlapService';
 
 import {
   getVacationBookings,
@@ -27,13 +23,13 @@ export {
   createVacationBooking,
   updateVacationBooking,
   deleteVacationBooking,
-  
+
   // Calculations
   calculateBusinessDays,
-  
+
   // Overlap detection
   checkOverlappingBookings,
-  
+
   // Queries
   getVacationBookings,
   getVacationDaysUsed,

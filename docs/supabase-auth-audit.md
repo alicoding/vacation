@@ -12,6 +12,7 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [x] Map out all client creation patterns across the codebase
 
 ### Fix:
+
 - [x] Make sure all client-side components use a unified client instance
 - [x] All server components must use `createSupabaseServerClient(cookies)`
 
@@ -21,14 +22,16 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [x] Look for `supabase.auth.getSession()` or `onAuthStateChange()` in client
 
 ### Fix:
+
 - [x] Move to cookie-based auth only
-- [x] Removed server-injected window.__INITIAL_AUTH_SESSION__ hydration pattern
+- [x] Removed server-injected window.**INITIAL_AUTH_SESSION** hydration pattern
 
 ## 3. Add a Central getSupabaseClient() Utility ✅
 
 - [x] Create or update `/lib/supabase.ts` with unified client creation functions
 
 ### Fix:
+
 - [x] Refactor key components to use centralized client creation utilities
 
 ## 4. Build a Universal useUser() Hook ✅
@@ -36,6 +39,7 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [x] Create or update hooks for user authentication state
 
 ### Fix:
+
 - [x] Replace all direct `supabase.auth.getUser()` calls with the hook
 
 ## 5. Verify Server-Side Auth in layout.tsx or Protected Pages ⏳
@@ -43,6 +47,7 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [ ] Ensure all protected routes properly check authentication server-side
 
 ### Fix:
+
 - [ ] Implement consistent auth checking in layouts/pages
 - [ ] Avoid fetching user on the client when server already has it
 
@@ -57,6 +62,7 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [ ] Check for localStorage remnants in auth flows
 
 ### Fix:
+
 - [ ] Clean up and standardize auth flow pages
 
 ## 8. Kill All Zombie Copilot Code ⏳
@@ -65,12 +71,13 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [ ] Look for duplicated auth logic across pages/components
 
 ### Fix:
+
 - [ ] Consolidate logic into shared auth.ts and useUser.ts
 
 ## Components Reviewed & Fixed
 
-- [x] EnvironmentProvider.tsx - Already uses a secure approach with window.__ENV__
-- [x] AuthProvider.tsx - Updated to use centralized createSupabaseClient() and removed window.__INITIAL_AUTH_SESSION__
+- [x] EnvironmentProvider.tsx - Already uses a secure approach with window.**ENV**
+- [x] AuthProvider.tsx - Updated to use centralized createSupabaseClient() and removed window.**INITIAL_AUTH_SESSION**
 - [x] InitialAuthHydration.tsx - Deleted, no longer needed
 - [x] middleware.ts - Updated to use createSupabaseMiddlewareClient()
 - [x] services/vacation/vacationQueryService.ts - Updated to use createSupabaseServerClient()

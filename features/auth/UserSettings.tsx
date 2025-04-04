@@ -34,7 +34,6 @@ interface ExtendedUser extends User {
   calendar_sync_enabled?: boolean;
 }
 
-
 const CANADIAN_PROVINCES = [
   { value: 'AB', label: 'Alberta' },
   { value: 'BC', label: 'British Columbia' },
@@ -64,18 +63,24 @@ const WEEK_START_OPTIONS = [
 
 export default function UserSettings() {
   // Use the shared AuthContext - add refreshSession
-  const { user, isLoading: isAuthLoading, isAuthenticated, refreshSession } = useAuth();
+  const {
+    user,
+    isLoading: isAuthLoading,
+    isAuthenticated,
+    refreshSession,
+  } = useAuth();
   const router = useRouter();
 
   const [isSaving, setIsSaving] = useState(false);
-  const [dataLoaded, setDataLoaded] = useState(false);  // New state to track if data has been loaded
+  const [dataLoaded, setDataLoaded] = useState(false); // New state to track if data has been loaded
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [vacationDays, setVacationDays] = useState<number | null>(null);
   const [province, setProvince] = useState<string>('ON');
   const [employmentType, setEmploymentType] = useState<string>('standard');
   const [weekStartsOn, setWeekStartsOn] = useState<string>('sunday');
-  const [calendarSyncEnabled, setCalendarSyncEnabled] = useState<boolean>(false);
+  const [calendarSyncEnabled, setCalendarSyncEnabled] =
+    useState<boolean>(false);
   const [refreshKey, setRefreshKey] = useState<number>(0); // Keep this for local data refresh if needed
   const [isFetchingSettings, setIsFetchingSettings] = useState(true); // Local loading state for API fetch
 
@@ -101,14 +106,22 @@ export default function UserSettings() {
       if (response.ok) {
         const userData = await response.json();
         // Update state with fetched user data - don't use OR fallback to ensure 0 is respected
-        setVacationDays(userData.total_vacation_days !== undefined ? userData.total_vacation_days : 2);
+        setVacationDays(
+          userData.total_vacation_days !== undefined
+            ? userData.total_vacation_days
+            : 2,
+        );
         setProvince(userData.province || 'ON');
         setEmploymentType(userData.employment_type || 'standard');
         setWeekStartsOn(userData.week_starts_on || 'sunday');
         setCalendarSyncEnabled(!!userData.calendar_sync_enabled);
-        setDataLoaded(true);  // Mark data as loaded
+        setDataLoaded(true); // Mark data as loaded
       } else {
-        console.error('Error fetching user data:', response.status, response.statusText);
+        console.error(
+          'Error fetching user data:',
+          response.status,
+          response.statusText,
+        );
         setErrorMessage(`Failed to load user settings (${response.status})`);
         setDataLoaded(false); // Indicate data load failed
       }
@@ -122,7 +135,7 @@ export default function UserSettings() {
   }, [user?.id, isAuthenticated, isAuthLoading, dataLoaded]); // Dependencies updated
 
   useEffect(() => {
-    fetchUserData();
+    void fetchUserData();
   }, [fetchUserData, refreshKey]); // Use fetchUserData callback
 
   const handleSaveSettings = async (e: React.FormEvent) => {
@@ -179,10 +192,11 @@ export default function UserSettings() {
 
       // Optionally trigger local data refresh if still needed (e.g., for calendar sync status)
       setRefreshKey((prevKey) => prevKey + 1);
-
     } catch (error) {
       console.error('Error saving settings:', error);
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to update settings');
+      setErrorMessage(
+        error instanceof Error ? error.message : 'Failed to update settings',
+      );
     } finally {
       setIsSaving(false);
     }
@@ -202,13 +216,13 @@ export default function UserSettings() {
       </Typography>
 
       {/* Use combined loading state */}
-      {(isAuthLoading || isFetchingSettings) ? (
+      {isAuthLoading || isFetchingSettings ? (
         <Box display="flex" justifyContent="center" alignItems="center" py={4}>
           <CircularProgress />
         </Box>
       ) : (
         <>
-          <form onSubmit={handleSaveSettings}>
+          <form onSubmit={(e) => void handleSaveSettings(e)}>
             <Box sx={{ mb: 3 }}>
               <TextField
                 id="vacationDays"
@@ -217,7 +231,9 @@ export default function UserSettings() {
                 fullWidth
                 inputProps={{ min: 0, max: 365 }}
                 value={vacationDays === null ? '' : vacationDays}
-                onChange={(e) => setVacationDays(parseInt(e.target.value, 10) || 0)}
+                onChange={(e) =>
+                  setVacationDays(parseInt(e.target.value, 10) || 0)
+                }
                 margin="normal"
                 size="small"
               />
@@ -240,14 +256,17 @@ export default function UserSettings() {
                   ))}
                 </Select>
                 <FormHelperText>
-                  This determines which provincial holidays are displayed in your calendar.
+                  This determines which provincial holidays are displayed in
+                  your calendar.
                 </FormHelperText>
               </FormControl>
             </Box>
 
             <Box sx={{ mb: 3 }}>
               <FormControl fullWidth margin="normal" size="small">
-                <InputLabel id="employment-type-label">Employment Type</InputLabel>
+                <InputLabel id="employment-type-label">
+                  Employment Type
+                </InputLabel>
                 <Select
                   labelId="employment-type-label"
                   id="employment-type"
@@ -262,7 +281,8 @@ export default function UserSettings() {
                   ))}
                 </Select>
                 <FormHelperText>
-                  Your employment type affects which holidays are applicable to you.
+                  Your employment type affects which holidays are applicable to
+                  you.
                 </FormHelperText>
               </FormControl>
             </Box>

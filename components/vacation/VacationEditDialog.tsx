@@ -7,10 +7,21 @@
 'use client';
 import React, { useState, useRef, useEffect } from 'react';
 import { useForm, Controller } from 'react-hook-form';
-import { 
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  TextField, Button, Alert, Box, Grid, Typography,
-  InputAdornment, IconButton, Popover, CircularProgress,
+import {
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
+  Button,
+  Alert,
+  Box,
+  Grid,
+  Typography,
+  InputAdornment,
+  IconButton,
+  Popover,
+  CircularProgress,
 } from '@mui/material';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import { DateTime } from 'luxon';
@@ -52,23 +63,25 @@ export default function VacationEditDialog({
 }: VacationEditDialogProps) {
   const startDateRef = useRef<HTMLDivElement>(null);
   const endDateRef = useRef<HTMLDivElement>(null);
-  
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(null);
+  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(
+    null,
+  );
   const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
 
   // Get current year for holiday fetching
   const currentYear = new Date().getFullYear();
   const province = 'ON'; // Default province - could be fetched from user settings
-  
+
   // Fetch holidays using the hook
-  const { 
-    holidays: fetchedHolidays, 
-    loading: holidaysLoading,
-  } = useHolidays(currentYear, province);
-  
+  const { holidays: fetchedHolidays, loading: holidaysLoading } = useHolidays(
+    currentYear,
+    province,
+  );
+
   // Update holidays when they're fetched
   useEffect(() => {
     if (fetchedHolidays?.length) {
@@ -77,7 +90,15 @@ export default function VacationEditDialog({
   }, [fetchedHolidays]);
 
   // Form setup with vacation data as default values
-  const { register, handleSubmit, control, formState: { errors }, watch, reset, setValue } = useForm<FormValues>({
+  const {
+    register,
+    handleSubmit,
+    control,
+    formState: { errors },
+    watch,
+    reset,
+    setValue,
+  } = useForm<FormValues>({
     defaultValues: {
       startDate: vacation ? DateTime.fromISO(vacation.start_date) : null,
       endDate: vacation ? DateTime.fromISO(vacation.end_date) : null,
@@ -131,12 +152,12 @@ export default function VacationEditDialog({
   const handleMiniCalendarDateSelect = (date: DateTime) => {
     if (activeField === 'start') {
       setValue('startDate', date);
-      
+
       // If end date is before start date, reset it
       if (watchEndDate && watchEndDate < date) {
         setValue('endDate', null);
       }
-      
+
       if (!watchEndDate) {
         setActiveField('end');
       } else {
@@ -185,7 +206,9 @@ export default function VacationEditDialog({
       onClose();
     } catch (error) {
       console.error('Error updating vacation:', error);
-      setError(error instanceof Error ? error.message : 'An unknown error occurred');
+      setError(
+        error instanceof Error ? error.message : 'An unknown error occurred',
+      );
     } finally {
       setIsSubmitting(false);
     }
@@ -193,26 +216,28 @@ export default function VacationEditDialog({
 
   // Is calendar popover open
   const isCalendarOpen = Boolean(calendarAnchorEl);
-  
+
   // Get active date for MiniCalendar
   const getActiveDate = () => {
     if (activeField === 'start') {
       return watchStartDate || DateTime.now();
     } else if (activeField === 'end') {
-      return watchEndDate || (watchStartDate ? watchStartDate.plus({ days: 1 }) : DateTime.now());
+      return (
+        watchEndDate ||
+        (watchStartDate ? watchStartDate.plus({ days: 1 }) : DateTime.now())
+      );
     }
     return DateTime.now();
   };
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose}
-      fullWidth
-      maxWidth="sm"
-    >
+    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Edit Vacation</DialogTitle>
-      <form onSubmit={handleSubmit(onSubmit)}>
+      <form
+        onSubmit={(e) => {
+          void handleSubmit(onSubmit)(e);
+        }}
+      >
         <DialogContent>
           <Grid container spacing={2}>
             <Grid item xs={12} md={6}>
@@ -226,12 +251,17 @@ export default function VacationEditDialog({
                     fullWidth
                     inputRef={startDateRef}
                     onClick={handleOpenStartDate}
-                    value={field.value ? field.value.toFormat('MMM d, yyyy') : ''}
+                    value={
+                      field.value ? field.value.toFormat('MMM d, yyyy') : ''
+                    }
                     InputProps={{
                       readOnly: true,
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton edge="end" onClick={(e) => handleOpenStartDate(e as any)}>
+                          <IconButton
+                            edge="end"
+                            onClick={(e) => handleOpenStartDate(e as any)}
+                          >
                             <CalendarTodayIcon />
                           </IconButton>
                         </InputAdornment>
@@ -249,7 +279,7 @@ export default function VacationEditDialog({
                 )}
               />
             </Grid>
-            
+
             <Grid item xs={12} md={6}>
               <Controller
                 name="endDate"
@@ -261,12 +291,17 @@ export default function VacationEditDialog({
                     fullWidth
                     inputRef={endDateRef}
                     onClick={handleOpenEndDate}
-                    value={field.value ? field.value.toFormat('MMM d, yyyy') : ''}
+                    value={
+                      field.value ? field.value.toFormat('MMM d, yyyy') : ''
+                    }
                     InputProps={{
                       readOnly: true,
                       endAdornment: (
                         <InputAdornment position="end">
-                          <IconButton edge="end" onClick={(e) => handleOpenEndDate(e as any)}>
+                          <IconButton
+                            edge="end"
+                            onClick={(e) => handleOpenEndDate(e as any)}
+                          >
                             <CalendarTodayIcon />
                           </IconButton>
                         </InputAdornment>
@@ -284,7 +319,7 @@ export default function VacationEditDialog({
                 )}
               />
             </Grid>
-            
+
             <Grid item xs={12}>
               <TextField
                 label="Note (Optional)"
@@ -296,7 +331,7 @@ export default function VacationEditDialog({
                 sx={{ mt: 2 }}
               />
             </Grid>
-            
+
             <Grid item xs={12}>
               <HalfDaySettings
                 startDate={watchStartDate}
@@ -308,7 +343,9 @@ export default function VacationEditDialog({
                   halfDayDates: {},
                 }}
                 onToggleHalfDay={(enabled) => setValue('isHalfDay', enabled)}
-                onHalfDayPortionChange={(portion) => setValue('halfDayPortion', portion)}
+                onHalfDayPortionChange={(portion) =>
+                  setValue('halfDayPortion', portion)
+                }
                 onToggleDateHalfDay={(dateKey) => {
                   // Empty handler, simplified edit mode doesn't use this
                 }}
@@ -343,9 +380,11 @@ export default function VacationEditDialog({
           >
             <Box sx={{ p: 1, width: 280 }}>
               <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                {activeField === 'start' ? 'Select Start Date' : 'Select End Date'}
+                {activeField === 'start'
+                  ? 'Select Start Date'
+                  : 'Select End Date'}
               </Typography>
-              
+
               {holidaysLoading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                   <CircularProgress size={24} />
@@ -360,31 +399,38 @@ export default function VacationEditDialog({
                   vacationToExclude={vacation?.id}
                 />
               )}
-              
-              <Box sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+
+              <Box
+                sx={{
+                  mt: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.5,
+                }}
+              >
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box 
-                    sx={{ 
-                      width: 12, 
-                      height: 12, 
-                      borderRadius: '50%', 
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
                       bgcolor: CALENDAR_COLORS.VACATION.FULL_DAY,
                       border: `1px solid ${CALENDAR_COLORS.VACATION.TEXT}`,
-                    }} 
+                    }}
                   />
                   <Typography variant="caption" color="text.secondary">
                     Already booked vacation (not selectable)
                   </Typography>
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <Box 
-                    sx={{ 
-                      width: 12, 
-                      height: 12, 
-                      borderRadius: '50%', 
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
                       bgcolor: CALENDAR_COLORS.HOLIDAY.BANK,
                       border: `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT}`,
-                    }} 
+                    }}
                   />
                   <Typography variant="caption" color="text.secondary">
                     Holiday
@@ -393,7 +439,7 @@ export default function VacationEditDialog({
               </Box>
             </Box>
           </Popover>
-          
+
           {error && (
             <Alert severity="error" sx={{ mt: 2 }}>
               {error}
@@ -404,9 +450,9 @@ export default function VacationEditDialog({
           <Button onClick={onClose} disabled={isSubmitting}>
             Cancel
           </Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
+          <Button
+            type="submit"
+            variant="contained"
             color="primary"
             disabled={isSubmitting || !watchStartDate || !watchEndDate}
           >

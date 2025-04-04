@@ -3,7 +3,9 @@
 ## Critical Issues to Address
 
 ### 1. Authentication & User Settings
+
 - **Verify Google OAuth Configuration**
+
   - [ ] Check if OAuth credentials are correctly set in `.env` file
   - [ ] Confirm callback URLs match between Google Cloud Console and NextAuth configuration
   - [ ] Test authentication flow in development environment before deployment
@@ -11,6 +13,7 @@
   - [ ] Add detailed logging to identify authentication failure points
 
 - **Database Connection**
+
   - [x] Verify PostgreSQL connection string in `.env` file
   - [x] Confirm database migrations have been properly applied
   - [ ] Test direct database connection using a database client
@@ -22,7 +25,9 @@
   - [x] Implement proper error handling for database operations
 
 ### 2. Integration Testing
+
 - **Component Integration**
+
   - Test the flow between authentication, user settings, booking, and holiday components
   - Ensure data properly passes between components
   - Verify state management across the application
@@ -36,7 +41,9 @@
     - Integrating holidays with vacation planning
 
 ### 3. Deployment Configuration
+
 - **Environment Variables**
+
   - Create a comprehensive `.env.example` file with all required variables
   - Document the purpose of each environment variable
   - Implement variable validation at application startup
@@ -48,6 +55,7 @@
   - Set up proper logging for production environment
 
 ### 4. Dashboard & Sidebar Completion
+
 - **Complete Missing Components**
   - [x] Implement remaining dashboard views and data visualization
   - [x] Complete sidebar functionality including mini-calendar
@@ -58,6 +66,7 @@
 ## Verification Checklist
 
 ### Authentication
+
 - [ ] User can successfully log in with Google
 - [ ] User data is correctly stored in database
 - [ ] User can log out and log back in
@@ -65,12 +74,14 @@
 - [x] Authentication errors are handled gracefully with user feedback
 
 ### User Preferences
+
 - [x] User can set vacation allowance
 - [x] User can select province
 - [x] Preferences are saved and loaded correctly
 - [x] UI reflects current user preferences
 
 ### Vacation Booking
+
 - [x] Create the vacation request page at `/dashboard/vacations`
 - [x] Date picker works correctly
 - [x] Cannot book on holidays or weekends (FIXED: validation now blocks booking on holidays)
@@ -81,6 +92,7 @@
 - [x] Create calendar view for visualizing vacations and holidays
 
 ### Request Page Issues
+
 - **Identified Bugs:**
   - [x] Start date can be after end date in some edge cases (FIXED)
   - [x] Holiday detection doesn't properly block booking on holidays (FIXED)
@@ -94,7 +106,9 @@
   - [x] **CRITICAL: Unnecessary "status" field (PENDING/APPROVED) when there's no HR approval process** (FIXED)
 
 ### Implementation Priorities
+
 1. **Implement Vacation Delete Functionality**
+
    - [x] Add DELETE endpoint to `/api/vacations/[id]` route
    - [x] Add delete buttons to vacation cards
    - [x] Add confirmation dialog before deletion
@@ -107,12 +121,14 @@
    - [x] Clearly document that this is a self-service tool without approval workflow
 
 ### Holiday Integration
+
 - [x] Holidays are fetched from API and cached
 - [x] UI distinguishes between bank holidays and provincial holidays
 - [x] Adjacent holidays and weekends are properly detected
 - [x] "Total Time Off" calculation includes holidays and weekends
 
 ### Dashboard & UI
+
 - [x] Dashboard displays all required information
 - [x] Sidebar contains mini-calendar and upcoming events
 - [x] UI is responsive across all device sizes
@@ -123,12 +139,14 @@
 ## Technical Debt & Documentation
 
 ### Code Quality
+
 - [x] ESLint and Prettier pass with no errors
 - [ ] Test coverage meets 80% minimum requirement
 - [x] No console warnings or errors in browser
 - [ ] Performance optimization completed
 
 ### Documentation
+
 - [x] README updated with accurate setup instructions
 - [x] API endpoints documented
 - [x] Database schema documented
@@ -140,30 +158,35 @@
 We've made several important updates to the vacation tracking application to address critical usability issues:
 
 1. **UI Styling & Responsiveness**
+
    - Added MUI styling to the settings page and vacation day page
    - Improved mobile responsiveness across all components
    - Fixed layout issues on smaller screens
    - Ensured consistent styling throughout the application
 
 2. **Vacation Booking & Calculation**
+
    - Fixed date handling to correctly display date ranges
    - Properly implemented holiday conflict logic to prevent booking on holidays
    - Enhanced calculation of business days to exclude weekends and holidays
    - Added clear visualization of total days vs. working days for each vacation
 
 3. **Vacation Management**
+
    - Added proper deletion functionality with confirmation dialogs
    - Implemented comprehensive error handling for all API operations
    - Enhanced success/error feedback with notification snackbars
    - Removed the unnecessary "Pending" status since this is a self-service tool
 
 4. **Vacation Day Accounting**
+
    - Fixed the calculation of vacation days to correctly account for holidays
    - Implemented separate counters for "total days off" and "working days used"
    - Fixed issues with incorrect day counts in the vacation stats
    - Ensured holiday days don't count against vacation allowance
 
 5. **User Experience Improvements (NEW)**
+
    - [x] Added ability to book vacations that overlap with holidays (with clear notification)
    - [x] Fixed "Invalid DateTime" displays throughout the application
    - [x] Simplified vacation creation UI to avoid confusion
@@ -185,11 +208,13 @@ These improvements have addressed all the major issues identified in our review,
 ## Timeline for Completion
 
 1. **Day 1-2: Fix Authentication Issues**
+
    - Resolve Google OAuth configuration
    - Test and verify user data persistence
    - Document authentication flow
 
 2. **Day 3-4: Complete Dashboard & Sidebar**
+
    - Agent Delta to complete remaining UI components
    - [x] Implement the vacation request page
    - [x] Create the calendar page at `/dashboard/calendar`
@@ -198,6 +223,7 @@ These improvements have addressed all the major issues identified in our review,
    - Implement responsive design across all components
 
 3. **Day 5-6: Integration Testing**
+
    - Develop and run end-to-end tests
    - Identify and fix integration bugs
    - Ensure all components work together seamlessly

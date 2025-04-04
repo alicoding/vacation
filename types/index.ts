@@ -16,9 +16,9 @@ export interface VacationBooking {
   note?: string | null;
   created_at: string | Date;
   userId: string;
-  startDate?: Date;  // For type compatibility with vacationTypes.ts
-  endDate?: Date;    // For type compatibility with vacationTypes.ts
-  createdAt?: Date;  // For type compatibility with vacationTypes.ts
+  startDate?: Date; // For type compatibility with vacationTypes.ts
+  endDate?: Date; // For type compatibility with vacationTypes.ts
+  createdAt?: Date; // For type compatibility with vacationTypes.ts
   is_half_day?: boolean;
   half_day_portion?: 'AM' | 'PM' | null;
 }

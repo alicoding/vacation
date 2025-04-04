@@ -6,23 +6,23 @@
  */
 
 // Type for vacation bookings from your schema
-export type VacationBooking = {
+export interface VacationBooking {
   id: string;
   startDate: Date;
   endDate: Date;
   note?: string;
   userId: string;
   // Add other fields as needed
-};
+}
 
 // Type for holidays from your schema
-export type Holiday = {
+export interface Holiday {
   id: string;
   date: Date;
   name: string;
   province: string | null;
   type: 'bank' | 'provincial';
-};
+}
 
 // Example function to fetch vacations
 export async function fetchVacations(): Promise<VacationBooking[]> {

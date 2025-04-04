@@ -11,6 +11,7 @@ To fix the `google_tokens` table:
 This approach avoids the "duplicate key" constraint errors in the schema_migrations table.
 
 Original migrations:
+
 - 20250328_add_token_type_to_google_tokens.sql
 - 20250328_fix_google_tokens_table.sql
 - 20250328_fix_missing_google_token_columns.sql
