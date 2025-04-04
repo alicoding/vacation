@@ -9,11 +9,18 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Impor
 import { cookies } from 'next/headers'; // Import cookies
 import type { Database } from '@/types/supabase'; // Ensure Database type is imported if not already
 
+// Define an interface for the route context, reflecting params as a Promise
+interface RouteContext {
+  params: Promise<{
+    id: string;
+  }>;
+}
+
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }, // Correct App Router signature
+  context: RouteContext, // Use the updated interface
 ) {
-  const { id } = params; // Standard access
+  const { id } = await context.params; // Await the promise before accessing id
   const cookieStore = await cookies(); // Use next/headers
 
   // Create Supabase client using the modern @supabase/ssr pattern with getAll/setAll
@@ -121,9 +128,9 @@ export async function DELETE(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }, // Revert to standard destructuring pattern
+  context: RouteContext, // Use the updated interface
 ) {
-  const { id } = params; // Standard access
+  const { id } = await context.params; // Await the promise before accessing id
   const cookieStore = await cookies(); // Use next/headers
 
   // Create Supabase client using the modern @supabase/ssr pattern with getAll/setAll
