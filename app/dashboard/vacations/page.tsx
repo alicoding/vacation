@@ -79,6 +79,8 @@ export default async function VacationsPage() {
     half_day_portion: v.half_day_portion === null ? undefined : v.half_day_portion,
     // Also handle google_event_id nullability
     google_event_id: v.google_event_id === null ? undefined : v.google_event_id,
+    is_half_day: v.is_half_day === null ? undefined : v.is_half_day,
+    created_at: v.created_at === null ? '' : v.created_at, // Handle null created_at
   }));
 
   // Removed unnecessary mapping, direct data should be compatible now
