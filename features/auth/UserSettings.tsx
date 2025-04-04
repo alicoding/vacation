@@ -1,14 +1,14 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react'; // Added useCallback
 import { useRouter } from 'next/navigation';
-import { 
-  Box, 
-  Typography, 
-  TextField, 
-  Button, 
-  FormControl, 
-  InputLabel, 
+import {
+  Box,
+  Typography,
+  TextField,
+  Button,
+  FormControl,
+  InputLabel,
   Select,
   MenuItem,
   FormHelperText,
@@ -18,9 +18,9 @@ import {
   Divider,
   Paper,
 } from '@mui/material';
-import { useSession } from '@/lib/auth-helpers.client';
-import type { Session, User } from '@/types/auth';
-import { createBrowserSupabaseClient } from '@/utils/supabase';
+// Removed useSession import
+import { useAuth } from '@/components/auth/AuthProvider'; // Import useAuth
+import type { User } from '@/types/auth'; // Keep User type
 import GoogleCalendarSync from '@/features/calendar/GoogleCalendarSync';
 
 // Define the extended user interface to match our custom fields
@@ -34,14 +34,6 @@ interface ExtendedUser extends User {
   calendar_sync_enabled?: boolean;
 }
 
-// Define the extended session interface that includes our custom user fields
-interface ExtendedSession extends Session {
-  user: ExtendedUser & {
-    name?: string | null;
-    email?: string | null;
-    image?: string | null;
-  };
-}
 
 const CANADIAN_PROVINCES = [
   { value: 'AB', label: 'Alberta' },
@@ -71,16 +63,11 @@ const WEEK_START_OPTIONS = [
 ];
 
 export default function UserSettings() {
-  const { data: sessionData, status: sessionStatus } = useSession();
-  // Cast the session to our extended type to access custom fields
-  const session = sessionData as ExtendedSession | null;
+  // Use the shared AuthContext - add refreshSession
+  const { user, isLoading: isAuthLoading, isAuthenticated, refreshSession } = useAuth();
   const router = useRouter();
-  
-  // Add debug logging to understand what's happening
-  console.log('UserSettings auth state:', { sessionData, sessionStatus });
-  
+
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
   const [dataLoaded, setDataLoaded] = useState(false);  // New state to track if data has been loaded
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -89,89 +76,79 @@ export default function UserSettings() {
   const [employmentType, setEmploymentType] = useState<string>('standard');
   const [weekStartsOn, setWeekStartsOn] = useState<string>('sunday');
   const [calendarSyncEnabled, setCalendarSyncEnabled] = useState<boolean>(false);
-  const [refreshKey, setRefreshKey] = useState<number>(0);
-  
+  const [refreshKey, setRefreshKey] = useState<number>(0); // Keep this for local data refresh if needed
+  const [isFetchingSettings, setIsFetchingSettings] = useState(true); // Local loading state for API fetch
+
   // Fetch user data including calendar sync settings
-  useEffect(() => {
-    async function fetchUserData() {
-      if (sessionStatus !== 'authenticated' || !session?.user?.id) {
-        setIsLoading(false);
-        return;
+  const fetchUserData = useCallback(async () => {
+    // Wait until auth is resolved and user is authenticated
+    if (isAuthLoading || !isAuthenticated || !user?.id) {
+      // If auth is done loading but user is not authenticated, stop fetching
+      if (!isAuthLoading && !isAuthenticated) {
+        setIsFetchingSettings(false);
       }
-      
-      // Only show loading state if data hasn't been loaded yet
-      if (!dataLoaded) {
-        setIsLoading(true);
-      }
-      
-      try {
-        const response = await fetch('/api/user');
-        
-        if (response.ok) {
-          const userData = await response.json();
-          console.log('Fetched user data:', userData);
-          
-          // Update state with fetched user data - don't use OR fallback to ensure 0 is respected
-          setVacationDays(userData.total_vacation_days !== undefined ? userData.total_vacation_days : 2);
-          setProvince(userData.province || 'ON');
-          setEmploymentType(userData.employment_type || 'standard');
-          setWeekStartsOn(userData.week_starts_on || 'sunday');
-          setCalendarSyncEnabled(!!userData.calendar_sync_enabled);
-          setDataLoaded(true);  // Mark data as loaded
-        } else {
-          console.error('Error fetching user data:', response.status, response.statusText);
-          // Fall back to session data if API fails
-          if (session?.user) {
-            // Don't use OR fallback to ensure 0 is respected
-            setVacationDays(session.user.total_vacation_days !== undefined ? session.user.total_vacation_days : 2);
-            setProvince(session.user.province || 'ON');
-            setEmploymentType(session.user.employment_type || 'standard');
-            setWeekStartsOn(session.user.week_starts_on || 'sunday');
-            setCalendarSyncEnabled(!!session.user.calendar_sync_enabled);
-            setDataLoaded(true);  // Mark data as loaded
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error);
-      } finally {
-        setIsLoading(false);
-      }
+      return;
     }
-    
+
+    // Only show loading state if data hasn't been loaded yet
+    if (!dataLoaded) {
+      setIsFetchingSettings(true);
+    }
+
+    try {
+      const response = await fetch('/api/user');
+
+      if (response.ok) {
+        const userData = await response.json();
+        // Update state with fetched user data - don't use OR fallback to ensure 0 is respected
+        setVacationDays(userData.total_vacation_days !== undefined ? userData.total_vacation_days : 2);
+        setProvince(userData.province || 'ON');
+        setEmploymentType(userData.employment_type || 'standard');
+        setWeekStartsOn(userData.week_starts_on || 'sunday');
+        setCalendarSyncEnabled(!!userData.calendar_sync_enabled);
+        setDataLoaded(true);  // Mark data as loaded
+      } else {
+        console.error('Error fetching user data:', response.status, response.statusText);
+        setErrorMessage(`Failed to load user settings (${response.status})`);
+        setDataLoaded(false); // Indicate data load failed
+      }
+    } catch (error) {
+      console.error('Error fetching user data:', error);
+      setErrorMessage('An error occurred while loading user settings.');
+      setDataLoaded(false); // Indicate data load failed
+    } finally {
+      setIsFetchingSettings(false);
+    }
+  }, [user?.id, isAuthenticated, isAuthLoading, dataLoaded]); // Dependencies updated
+
+  useEffect(() => {
     fetchUserData();
-  }, [session?.user?.id, sessionStatus, refreshKey]);
+  }, [fetchUserData, refreshKey]); // Use fetchUserData callback
 
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
     setSuccessMessage(null);
     setErrorMessage(null);
-    
+
+    // Ensure user is authenticated before saving
+    if (!isAuthenticated || !user?.id) {
+      setErrorMessage('You must be signed in to save settings.');
+      setIsSaving(false);
+      return;
+    }
+
     try {
-      // Create Supabase client for updating user metadata
-      const supabase = createBrowserSupabaseClient();
-      
-      // Update user metadata in Supabase
-      const { error } = await supabase.auth.updateUser({
-        data: {
-          total_vacation_days: vacationDays,
-          province,
-          employment_type: employmentType,
-          week_starts_on: weekStartsOn,
-          calendar_sync_enabled: calendarSyncEnabled,
-        },
-      });
-      
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      // Also update in our app's database if needed
+      // Create Supabase client - not needed for update anymore
+      // const supabase = createSupabaseClient();
+
+      // Call the backend API which handles both Supabase auth and DB updates
       const response = await fetch('/api/user/settings', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           total_vacation_days: vacationDays,
           province,
@@ -180,14 +157,29 @@ export default function UserSettings() {
           calendar_sync_enabled: calendarSyncEnabled,
         }),
       });
-      
+
       if (!response.ok) {
-        throw new Error('Failed to update settings in the database');
+        // Try to parse error message from backend
+        let errorMsg = `Failed to update settings (status: ${response.status})`;
+        try {
+          const errorData = await response.json();
+          if (errorData.error) {
+            errorMsg = errorData.error;
+          }
+        } catch (parseError) {
+          // Ignore if response body is not JSON or empty
+        }
+        throw new Error(errorMsg);
       }
-      
+
       setSuccessMessage('Settings updated successfully');
-      // Force a refresh of the component data by updating refreshKey instead of using router.refresh()
+
+      // Refresh the global auth context user data
+      await refreshSession();
+
+      // Optionally trigger local data refresh if still needed (e.g., for calendar sync status)
       setRefreshKey((prevKey) => prevKey + 1);
+
     } catch (error) {
       console.error('Error saving settings:', error);
       setErrorMessage(error instanceof Error ? error.message : 'Failed to update settings');
@@ -198,6 +190,9 @@ export default function UserSettings() {
 
   const handleToggleCalendarSync = (enabled: boolean) => {
     setCalendarSyncEnabled(enabled);
+    // Trigger a refetch of user data after the toggle action completes
+    // This ensures the local state aligns with the database state updated by GoogleCalendarSync's API call
+    setRefreshKey((prevKey) => prevKey + 1);
   };
 
   return (
@@ -205,8 +200,9 @@ export default function UserSettings() {
       <Typography variant="h6" gutterBottom>
         Your Settings
       </Typography>
-      
-      {(isLoading || vacationDays === null) ? (
+
+      {/* Use combined loading state */}
+      {(isAuthLoading || isFetchingSettings) ? (
         <Box display="flex" justifyContent="center" alignItems="center" py={4}>
           <CircularProgress />
         </Box>
@@ -220,13 +216,13 @@ export default function UserSettings() {
                 type="number"
                 fullWidth
                 inputProps={{ min: 0, max: 365 }}
-                value={vacationDays === null ? '' : vacationDays} 
+                value={vacationDays === null ? '' : vacationDays}
                 onChange={(e) => setVacationDays(parseInt(e.target.value, 10) || 0)}
                 margin="normal"
                 size="small"
               />
             </Box>
-            
+
             <Box sx={{ mb: 3 }}>
               <FormControl fullWidth margin="normal" size="small">
                 <InputLabel id="province-label">Province</InputLabel>
@@ -248,7 +244,7 @@ export default function UserSettings() {
                 </FormHelperText>
               </FormControl>
             </Box>
-            
+
             <Box sx={{ mb: 3 }}>
               <FormControl fullWidth margin="normal" size="small">
                 <InputLabel id="employment-type-label">Employment Type</InputLabel>
@@ -270,7 +266,7 @@ export default function UserSettings() {
                 </FormHelperText>
               </FormControl>
             </Box>
-            
+
             <Box sx={{ mb: 3 }}>
               <FormControl fullWidth margin="normal" size="small">
                 <InputLabel id="week-start-label">Week Starts On</InputLabel>
@@ -292,7 +288,7 @@ export default function UserSettings() {
                 </FormHelperText>
               </FormControl>
             </Box>
-            
+
             <Button
               type="submit"
               variant="contained"
@@ -303,7 +299,7 @@ export default function UserSettings() {
             >
               {isSaving ? (
                 <>
-                  <CircularProgress size={24} sx={{ mr: 1 }} /> 
+                  <CircularProgress size={24} sx={{ mr: 1 }} />
                   Saving...
                 </>
               ) : (
@@ -311,37 +307,37 @@ export default function UserSettings() {
               )}
             </Button>
           </form>
-          
+
           <Divider sx={{ my: 3 }} />
-          
+
           <Typography variant="h6" gutterBottom>
             Calendar Integration
           </Typography>
-          
+
           <Box mb={3}>
             <Paper elevation={1}>
-              <GoogleCalendarSync 
-                enabled={calendarSyncEnabled} 
-                onToggle={handleToggleCalendarSync} 
+              <GoogleCalendarSync
+                enabled={calendarSyncEnabled}
+                onToggle={handleToggleCalendarSync}
               />
             </Paper>
           </Box>
         </>
       )}
-      
-      <Snackbar 
-        open={!!successMessage} 
-        autoHideDuration={6000} 
+
+      <Snackbar
+        open={!!successMessage}
+        autoHideDuration={6000}
         onClose={() => setSuccessMessage(null)}
       >
         <Alert severity="success" onClose={() => setSuccessMessage(null)}>
           {successMessage}
         </Alert>
       </Snackbar>
-      
-      <Snackbar 
-        open={!!errorMessage} 
-        autoHideDuration={6000} 
+
+      <Snackbar
+        open={!!errorMessage}
+        autoHideDuration={6000}
         onClose={() => setErrorMessage(null)}
       >
         <Alert severity="error" onClose={() => setErrorMessage(null)}>

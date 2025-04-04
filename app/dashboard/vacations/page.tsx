@@ -6,8 +6,10 @@ import { Box, Container, Typography, Button } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
 import Link from 'next/link';
 import VacationList from '@/components/vacation/VacationList';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+// Removed cookies from next/headers
+// Removed createServerClient from @supabase/ssr
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
+import { VacationBookingDb } from '@/services/vacation/vacationTypes'; // Import the DB type
 
 export default async function VacationsPage() {
   // Middleware ensures we have a session, so we don't need the redirect check
@@ -27,35 +29,21 @@ export default async function VacationsPage() {
   }
   
   // Use the createServerClient approach that works in dashboard page
-  const cookieStore = await cookies();
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          // Fix: Need to await the cookie store
-          const cookie = cookieStore.get(name);
-          return cookie?.value;
-        },
-        set(name, value, options) {
-          cookieStore.set(name, value, options);
-        },
-        remove(name, options) {
-          cookieStore.set(name, '', { ...options, maxAge: 0 });
-        },
-      },
-    },
-  );
+  // Use the new utility function to create the Supabase client
+  const supabase = await createSupabaseServerClient(); // Await the async function
   
   console.log('Fetching vacations for user ID:', session.user.id);
   
   // Fetch vacations using the same approach as dashboard page
-  const { data: vacations, error } = await supabase
+  const { data, error } = await supabase
     .from('vacation_bookings')
     .select('*')
     .eq('user_id', session.user.id)
     .order('start_date', { ascending: false });
+  
+  // Explicitly type the fetched data using the shared DB type
+  // Type inference should now work correctly with the fixed Database type
+  const vacations = data || [];
   
   if (error) {
     console.error('Error fetching vacations:', error);
@@ -82,7 +70,18 @@ export default async function VacationsPage() {
     );
   }
   
-  console.log('Fetched vacations:', vacations?.length || 0);
+  console.log('Fetched vacations:', vacations.length);
+
+  // Prepare data for VacationList, ensuring 'note' is undefined if null
+  const vacationsForList = vacations.map(v => ({
+    ...v,
+    note: v.note === null ? undefined : v.note,
+    half_day_portion: v.half_day_portion === null ? undefined : v.half_day_portion,
+    // Also handle google_event_id nullability
+    google_event_id: v.google_event_id === null ? undefined : v.google_event_id,
+  }));
+
+  // Removed unnecessary mapping, direct data should be compatible now
   
   return (
     <Container maxWidth="lg">
@@ -102,7 +101,9 @@ export default async function VacationsPage() {
           </Button>
         </Box>
         
-        <VacationList vacations={vacations || []} />
+        {/* Pass the fetched data directly */}
+        {/* Pass the mapped data to the component */}
+        <VacationList vacations={vacationsForList} />
       </Box>
     </Container>
   );

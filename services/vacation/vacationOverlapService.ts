@@ -1,7 +1,7 @@
 'use server';
 import { DateTime } from 'luxon';
-import { cookies } from 'next/headers';
-import { createSupabaseServerClient } from '@/lib/supabase.server';
+// Remove unused cookies import
+import { createAuthedServerClient } from '@/lib/supabase.server'; // Import the correct helper
 import { VacationServiceError } from './vacationTypes';
 
 /**
@@ -14,8 +14,8 @@ export async function checkOverlappingBookings(
   excludeId?: string,
 ): Promise<boolean> {
   try {
-    // Create a server client with proper authentication
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     // Standardize date format for comparison (using start of day)
     const start = DateTime.fromJSDate(startDate).startOf('day');

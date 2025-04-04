@@ -18,6 +18,11 @@ export interface CalendarEvent {
     timeZone: string;
   };
   colorId?: string;
+  // Add extendedProperties to match Google API structure
+  extendedProperties?: {
+    private?: { [key: string]: string };
+    shared?: { [key: string]: string };
+  };
 }
 
 export interface VacationEventData {

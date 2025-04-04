@@ -1,4 +1,4 @@
-import { createDirectClient } from '../supabase';
+import { createServiceClient, createDirectClient } from '@/lib/supabase.shared'; // Import both clients
 import { TokenRefreshResponse, GoogleTokenData } from './types';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
@@ -8,7 +8,7 @@ import { DateTime } from 'luxon';
  * Gets the Google access token for a user, refreshing if necessary
  */
 export async function getGoogleToken(userId: string): Promise<string | null> {
-  const supabase = createDirectClient();
+  const supabase = createServiceClient(); // Use service client to bypass RLS for reading tokens
   
   try {
     const { data: tokenData, error } = await supabase
@@ -65,9 +65,10 @@ export async function getGoogleToken(userId: string): Promise<string | null> {
     const expiresAtStr = String(tokenData.expires_at);
     const expiresAt = DateTime.fromISO(expiresAtStr);
     const now = DateTime.now();
+    console.log(`[Token Manager] Checking token expiration: Now=${now.toISO()}, ExpiresAt=${expiresAt.toISO()}`);
     
     if (now > expiresAt) {
-      console.log(`Token expired at ${expiresAt.toISO()}, refreshing...`);
+      console.log(`[Token Manager] Token expired at ${expiresAt.toISO()}, attempting refresh via /api/auth/refresh-token...`);
       try {
         // Set a timeout for the fetch request to prevent hanging
         const controller = new AbortController();
@@ -88,22 +89,33 @@ export async function getGoogleToken(userId: string): Promise<string | null> {
         clearTimeout(timeoutId);
         
         if (!response.ok) {
+          const errorBody = await response.text(); // Read body for more details
+          console.error(`[Token Manager] Refresh API call failed: Status=${response.status}, Body=${errorBody}`);
           throw new Error(`Failed to refresh token: ${response.status} ${response.statusText}`);
         }
         
         const newTokenData = await response.json();
-        console.log('Token refreshed successfully');
-        return String(newTokenData.access_token);
-      } catch (refreshError) {
-        console.error('Error refreshing Google token:', refreshError);
-        if (refreshError instanceof Error && refreshError.name === 'AbortError') {
-          console.error('Token refresh timed out after 10 seconds');
+        console.log('[Token Manager] Refresh API call successful.');
+        // Ensure the response actually contains an access_token
+        if (newTokenData && newTokenData.access_token) {
+          console.log('[Token Manager] New access token received from refresh API.');
+          return String(newTokenData.access_token);
+        } else {
+          console.error('[Token Manager] Refresh API response did not contain access_token:', newTokenData);
+          throw new Error('Refresh API response missing access_token');
         }
+      } catch (refreshError) {
+        console.error('[Token Manager] Error during token refresh process:', refreshError);
+        if (refreshError instanceof Error && refreshError.name === 'AbortError') {
+          console.error('[Token Manager] Token refresh fetch timed out after 10 seconds');
+        }
+        // Explicitly return null after failed refresh attempt
+        console.log('[Token Manager] Returning null due to refresh failure.');
         return null;
       }
     }
     
-    console.log(`Token valid until ${expiresAt.toISO()}`);
+    console.log(`[Token Manager] Token is still valid until ${expiresAt.toISO()}. Returning existing access token.`);
     return String(tokenData.access_token);
   } catch (e) {
     console.error('Unexpected error in getGoogleToken:', e);
@@ -214,7 +226,7 @@ export async function saveTokensToSupabase(
 ): Promise<void> {
   try {
     // Use provided client or create one
-    const supabase = supabaseClient || createDirectClient();
+    const supabase = supabaseClient || createDirectClient(); // Use direct server client by default
     
     // Calculate when the token will expire as an ISO string using Luxon for timestamp compatibility
     const expiresAt = DateTime.now().plus({ seconds: tokens.expires_in }).toISO();

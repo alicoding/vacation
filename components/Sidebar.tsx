@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useSession } from '@/lib/auth-helpers.client';
+import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
 import { Box, Typography, List, ListItem, ListItemText, Divider, CircularProgress } from '@mui/material';
 import useHolidays from '@/lib/hooks/useHolidays';
 import { DateTime } from 'luxon';
@@ -18,12 +18,12 @@ const navigation = [
 
 export default function Sidebar() {
   const pathname = usePathname();
-  const { data: session, status } = useSession();
+  const { user, isLoading, isAuthenticated } = useAuth(); // Use values from useAuth
   const [upcomingHolidays, setUpcomingHolidays] = useState<any[]>([]);
   
   // Get current year for holiday fetching
   const currentYear = new Date().getFullYear();
-  const province = (session?.user as any)?.province || 'ON';
+  const province = user?.province || 'ON'; // Access province directly from user object
   
   // Use our useHolidays hook to fetch holidays
   const { 
@@ -57,7 +57,7 @@ export default function Sidebar() {
     }
   }, [allHolidays]);
   
-  if (!session) {
+  if (!isAuthenticated || !user) { // Check authentication status and user object
     return null;
   }
 
@@ -93,14 +93,14 @@ export default function Sidebar() {
         <div className="mt-2 flex justify-between">
           <span className="text-sm font-medium text-gray-500">Total Days:</span>
           <span className="text-sm font-semibold text-gray-900">
-            {(session.user as any).total_vacation_days || 0}
+            {user?.total_vacation_days ?? 0} {/* Access directly */}
           </span>
         </div>
         <div className="mt-1 flex justify-between">
           <span className="text-sm font-medium text-gray-500">Available:</span>
           <span className="text-sm font-semibold text-vacation-booked">
             {/* This will be calculated dynamically */}
-            {(session.user as any).total_vacation_days || 0} days
+            {user?.total_vacation_days ?? 0} days {/* Access directly */}
           </span>
         </div>
         <div className="mt-1 flex justify-between">

@@ -1,6 +1,6 @@
 'use server';
-import { cookies } from 'next/headers';
-import { createSupabaseServerClient } from '@/lib/supabase.server';
+// Remove unused cookies import
+import { createAuthedServerClient } from '@/lib/supabase.server'; // Import the correct helper
 import { VacationBooking, VacationServiceError } from './vacationTypes';
 import { calculateBusinessDays } from './vacationCalculationService';
 import { DateTime } from 'luxon';
@@ -36,8 +36,8 @@ function mapDbToVacationBooking(booking: any): VacationBooking | null {
  */
 export async function getVacationBookings(userId: string): Promise<VacationBooking[]> {
   try {
-    // Create a server client with proper authentication
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     const { data: dbBookings, error } = await supabaseServer
       .from('vacation_bookings')
@@ -53,7 +53,7 @@ export async function getVacationBookings(userId: string): Promise<VacationBooki
     // Using proper type guards and null checks as per project guidelines
     const bookings: VacationBooking[] = (dbBookings || [])
       .map(mapDbToVacationBooking)
-      .filter((booking): booking is VacationBooking => booking !== null);
+      .filter((booking: VacationBooking | null): booking is VacationBooking => booking !== null);
     
     return bookings;
   } catch (error) {
@@ -73,8 +73,8 @@ export async function getVacationDaysUsed(
   year: number,
 ): Promise<number> {
   try {
-    // Create a server client with proper authentication
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     // First try to get user from users table
     const { data: user, error: userError } = await supabaseServer
@@ -163,7 +163,8 @@ export async function getRemainingVacationDays(
   year: number,
 ): Promise<number> {
   try {
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     // Get user's total vacation allocation
     const { data: user, error: userError } = await supabaseServer

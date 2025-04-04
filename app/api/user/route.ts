@@ -1,43 +1,16 @@
 export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { createServerClient } from '@supabase/ssr';
+// Removed createServerClient from @supabase/ssr
 import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+// Removed cookies from next/headers
 import type { Database } from '@/types/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
 
 export async function GET(request: NextRequest) {
   try {
-    // Use createServerClient with cookies for proper auth in Edge runtime
-    const cookieStore = await cookies();
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
-            try {
-              // Ensure sameSite is a string value required by cookie API
-              if (options?.sameSite === true) options.sameSite = 'strict';
-              if (options?.sameSite === false) options.sameSite = 'lax';
-              
-              cookieStore.set(name, value, options);
-            } catch (e) {
-              console.warn('Error setting cookie:', e);
-            }
-          },
-          remove(name, options) {
-            try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
-            } catch (e) {
-              console.warn('Error removing cookie:', e);
-            }
-          },
-        },
-      },
-    );
+    // Use the new utility function to create the Supabase client
+    // This handles cookies correctly (getAll/setAll, path: '/')
+    const supabase = await createSupabaseServerClient(); // Await the async function
     
     // Get the authenticated user
     const { data: { user }, error: authError } = await supabase.auth.getUser();

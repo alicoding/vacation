@@ -1,7 +1,7 @@
 'use server';
-import { cookies } from 'next/headers';
+// Remove unused cookies import
 import { DateTime } from 'luxon';
-import { createSupabaseServerClient } from '@/lib/supabase.server';
+import { createAuthedServerClient } from '@/lib/supabase.server'; // Import the correct helper
 import { createServiceClient } from '@/lib/supabase.shared';
 import { VacationBooking, VacationServiceError, VacationBookingDb } from './vacationTypes';
 import { checkOverlappingBookings } from './vacationOverlapService';
@@ -19,8 +19,8 @@ export async function createVacationBooking(
   halfDayPortion?: string,
 ): Promise<VacationBooking> {
   try {
-    // Create a server client with proper authentication
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     // First check if the user exists in the users table
     const { data: existingUser, error: userError } = await supabaseServer
@@ -157,8 +157,8 @@ export async function updateVacationBooking(
   halfDayPortion?: string,
 ): Promise<VacationBooking> {
   try {
-    // Create a server client with proper authentication
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     // Check if calendar sync is enabled for this user
     const { data: userData } = await supabaseServer
@@ -282,8 +282,8 @@ export async function deleteVacationBooking(
   userId: string,
 ): Promise<void> {
   try {
-    // Create a server client with proper authentication
-    const supabaseServer = createSupabaseServerClient(cookies());
+    // Use the authenticated server client helper
+    const supabaseServer = await createAuthedServerClient();
     
     const { error } = await supabaseServer
       .from('vacation_bookings')

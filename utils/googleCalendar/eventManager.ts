@@ -1,5 +1,6 @@
 // filepath: /Users/ali/Documents/projects/vacation/utils/googleCalendar/eventManager.ts
 import { DateTime } from 'luxon';
+// Remove googleapis import: import { google } from 'googleapis';
 import { getGoogleToken } from './tokenManager';
 import { CalendarEvent, VacationEventData } from './types';
 
@@ -7,8 +8,8 @@ import { CalendarEvent, VacationEventData } from './types';
  * Creates a calendar event for a vacation
  */
 export async function createCalendarEvent(
-  userId: string, 
-  vacation: VacationEventData,
+  userId: string,
+  vacation: VacationEventData, // Includes vacation.id
 ): Promise<{ id: string } | null> {
   const token = await getGoogleToken(userId);
   
@@ -52,6 +53,10 @@ export async function createCalendarEvent(
       timeZone: 'UTC',
     },
     colorId: '5', // A nice vacation color
+    // Add extended property to link event back to our vacation ID
+    extendedProperties: {
+      private: { vacationId: vacation.id },
+    },
   };
   
   try {
@@ -85,7 +90,7 @@ export async function createCalendarEvent(
 export async function updateCalendarEvent(
   userId: string,
   googleEventId: string,
-  vacation: Omit<VacationEventData, 'id' | 'google_event_id'>,
+  vacation: VacationEventData, // Change to full VacationEventData to access vacation.id
 ): Promise<{ id: string } | null> {
   const token = await getGoogleToken(userId);
   
@@ -128,6 +133,10 @@ export async function updateCalendarEvent(
       timeZone: 'UTC',
     },
     colorId: '5', // A nice vacation color
+    // Ensure extended property is maintained during update
+    extendedProperties: {
+      private: { vacationId: vacation.id },
+    },
   };
   
   try {
@@ -190,5 +199,62 @@ export async function deleteCalendarEvent(userId: string, googleEventId: string)
   } catch (error) {
     console.error('Failed to delete calendar event:', error);
     throw error;
+  }
+}
+
+/*
+ * Finds a Google Calendar event associated with a specific vacation ID
+ * using extended properties.
+ * @returns The Google Calendar event ID if found, otherwise null.
+ */
+export async function findCalendarEventByVacationId(
+  userId: string,
+  vacationId: string,
+): Promise<string | null> {
+  const token = await getGoogleToken(userId);
+  if (!token) {
+    console.error(`[findCalendarEventByVacationId] No valid Google token for user ${userId}`);
+    // Decide if throwing or returning null is better. Returning null might be safer.
+    return null;
+  }
+
+  // Construct the API URL for listing events with the private extended property filter
+  const encodedVacationId = encodeURIComponent(vacationId);
+  const searchParams = new URLSearchParams({
+    privateExtendedProperty: `vacationId=${encodedVacationId}`,
+    maxResults: '1',
+    fields: 'items(id)', // Only fetch the event ID
+  });
+  const apiUrl = `https://www.googleapis.com/calendar/v3/calendars/primary/events?${searchParams.toString()}`;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Google Calendar API error: ${response.status} ${response.statusText}`);
+    }
+
+    const data = await response.json();
+
+    if (data.items && data.items.length > 0 && data.items[0].id) {
+      console.log(`[findCalendarEventByVacationId] Found existing event for vacation ${vacationId}: ${data.items[0].id}`);
+      return data.items[0].id;
+    } else {
+      console.log(`[findCalendarEventByVacationId] No existing event found for vacation ${vacationId}`);
+      return null;
+    }
+  } catch (error: any) {
+    console.error(
+      `[findCalendarEventByVacationId] Error searching for event for vacation ${vacationId}:`,
+      error.message || error,
+    );
+    // Depending on the error, might want to throw or return null
+    return null; // Return null on error to avoid blocking sync
   }
 }

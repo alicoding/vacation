@@ -1,312 +1,263 @@
 'use client';
 
-import { createSupabaseClient } from '@/lib/supabase.client';
-import { Session, User } from '@supabase/supabase-js';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react'; // Import useMemo
 import { useRouter } from 'next/navigation';
-import { createContext, useContext, useEffect, useState, useRef, useCallback } from 'react';
-import type { Database } from '@/types/supabase';
+import { createSupabaseClient } from '@/lib/supabase.client';
+import { getRequiredEnvVar } from '@/lib/supabase.shared'; // Import helper
+import type { Session as SupabaseSession } from '@supabase/supabase-js'; // Import SupabaseSession
+import type { User as CustomUser } from '@/types/auth'; // Rename imported User to avoid conflict
+import type { User as SupabaseUser } from '@supabase/supabase-js'; // Import SupabaseUser explicitly
 
-export type AuthContextType = {
-  user: User | null;
-  session: Session | null;
+// Auth timeout in milliseconds (10 seconds)
+const AUTH_DETECTION_TIMEOUT = 10000;
+
+interface AuthContextType {
+  session: SupabaseSession | null; // Use SupabaseSession type
+  user: CustomUser | null; // Use the renamed CustomUser type
   isLoading: boolean;
   isAuthenticated: boolean;
   signInWithGoogle: (callbackUrl?: string) => Promise<void>;
-  signOut: () => Promise<void>;
+  signOut: (callbackUrl?: string) => Promise<void>;
+  refreshSession: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+// Create a context with a default value
+const AuthContext = createContext<AuthContextType>({
+  session: null, // Default remains null
+  user: null, // Default remains null
+  isLoading: true,
+  isAuthenticated: false,
+  signInWithGoogle: async () => { throw new Error('Not implemented'); },
+  signOut: async () => { throw new Error('Not implemented'); },
+  refreshSession: async () => { throw new Error('Not implemented'); },
+});
 
-// Maintain a global reference to the auth context for non-React access
-let globalAuthContext: AuthContextType | null = null;
-
-/**
- * Get the auth instance outside of React components
- * Used by auth-helpers.ts for backward compatibility
- */
-export function getAuthInstance(): AuthContextType {
-  if (!globalAuthContext) {
-    throw new Error('Auth context not initialized. Make sure AuthProvider is rendered.');
-  }
-  return globalAuthContext;
-}
-
-interface AuthProviderProps {
-  children: React.ReactNode;
-  supabaseUrl?: string;
-  supabaseAnonKey?: string;
-}
-
-export function AuthProvider({ 
-  children, 
-  supabaseUrl,
-  supabaseAnonKey,
-}: AuthProviderProps) {
-  // Use createSupabaseClient which now implements singleton pattern
-  // This prevents multiple GoTrueClient instances
+// Create a provider component
+export function AuthProvider({ children }: { children: ReactNode }) {
   const [supabase] = useState(() => createSupabaseClient());
-  
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
+  const [user, setUser] = useState<CustomUser | null>(null); // Use CustomUser type for state
+  const [session, setSession] = useState<SupabaseSession | null>(null); // Use SupabaseSession type for state
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const router = useRouter();
-  const refreshing = useRef(false);
-  const lastAuthEvent = useRef<string | null>(null);
-  const lastAuthTime = useRef<number>(0);
-  const authInitialized = useRef(false);
-  
-  // Initialize auth state using getUser first, then getSession
+
+  // Initialize auth state
+  // Helper function to convert SupabaseUser to CustomUser
+  const convertUser = (supabaseUser: SupabaseUser | null): CustomUser | null => {
+    if (!supabaseUser) return null;
+    return {
+      id: supabaseUser.id,
+      name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || null,
+      email: supabaseUser.email || null,
+      image: supabaseUser.user_metadata?.avatar_url || null,
+      total_vacation_days: supabaseUser.user_metadata?.total_vacation_days, // Keep undefined if not set
+      province: supabaseUser.user_metadata?.province,
+      employment_type: supabaseUser.user_metadata?.employment_type,
+      week_starts_on: supabaseUser.user_metadata?.week_starts_on,
+    };
+  };
+
   const initializeAuth = useCallback(async () => {
-    if (authInitialized.current) return;
-    
     try {
-      setIsLoading(true);
-      console.log('Initializing auth state'); // Debugging
-      
-      // First check if we have a server-provided session
-      const serverSession = (window as any).__INITIAL_AUTH_SESSION__;
-      if (serverSession?.user) {
-        console.log('Found server-provided session for:', serverSession.user.email);
-      }
-      
-      // Get session first - this is safer for client components
-      const { data: { session: sessionData }, error: sessionError } = await supabase.auth.getSession();
-      
-      if (!sessionError && sessionData?.user) {
-        // We have a session with user, set auth state
-        console.log('Session found with user:', sessionData.user.email);
-        setUser(sessionData.user);
-        setSession(sessionData);
-        setIsAuthenticated(true);
-        
-        // Still verify with getUser for security, but don't block UI
-        try {
-          const { data: { user: verifiedUser } } = await supabase.auth.getUser();
-          if (verifiedUser) {
-            // Update with verified user data
-            console.log('User verified with getUser:', verifiedUser.email);
-            setUser(verifiedUser);
-          }
-        } catch (verifyError) {
-          console.warn('Non-blocking verification error:', verifyError);
-          // Continue with session user data
-        }
-      } else if (serverSession?.user) {
-        // Fallback to server-provided session
-        console.log('Using server session as fallback for:', serverSession.user.email);
-        setUser(serverSession.user);
-        setSession(serverSession);
-        setIsAuthenticated(true);
-      } else {
-        console.log('No authenticated user found');
-        setUser(null);
-        setSession(null);
-        setIsAuthenticated(false);
-      }
-      
-      authInitialized.current = true;
-    } catch (error) {
-      console.error('Error initializing auth state:', error);
-      // Don't reset state if we already have a user (helps prevent flickering)
-      if (!user) {
-        setUser(null);
-        setSession(null);
-        setIsAuthenticated(false);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [supabase, user]);
-  
-  useEffect(() => {
-    // Initialize auth state on mount
-    initializeAuth();
-    
-    // Set up auth state change listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, newSession) => {
-        const now = Date.now();
-        
-        // Prevent handling duplicate events (Supabase sometimes sends multiple events)
-        if (
-          lastAuthEvent.current === event && 
-          lastAuthTime.current > 0 && 
-          now - lastAuthTime.current < 2000
-        ) {
-          console.log('Ignoring duplicate auth event:', event);
-          return;
-        }
-        
-        // Update the last event tracking
-        lastAuthEvent.current = event;
-        lastAuthTime.current = now;
-        
-        console.log('Auth state changed:', event, newSession?.user?.email || 'No user');
-        
-        if (event === 'SIGNED_OUT') {
-          // Handle sign out specifically
-          setUser(null);
+      // Start auth detection timeout
+      const timeoutId = setTimeout(() => {
+        // Only force state resolution if still loading after timeout
+        if (isLoading) {
+          console.warn('Auth detection timeout reached while still loading - forcing state resolution to unauthenticated.');
+          setUser(null); // Ensure user is null if timeout forces state
           setSession(null);
           setIsAuthenticated(false);
           setIsLoading(false);
-        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'USER_UPDATED') {
-          // For significant auth events with a session, verify the user first
-          try {
-            setIsLoading(true);
-            
-            // Always verify the user with getUser() first for security
-            const { data: { user: verifiedUser }, error: userError } = await supabase.auth.getUser();
-            
-            if (!userError && verifiedUser) {
-              // Get session for access tokens after verifying user
-              const { data: { session: verifiedSession } } = await supabase.auth.getSession();
-              
-              setUser(verifiedUser);
-              setSession(verifiedSession || newSession);
-              setIsAuthenticated(true);
-              console.log('Auth event verified user:', verifiedUser.email);
-            } else if (newSession?.user) {
-              // Fall back to session from event only if verification fails
-              console.warn('Using unverified session user as fallback');
-              setUser(newSession.user);
-              setSession(newSession);
-              setIsAuthenticated(true);
-            } else {
-              console.warn('Auth event had no verifiable user');
-              // Only reset if we don't already have a user
-              if (!user) {
-                setUser(null);
-                setSession(null);
-                setIsAuthenticated(false);
-              }
-            }
-          } catch (error) {
-            console.error('Error handling auth state change:', error);
-            // Don't reset user state on error if we already have data
-            if (!user && !session) {
-              setUser(null);
-              setSession(null);
-              setIsAuthenticated(false);
-            }
-          } finally {
-            setIsLoading(false);
-          }
-        } else if (newSession?.user) {
-          // For any other event with a user, verify the user first
-          try {
-            // Always verify user credentials securely
-            const { data: { user: verifiedUser } } = await supabase.auth.getUser();
-            if (verifiedUser) {
-              setUser(verifiedUser);
-              setSession(newSession);
-              setIsAuthenticated(true);
-            } else {
-              // Use session user as fallback
-              setUser(newSession.user);
-              setSession(newSession);
-              setIsAuthenticated(true);
-            }
-          } catch (error) {
-            console.error('Error verifying user for event:', event, error);
-            // Still use the session user as a fallback
-            setUser(newSession.user);
+        } else {
+          console.log('[AuthProvider] Timeout reached, but loading already finished. No state change forced.');
+        }
+      }, AUTH_DETECTION_TIMEOUT);
+
+      // First check for user - this is more secure for authentication verification
+      console.log('[AuthProvider] Calling supabase.auth.getUser()...');
+      // console.log('[AuthProvider] Current document.cookie:', document.cookie); // Removed debug log
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      // console.log('[AuthProvider] getUser returned:', { user: userData?.user, userError }); // Removed debug log
+      // console.log('[AuthProvider] getUser result:', { user: userData?.user, userError }); // Removed debug log
+
+      if (userError) {
+        console.error('Error checking authentication:', userError);
+        setUser(null);
+        setSession(null);
+        setIsAuthenticated(false);
+        clearTimeout(timeoutId); // Restore timeout clearing
+        setIsLoading(false);
+        return;
+      }
+      
+      if (userData.user) {
+        setUser(convertUser(userData.user)); // Convert before setting state
+        setIsAuthenticated(true);
+        
+        // Optionally get session for token info if needed
+        const { data, error } = await supabase.auth.getSession();
+        // console.log('[AuthProvider] getSession result:', { session: data?.session, error }); // Removed debug log
+        if (error) {
+          console.error('Error getting session:', error);
+        } else if (data.session) {
+          setSession(data.session);
+        }
+      } else {
+        setUser(null); // Set to null if no user data
+        setSession(null);
+        setIsAuthenticated(false);
+      }
+
+      // Clear timeout as we've resolved auth state
+      // console.log('[AuthProvider] Resolved auth state before timeout:', { isAuthenticated: !!userData?.user, user: userData?.user }); // Removed debug log
+      clearTimeout(timeoutId); // Restore timeout clearing
+      setIsLoading(false);
+    } catch (error) {
+      console.error('Unhandled error in auth initialization:', error);
+      setUser(null); // Set to null on error
+      setSession(null);
+      setIsAuthenticated(false);
+      // Ensure loading is false even on error, clear timeout if it exists
+      // clearTimeout(timeoutId); // Timeout should be cleared within try if successful, or here if error
+      setIsLoading(false);
+    }
+    // No finally block needed as isLoading is set in try/catch
+  }, [supabase]);
+
+  const refreshSession = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      await initializeAuth();
+    } catch (error) {
+      console.error('Error refreshing session:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [initializeAuth]);
+
+  // Set up auth state listener
+  useEffect(() => {
+    // Initialize auth state
+    initializeAuth();
+
+    // Set up auth listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, newSession) => {
+        // console.log('Auth state change:', event, !!newSession); // Can keep this if desired, or remove
+        
+        if (['SIGNED_OUT', 'USER_DELETED'].includes(event)) {
+          setUser(null);
+          setSession(null);
+          setIsAuthenticated(false);
+        // Handle SIGNED_IN slightly differently to avoid race condition with initializeAuth
+        } else if (event === 'SIGNED_IN' && newSession) {
+            // console.log('[AuthProvider] onAuthStateChange: SIGNED_IN event detected. Assuming initializeAuth will handle user fetch.'); // Removed debug log
+            // We might still want to set the session object from the event
             setSession(newSession);
-            setIsAuthenticated(true);
-          }
+            // Don't call getUser here, let initializeAuth handle it to avoid race condition.
+            // We also don't set isAuthenticated or user here, trusting initializeAuth.
+            // We might need to reconsider setting isLoading false here, maybe only initializeAuth should do it?
+            // For now, let's keep it, but be aware.
+            // setIsLoading(false); // Let initializeAuth handle final isLoading state? Let's keep for now.
+
+        // Handle other events that require fetching/updating user data
+        } else if (['TOKEN_REFRESHED', 'USER_UPDATED'].includes(event) && newSession) {
+            // console.log(`[AuthProvider] onAuthStateChange: ${event} event. Calling getUser...`); // Removed debug log
+            // Get full user data
+            const { data: userData, error: userError } = await supabase.auth.getUser(); // Capture error too
+            // console.log(`[AuthProvider] onAuthStateChange (${event}) -> getUser result:`, { user: userData?.user, userError }); // Removed debug log
+            if (userError) {
+              console.error(`[AuthProvider] onAuthStateChange (${event}): Error calling getUser:`, userError);
+              // If getUser fails after refresh/update, maybe sign out? Or just log?
+              // Let's just log for now, maybe the session is still valid enough.
+            } else if (userData.user) {
+              // console.log(`[AuthProvider] onAuthStateChange (${event}): Successfully got user data. Updating state.`); // Removed debug log
+              setUser(convertUser(userData.user)); // Update user state
+              setSession(newSession); // Update session state
+              setIsAuthenticated(true); // Ensure authenticated
+            } else {
+               // console.warn(`[AuthProvider] onAuthStateChange (${event}): getUser returned no user data.`); // Removed debug log
+               // Should we sign out here? If user is gone after update/refresh?
+               setUser(null);
+               setSession(null);
+               setIsAuthenticated(false);
+            }
         }
         
-        // Only refresh the router for significant auth state changes
-        // that require UI updates
-        if (
-          ['SIGNED_IN', 'SIGNED_OUT', 'USER_UPDATED', 'TOKEN_REFRESHED'].includes(event) && 
-          !refreshing.current
-        ) {
-          refreshing.current = true;
-          setTimeout(() => {
-            try {
-              // Only refresh the router for actual auth state changes
-              router.refresh();
-            } catch (error) {
-              console.warn('Error refreshing router:', error);
-            } finally {
-              // Reset after a longer delay to prevent cascading refreshes
-              setTimeout(() => {
-                refreshing.current = false;
-              }, 2000);
-            }
-          }, 100);
-        }
-      },
+        // Ensure loading is set to false after handling the event
+        // Avoid setting loading false if initial check is still running? Maybe not necessary.
+        setIsLoading(false);
+      }
     );
 
+    // Clean up subscription
     return () => {
       subscription.unsubscribe();
     };
-  }, [supabase, router, initializeAuth]);
+  }, [supabase, initializeAuth]); // Restore dependencies
 
-  const signInWithGoogle = async (callbackUrl?: string) => {
+  // Sign in with Google
+  const signInWithGoogle = useCallback(async (callbackUrl = '/dashboard') => {
     try {
-      // Get the current origin for more flexible redirect URLs
-      const origin = typeof window !== 'undefined' ? window.location.origin : '';
-      const redirectUrl = `${origin}/auth/callback${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ''}`;
-      
-      console.log('Signing in with Google, redirect URL:', redirectUrl);
-      
-      await supabase.auth.signInWithOAuth({
+      const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          scopes: 'email profile https://www.googleapis.com/auth/calendar',
-          redirectTo: redirectUrl,
+          redirectTo: `${getRequiredEnvVar('NEXT_PUBLIC_SITE_URL')}/auth/callback?callbackUrl=${callbackUrl}`, // Use env var
         },
       });
+      
+      if (error) {
+        throw error;
+      }
     } catch (error) {
-      console.error('Error during Google sign in:', error);
-      // Fallback to basic redirect if the OAuth flow fails
-      window.location.href = '/auth/signin';
+      console.error('Error signing in with Google:', error);
+      throw error;
     }
-  };
+  }, [supabase]);
 
-  const signOut = async () => {
+  // Sign out
+  const signOut = useCallback(async (callbackUrl = '/') => {
     try {
-      await supabase.auth.signOut();
-      // Force a hard navigation to clear any stale state
-      window.location.href = '/';
+      setIsLoading(true);
+      const { error } = await supabase.auth.signOut();
+      
+      if (error) {
+        throw error;
+      }
+      
+      // Reset auth state
+      setUser(null); // Reset on sign out
+      setSession(null);
+      setIsAuthenticated(false);
+      
+      // Redirect after signout
+      router.push(callbackUrl);
     } catch (error) {
       console.error('Error signing out:', error);
-      router.push('/');
+      throw error;
+    } finally {
+      setIsLoading(false);
     }
-  };
+  }, [supabase, router]);
 
-  const value = {
-    user,
+  // Memoize the context value to prevent unnecessary re-renders in consumers
+  const contextValue = useMemo(() => ({
     session,
+    user,
     isLoading,
     isAuthenticated,
     signInWithGoogle,
     signOut,
-  };
-  
-  // Update the global context reference whenever the value changes
-  // This allows non-React code to access the current auth state
-  useEffect(() => {
-    globalAuthContext = value;
-    return () => {
-      // Clear the global reference when the component unmounts
-      // This prevents stale references
-      if (globalAuthContext === value) {
-        globalAuthContext = null;
-      }
-    };
-  }, [value]);
+    refreshSession,
+  }), [session, user, isLoading, isAuthenticated, signInWithGoogle, signOut, refreshSession]);
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  // Provide auth context
+  return (
+    <AuthContext.Provider value={contextValue}>
+      {children}
+    </AuthContext.Provider>
+  );
 }
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
-  }
-  return context;
-};
+// Custom hook to use the auth context
+export const useAuth = () => useContext(AuthContext);

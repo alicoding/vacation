@@ -114,9 +114,9 @@ export function HalfDaySettings({
                 {workingDays.map((day, index) => {
                   const dateKey = day.toISODate() || '';
                   const settings = halfDayDates[dateKey] || { isHalfDay: false, portion: 'AM' };
-                  
+                  const marginBottom = index < workingDays.length - 1 ? 2 : 0;
                   return (
-                    <Box key={dateKey} sx={{ mb: index < workingDays.length - 1 ? 2 : 0 }}>
+                    <Box key={dateKey} sx={{ mb: marginBottom }}>
                       <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
                         <FormControlLabel
                           control={

@@ -1,9 +1,11 @@
 'use server';
 
 import { DateTime } from 'luxon';
-import { createSupabaseServerClient } from '@/lib/supabase.server';
+// Import the new helper, remove the old one if not needed
+import { createAuthedServerClient } from '@/lib/supabase.server';
 import { createServiceClient } from '@/lib/supabase.shared';
-import { cookies } from 'next/headers';
+// Remove cookies import
+// import { cookies } from 'next/headers';
 
 export interface HolidayInfo {
   isHoliday: boolean;
@@ -172,9 +174,8 @@ export async function isHoliday(
   province: string,
 ): Promise<{ isHoliday: boolean; name: string | null }> {
   try {
-    // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createSupabaseServerClient(cookieStore);
+    // Use the new helper
+    const supabaseServer = await createAuthedServerClient();
     
     const dateStr = DateTime.fromJSDate(date).toISODate();
     
@@ -222,9 +223,8 @@ export async function getHolidaysInRange(
   province: string,
 ): Promise<Holiday[]> {
   try {
-    // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createSupabaseServerClient(cookieStore);
+    // Use the new helper
+    const supabaseServer = await createAuthedServerClient();
     
     const startDateStr = DateTime.fromJSDate(startDate).toISODate();
     const endDateStr = DateTime.fromJSDate(endDate).toISODate();
@@ -256,9 +256,8 @@ export async function getHolidaysByYear(
   province: string,
 ): Promise<Holiday[]> {
   try {
-    // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createSupabaseServerClient(cookieStore);
+    // Use the new helper
+    const supabaseServer = await createAuthedServerClient();
     
     const startDate = DateTime.local(year, 1, 1).toISODate();
     const endDate = DateTime.local(year, 12, 31).toISODate();
@@ -291,9 +290,8 @@ export async function importHolidays(
   province: string,
 ): Promise<void> {
   try {
-    // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createSupabaseServerClient(cookieStore);
+    // Use the new helper
+    const supabaseServer = await createAuthedServerClient();
     
     // First, delete existing holidays for this year and province
     const startDate = DateTime.local(year, 1, 1).toISODate();
@@ -384,9 +382,8 @@ export async function holidayExists(
   province: string | null,
 ): Promise<boolean> {
   try {
-    // Create a server client with proper authentication
-    const cookieStore = cookies();
-    const supabaseServer = createSupabaseServerClient(cookieStore);
+    // Use the new helper
+    const supabaseServer = await createAuthedServerClient();
     
     const dateStr = DateTime.fromJSDate(date).toISODate();
     

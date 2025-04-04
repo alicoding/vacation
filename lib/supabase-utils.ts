@@ -4,11 +4,14 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 import camelcaseKeys from 'camelcase-keys';
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { cookies } from 'next/headers'; // Add back cookies import
+// No longer importing cookies here, it will be passed in
 
 type SupabaseClientType = SupabaseClient<Database>;
 // Define valid table names type from the Database type
 type TableNames = keyof Database['public']['Tables'];
-
+// Remove incorrect RequestCookies import
 /**
  * Helper to handle Prisma-like findFirst operations with Supabase
  */
@@ -172,4 +175,44 @@ export async function remove<T = unknown>(
   }
   
   return camelcaseKeys(result, { deep: true }) as T;
+}
+
+/**
+ * Creates a Supabase client for Server Components (Pages Router, Route Handlers).
+ * Ensures cookies are handled correctly with `getAll`/`setAll` and `path: '/'`.
+ * NOTE: This function must be called within an async context.
+ */
+export async function createSupabaseServerClient() { // Make async, remove parameter
+  const cookieStore = await cookies(); // Await the call
+
+  return createServerClient<Database>(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          // Use the awaited cookieStore
+          return cookieStore.getAll();
+        },
+        // Define the type for cookiesToSet based on Supabase/Next.js types
+        setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              // Ensure path is always set
+              const cookieOptions = { ...options, path: '/' };
+              // Handle sameSite boolean conversion if necessary
+              if (cookieOptions.sameSite === true) cookieOptions.sameSite = 'strict';
+              if (cookieOptions.sameSite === false) cookieOptions.sameSite = 'lax';
+              // Use the awaited cookieStore's set method
+              cookieStore.set(name, value, cookieOptions);
+            });
+          } catch (error) {
+            // The `setAll` method may fail in Server Components.
+            // This can be ignored if you have middleware refreshing sessions.
+            console.warn('Error setting cookies via Supabase server client:', error);
+          }
+        },
+      },
+    }
+  );
 }

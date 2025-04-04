@@ -21,7 +21,8 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 - [x] Look for `supabase.auth.getSession()` or `onAuthStateChange()` in client
 
 ### Fix:
-- [x] Move to cookie-based auth only with window.__INITIAL_AUTH_SESSION__ for hydration
+- [x] Move to cookie-based auth only
+- [x] Removed server-injected window.__INITIAL_AUTH_SESSION__ hydration pattern
 
 ## 3. Add a Central getSupabaseClient() Utility ✅
 
@@ -69,8 +70,8 @@ This document tracks our progress in auditing and cleaning up Supabase authentic
 ## Components Reviewed & Fixed
 
 - [x] EnvironmentProvider.tsx - Already uses a secure approach with window.__ENV__
-- [x] AuthProvider.tsx - Updated to use centralized createSupabaseClient()
-- [x] InitialAuthHydration.tsx - Updated to use createSupabaseServerClient()
+- [x] AuthProvider.tsx - Updated to use centralized createSupabaseClient() and removed window.__INITIAL_AUTH_SESSION__
+- [x] InitialAuthHydration.tsx - Deleted, no longer needed
 - [x] middleware.ts - Updated to use createSupabaseMiddlewareClient()
 - [x] services/vacation/vacationQueryService.ts - Updated to use createSupabaseServerClient()
 - [x] services/vacation/vacationBookingService.ts - Updated to use createSupabaseServerClient() and createServiceClient()

@@ -2,45 +2,17 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthorizationUrl } from '@/utils/googleCalendar/tokenManager';
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+// Removed createServerClient from @supabase/ssr
+// Removed cookies from next/headers
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
 
 /**
  * Authorize Google Calendar access by redirecting to Google's authorization page
  */
 export async function GET(request: NextRequest) {
   try {
-    // Use cookies() with await as per Next.js 15 recommended pattern - same as main auth callback
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
-            try {
-              // Ensure sameSite is a string value required by cookie API
-              if (options?.sameSite === true) options.sameSite = 'strict';
-              if (options?.sameSite === false) options.sameSite = 'lax';
-              
-              cookieStore.set(name, value, options);
-            } catch (e) {
-              console.warn('Error setting cookie:', e);
-            }
-          },
-          remove(name, options) {
-            try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
-            } catch (e) {
-              console.warn('Error removing cookie:', e);
-            }
-          },
-        },
-      },
-    );
+    // Use the new utility function to create the Supabase client
+    const supabase = await createSupabaseServerClient(); // Await the async function
     
     // Get the authenticated user using the same pattern as main auth callback
     const { data: { user }, error: authError } = await supabase.auth.getUser();

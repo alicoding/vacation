@@ -1,4 +1,4 @@
-import { createDirectClient } from '@/utils/supabase';
+import { createDirectClient } from '@/lib/supabase.server';
 import { NextResponse, type NextRequest } from 'next/server';
 import { DateTime } from 'luxon';
 

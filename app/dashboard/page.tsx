@@ -12,7 +12,8 @@ import { getVacationDaysUsed } from '@/services/vacation/vacationService';
 import { getServerSession } from '@/lib/auth-helpers.server';
 import type { Database } from '@/types/supabase';
 import { DateTime } from 'luxon';
-import { createServerClient } from '@supabase/ssr';
+// Removed createServerClient from @supabase/ssr
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
 
 interface UserData {
   name: string | null;
@@ -22,56 +23,13 @@ interface UserData {
   vacationBookings: VacationBooking[];
 }
 
-// Centralized function to handle cookie-based server client creation
-// This avoids multiple implementations of cookie handling logic
-async function getEdgeCompatibleServerClient<T = any>() {
-  // Using dynamic import with an IIFE pattern for better edge compatibility
-  const cookieStore = await (async () => {
-    try {
-      const { cookies } = await import('next/headers');
-      return cookies();
-    } catch (e) {
-      console.error('Error importing cookies:', e);
-      throw new Error('Failed to initialize cookies for edge compatibility');
-    }
-  })();
-  
-  return createServerClient<T>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name) {
-          try {
-            return cookieStore.get(name)?.value;
-          } catch (e) {
-            console.warn('Error getting cookie in dashboard page:', e);
-            return undefined;
-          }
-        },
-        set(name, value, options) {
-          try {
-            cookieStore.set(name, value, options);
-          } catch (e) {
-            console.warn('Error setting cookie in dashboard page:', e);
-          }
-        },
-        remove(name, options) {
-          try {
-            cookieStore.set(name, '', { ...options, maxAge: 0 });
-          } catch (e) {
-            console.warn('Error removing cookie in dashboard page:', e);
-          }
-        },
-      },
-    },
-  );
-}
+// Removed internal getEdgeCompatibleServerClient function
+// Will use the shared createSupabaseServerClient utility instead
 
 async function getUserData(userId: string): Promise<UserData | null> {
   try {
     // Use the centralized function for edge-compatible Supabase client
-    const supabase = await getEdgeCompatibleServerClient<Database>();
+    const supabase = await createSupabaseServerClient(); // Use the new utility
 
     // Get user data directly from the authenticated user
     const { data: { user }, error: userError } = await supabase.auth.getUser();
@@ -122,7 +80,7 @@ async function getUserData(userId: string): Promise<UserData | null> {
 async function getVacationBalance(userId: string, province: string) {
   try {
     // Use the centralized function for edge-compatible Supabase client
-    const supabase = await getEdgeCompatibleServerClient<Database>();
+    const supabase = await createSupabaseServerClient(); // Use the new utility
     
     // Get current year using Luxon instead of native Date
     const currentYear = DateTime.now().year;

@@ -6,9 +6,11 @@
  * Do NOT import or use this file inside Client Components or `pages/` directory files.
  * Intended for server-only logic in the App Router.
  */
-import { cookies } from 'next/headers';
+// Remove cookies import if no longer needed elsewhere in the file
+// import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { createSupabaseServerClient } from '@/lib/supabase.server';
+// Import the new helper (and keep the old one if needed elsewhere, though likely not)
+import { createAuthedServerClient, createSupabaseServerClient } from '@/lib/supabase.server';
 import { createDirectClient } from '@/lib/supabase.shared';
 import type { Database } from '@/types/supabase';
 import type { User } from '@/types/auth';
@@ -19,8 +21,8 @@ import { getServerSession as originalGetServerSession } from './auth-server';
  * ❗ Server-only function. Do not use in Client Components or `pages/` directory.
  */
 export async function getCurrentSession() {
-  const cookieStore = cookies();
-  const supabase = createSupabaseServerClient(cookieStore);
+  // Replace the old pattern with the new helper
+  const supabase = await createAuthedServerClient(); // Use the new async helper
   
   const { data: { session } } = await supabase.auth.getSession();
   return session;

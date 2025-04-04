@@ -37,13 +37,6 @@ The app allows users to:
 - `/types` - TypeScript type definitions
 - `/lib` - Core business logic and services
 
-### Key Files
-- `utils/supabase.ts` - Supabase client creation for different contexts
-- `utils/supabase-server.ts` - Server-specific Supabase client
-- `components/auth/AuthProvider.tsx` - Auth context provider
-- `lib/auth-helpers.ts` - Authentication utility functions
-- `middleware.ts` - Route protection and session handling
-
 ## Coding Standards
 
 ### TypeScript
@@ -121,13 +114,6 @@ The app allows users to:
 - Keep server-specific code in designated server components
 - Ensure all API routes use edge runtime
 
-## Supabase Integration
-
-### Auth
-- Use `createBrowserSupabaseClient()` for client components
-- Use `createServerClient()` for server components
-- Use `createDirectClient()` for direct API access
-- Protect routes using the middleware
 
 ### Database
 - Define strong types for all tables in Database type

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createDirectClient } from '@/utils/supabase';
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Use the correct client for Edge routes
 import { getGoogleToken, syncVacationToCalendar } from '@/utils/googleCalendar';
 import type { Database } from '@/types/supabase';
 
 export const runtime = 'edge';
 
 export async function POST(request: NextRequest) {
-  // Get the authenticated user using getUser() for better security
-  const supabase = createDirectClient();
+  // Get the authenticated user using the server client utility
+  console.log(`[Sync Route - POST] Request received at ${new Date().toISOString()}`); // Add log
+  const supabase = await createSupabaseServerClient(); // Use the async utility
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
@@ -31,14 +32,18 @@ export async function POST(request: NextRequest) {
     // If calendar sync is being enabled, sync all vacations
     if (enabled) {
       // Verify Google token exists and is valid
+      console.log(`[Sync Route] Attempting to get Google token for user: ${user.id}`);
       const token = await getGoogleToken(user.id);
+      console.log(`[Sync Route] Result of getGoogleToken for user ${user.id}:`, token ? 'Token found' : 'No token found');
       
       if (!token) {
+        console.error(`[Sync Route] No valid Google token found for user ${user.id}. Returning 400.`);
         return NextResponse.json(
-          { message: 'Google Calendar access not authorized. Please reconnect your Google account.' }, 
+          { message: 'Google Calendar access not authorized. Please reconnect your Google account.' },
           { status: 400 },
         );
       }
+      console.log(`[Sync Route] Valid Google token found for user ${user.id}. Proceeding with sync.`);
       
       // Get user's vacation bookings that need to be synced
       // Either they don't have a Google event ID yet or sync failed previously
@@ -61,9 +66,9 @@ export async function POST(request: NextRequest) {
       
       // Sync each vacation booking to Google Calendar
       if (vacations && vacations.length > 0) {
-        for (const vacation of vacations) {
+        for (const vacation of vacations) { // Pass supabase client to sync function
           try {
-            const eventId = await syncVacationToCalendar(user.id, vacation as any);
+            const eventId = await syncVacationToCalendar(supabase, user.id, vacation as any);
             
             if (eventId) {
               results.successful++;
@@ -101,7 +106,8 @@ export async function POST(request: NextRequest) {
  * Endpoint for manually syncing a specific vacation
  */
 export async function PATCH(request: NextRequest) {
-  const supabase = createDirectClient();
+  console.log(`[Sync Route - PATCH] Request received at ${new Date().toISOString()}`); // Add log
+  const supabase = await createSupabaseServerClient(); // Use the async utility
   const { data: { user }, error: authError } = await supabase.auth.getUser();
   
   if (authError || !user) {
@@ -111,6 +117,7 @@ export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
     const { vacationId } = body;
+    console.log(`[Sync Route - PATCH] Processing vacationId: ${vacationId}`); // Add log
     
     if (!vacationId) {
       return NextResponse.json({ message: 'Vacation ID is required' }, { status: 400 });
@@ -138,8 +145,8 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ message: 'Vacation not found' }, { status: 404 });
     }
     
-    // Sync the vacation to Google Calendar
-    const eventId = await syncVacationToCalendar(user.id, vacation as any);
+    // Sync the vacation to Google Calendar (pass supabase client)
+    const eventId = await syncVacationToCalendar(supabase, user.id, vacation as any);
     
     if (eventId) {
       return NextResponse.json({ 

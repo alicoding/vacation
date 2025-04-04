@@ -2,7 +2,6 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import ThemeRegistry from './ThemeRegistry';
 import { Providers } from './providers';
-import InitialAuthHydration from '@/components/auth/InitialAuthHydration';
 import EnvironmentProvider from '@/components/EnvironmentProvider';
 import '@/styles/globals.css';
 
@@ -21,7 +20,6 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
-        <InitialAuthHydration />
         <EnvironmentProvider />
       </head>
       <body className={inter.className}>

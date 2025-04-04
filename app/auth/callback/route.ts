@@ -1,5 +1,6 @@
-import { createServerClient } from '@supabase/ssr';
-import { cookies } from 'next/headers';
+// Removed createServerClient from @supabase/ssr
+// Removed cookies from next/headers
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
 import { NextResponse, type NextRequest } from 'next/server';
 import { ensureUserRecord } from '@/lib/auth-helpers.server';
 
@@ -15,36 +16,8 @@ export async function GET(request: NextRequest) {
   
   try {
     // Use cookies() with await as per Next.js 15 recommended pattern
-    const cookieStore = await cookies();
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
-            try {
-              // Ensure sameSite is a string value required by cookie API
-              if (options?.sameSite === true) options.sameSite = 'strict';
-              if (options?.sameSite === false) options.sameSite = 'lax';
-              
-              cookieStore.set(name, value, options);
-            } catch (e) {
-              console.warn('Error setting cookie:', e);
-            }
-          },
-          remove(name, options) {
-            try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
-            } catch (e) {
-              console.warn('Error removing cookie:', e);
-            }
-          },
-        },
-      },
-    );
+    // Use the new utility function to create the Supabase client
+    const supabase = await createSupabaseServerClient(); // Await the async function
     
     // Exchange the code for a session
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -76,7 +49,13 @@ export async function GET(request: NextRequest) {
     
     // Add a flag in the URL to indicate this is a post-authentication redirect
     // This will help the middleware avoid redirect loops
-    const redirectUrl = new URL(callbackUrl, request.url);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!siteUrl) {
+      console.error('NEXT_PUBLIC_SITE_URL is not set in the environment for the auth callback.');
+      // Fallback or throw error - using request.url as a less ideal fallback
+      const redirectUrl = new URL(callbackUrl, request.url);
+    }
+    const redirectUrl = new URL(callbackUrl, siteUrl); // Use environment variable as base
     redirectUrl.searchParams.set('auth_success', 'true');
     
     // URL to redirect to after sign in process completes

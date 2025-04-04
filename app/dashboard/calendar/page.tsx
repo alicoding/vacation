@@ -3,7 +3,7 @@
 export const runtime = 'edge';
 
 import { useState, useEffect, Suspense } from 'react';
-import { useSession } from '@/lib/auth-helpers.client';
+import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
 import { Container, Box, Typography, Paper, Divider, CircularProgress } from '@mui/material';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
@@ -33,7 +33,7 @@ function GoogleCalendarSyncWrapper({ calendarSyncEnabled, onToggle }: {
 }
 
 export default function CalendarPage() {
-  const { data: session } = useSession();
+  const { user, isLoading: isAuthLoading, isAuthenticated } = useAuth(); // Use values from useAuth
   const [currentDate, setCurrentDate] = useState(DateTime.local());
   const [vacations, setVacations] = useState<VacationBooking[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -78,7 +78,8 @@ export default function CalendarPage() {
   // Fetch user calendar sync preferences
   useEffect(() => {
     async function fetchUserSettings() {
-      if (!session) return;
+      // Check authentication status before fetching settings
+      if (!isAuthenticated || !user?.id) return;
       
       try {
         const response = await fetch('/api/user');
@@ -92,7 +93,7 @@ export default function CalendarPage() {
     }
     
     fetchUserSettings();
-  }, [session]);
+  }, [isAuthenticated, user?.id]); // Update dependencies
 
   // Navigation functions
   const goToPreviousMonth = () => {

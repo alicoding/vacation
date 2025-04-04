@@ -60,6 +60,14 @@ export async function middleware(req: NextRequest) {
       
       // Reset redirect count when a valid user is found
       res.cookies.set('auth_redirect_count', '0', { path: '/', maxAge: 0 });
+
+      // Add specific log for calendar sync path
+      if (path === '/api/calendar/sync') {
+        console.log('Middleware check specifically for /api/calendar/sync:', {
+          hasUser: !!user,
+          userEmail: user?.email || 'none',
+        });
+      }
       return res;
     }
     

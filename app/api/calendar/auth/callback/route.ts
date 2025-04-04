@@ -2,9 +2,8 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { exchangeCodeForTokens } from '@/utils/googleCalendar/tokenManager';
-import { createServerClient } from '@supabase/ssr';
-import { createClient } from '@supabase/supabase-js';
-import { cookies } from 'next/headers';
+import { createServiceClient } from '@/lib/supabase.shared'; // Import service client creator
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
 import type { Database } from '@/types/supabase';
 import { DateTime } from 'luxon';
 
@@ -35,36 +34,8 @@ export async function GET(request: NextRequest) {
     }
     
     // Use cookies() with await as per Next.js 15 recommended pattern
-    const cookieStore = await cookies();
-    const supabase = createServerClient<Database>(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          get(name) {
-            return cookieStore.get(name)?.value;
-          },
-          set(name, value, options) {
-            try {
-              // Ensure sameSite is a string value required by cookie API
-              if (options?.sameSite === true) options.sameSite = 'strict';
-              if (options?.sameSite === false) options.sameSite = 'lax';
-              
-              cookieStore.set(name, value, options);
-            } catch (e) {
-              console.warn('Error setting cookie:', e);
-            }
-          },
-          remove(name, options) {
-            try {
-              cookieStore.set(name, '', { ...options, maxAge: 0 });
-            } catch (e) {
-              console.warn('Error removing cookie:', e);
-            }
-          },
-        },
-      },
-    );
+    // Use the new utility function to create the Supabase client
+    const supabase = await createSupabaseServerClient(); // Await the async function
     
     // Get the current user from Supabase
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -89,16 +60,8 @@ export async function GET(request: NextRequest) {
       
       const tokens = await exchangeCodeForTokens(code, redirectUri);
       
-      // Create a service role client to bypass RLS
-      const adminClient = createClient<Database>(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.SUPABASE_SERVICE_ROLE_KEY!,
-        { 
-          auth: { 
-            persistSession: false, 
-          }, 
-        },
-      );
+      // Use the shared service client creator which includes checks
+      const adminClient = createServiceClient();
       
       // Calculate when the token will expire
       // Using Luxon for date handling as per project standards
@@ -126,7 +89,6 @@ export async function GET(request: NextRequest) {
           refresh_token: tokens.refresh_token,
           expires_at: expiresAt, // ISO string compatible with timestamp type
           token_type: tokens.token_type,
-          scope: '', // Default empty string for required scope field
           updated_at: new Date().toISOString(),
         }, {
           onConflict: 'user_id',
@@ -154,7 +116,7 @@ export async function GET(request: NextRequest) {
       }
       
       // Redirect back to the app
-      const redirectUrl = new URL(redirectPath, request.url);
+      const redirectUrl = new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL || request.url); // Use SITE_URL as base
       redirectUrl.searchParams.set('success', 'true');
       
       const response = NextResponse.redirect(redirectUrl);
@@ -170,7 +132,7 @@ export async function GET(request: NextRequest) {
       console.error('Error in Google Calendar auth flow:', tokenError);
       
       // Add more detailed error information to help debugging
-      const redirectUrl = new URL(redirectPath, request.url);
+      const redirectUrl = new URL(redirectPath, process.env.NEXT_PUBLIC_SITE_URL || request.url); // Use SITE_URL as base
       redirectUrl.searchParams.set('error', 'token_exchange_failed');
       redirectUrl.searchParams.set('details', encodeURIComponent(tokenError instanceof Error ? tokenError.message : String(tokenError)));
       return NextResponse.redirect(redirectUrl);

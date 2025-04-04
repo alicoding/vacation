@@ -10,21 +10,8 @@ import { styled } from '@mui/material/styles';
 import { DateTime } from 'luxon';
 import { VacationBooking, Holiday } from '@/types';
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
-import { useSession } from '@/lib/auth-helpers.client';
-import type { Session } from '@/types/auth';
-
-// Extend the Session user type to include week_starts_on
-interface ExtendedUser {
-  id: string;
-  name?: string | null;
-  email?: string | null;
-  image?: string | null;
-  week_starts_on?: string;
-}
-
-interface ExtendedSession extends Session {
-  user: ExtendedUser;
-}
+import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
+// ExtendedUser and ExtendedSession interfaces removed as we use the user from useAuth directly
 
 // Styled components for the calendar
 const CalendarCell = styled(TableCell)(({ theme }) => ({
@@ -93,8 +80,9 @@ export default function FullCalendar({
   onNextMonth,
   onCurrentMonth,
 }: FullCalendarProps) {
-  const { data: session, status } = useSession();
-  const weekStartsOn = (session as ExtendedSession)?.user?.week_starts_on || 'sunday';
+  const { user, isLoading, isAuthenticated } = useAuth(); // Use values from useAuth
+  // Access week_starts_on directly from the user object provided by useAuth
+  const weekStartsOn = user?.week_starts_on === 'monday' ? 1 : 0; // 0 for Sunday, 1 for Monday
   
   // Generate calendar days
   const generateCalendarDays = () => {
@@ -103,7 +91,7 @@ export default function FullCalendar({
     
     // Find the day that starts the week containing the first of the month
     let startDay;
-    if (weekStartsOn === 'sunday') {
+    if (weekStartsOn === 0) { // Compare against number 0 (Sunday)
       // If week starts on Sunday (Luxon weekday 7), find the Sunday before or on firstDay
       const dayOfWeek = firstDay.weekday;
       const daysToSubtract = dayOfWeek === 7 ? 0 : dayOfWeek;
@@ -173,7 +161,7 @@ export default function FullCalendar({
 
   // Day headers based on user preference
   const getDayHeaders = () => {
-    if (weekStartsOn === 'sunday') {
+    if (weekStartsOn === 0) { // Compare against number 0 (Sunday)
       return (
         <TableRow>
           <TableCell align="center">Sunday</TableCell>

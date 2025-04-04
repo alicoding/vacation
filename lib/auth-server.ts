@@ -1,7 +1,8 @@
-import { createServerClient } from '@supabase/ssr';
+// Removed createServerClient from @supabase/ssr
+import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
 import type { Database } from '@/types/supabase';
 import { convertSupabaseSession } from '@/types/auth';
-import { createDirectClient } from '@/utils/supabase';
+import { createDirectClient } from '@/lib/supabase.server';
 // Avoid direct import of next/headers since it's App Router only
 // import { cookies } from 'next/headers';
 
@@ -34,41 +35,9 @@ export async function getServerSession() {
       }
 
       if (cookieStore) {
-        const supabase = createServerClient<Database>(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-          {
-            cookies: {
-              get(name) {
-                try {
-                  return cookieStore.get(name)?.value;
-                } catch (e) {
-                  console.warn('Error getting cookie in server context:', e);
-                  return undefined;
-                }
-              },
-              set(name, value, options) {
-                try {
-                  // Ensure sameSite is a string value as required by Cookie API
-                  const cookieOptions = { ...options };
-                  if (cookieOptions.sameSite === true) cookieOptions.sameSite = 'strict';
-                  if (cookieOptions.sameSite === false) cookieOptions.sameSite = 'lax';
-                  
-                  cookieStore.set(name, value, cookieOptions);
-                } catch (e) {
-                  console.warn('Error setting cookie in server context:', e);
-                }
-              },
-              remove(name, options) {
-                try {
-                  cookieStore.set(name, '', { ...options, maxAge: 0 });
-                } catch (e) {
-                  console.warn('Error removing cookie in server context:', e);
-                }
-              },
-            },
-          },
-        );
+        // Use the new utility function to create the Supabase client
+        // Note: createSupabaseServerClient handles cookies internally now
+        const supabase = await createSupabaseServerClient();
         
         // First, get the user directly which is more secure
         // This follows Supabase's recommendation for better security

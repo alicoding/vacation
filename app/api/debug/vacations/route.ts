@@ -2,8 +2,8 @@ export const runtime = 'edge';
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createDirectClient, createServiceClient } from '@/lib/supabase.shared';
-import { createSupabaseServerClient } from '@/lib/supabase.server';
-import { cookies } from 'next/headers';
+import { createAuthedServerClient } from '@/lib/supabase.server'; // Import the correct helper
+// Remove unused cookies import
 
 /**
  * Debug endpoint to help identify issues with vacation bookings retrieval
@@ -23,8 +23,8 @@ export async function GET(req: NextRequest) {
     // 2. Create a service client that bypasses RLS
     const serviceClient = createServiceClient();
     
-    // 3. Create a server client (like in dashboard page)
-    const serverClient = createSupabaseServerClient(cookies());
+    // 3. Use the authenticated server client helper
+    const serverClient = await createAuthedServerClient();
     
     // 4. Debug responses with different query approaches
     const results = {

@@ -1,6 +1,6 @@
 export const runtime = 'edge';
 import { NextRequest, NextResponse } from 'next/server';
-import { createDirectClient } from '@/utils/supabase';
+import { createDirectClient } from '@/lib/supabase.server';
 import { handleVacationDeletion, updateVacationInGoogle } from '@/utils/googleCalendar';
 import { createServerClient } from '@supabase/ssr';
 

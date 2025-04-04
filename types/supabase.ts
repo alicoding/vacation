@@ -1,284 +1,390 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
 export type Database = {
   public: {
     Tables: {
-      users: {
+      accounts: {
         Row: {
+          access_token: string | null
+          expires_at: number | null
           id: string
-          name: string | null
-          email: string | null
-          emailVerified: string | null
-          image: string | null
-          total_vacation_days: number
-          province: string
-          employment_type: string
-          week_starts_on: string
-          calendar_sync_enabled: boolean
-          google_calendar_id: string | null
+          id_token: string | null
+          provider: string
+          provider_account_id: string
+          refresh_token: string | null
+          scope: string | null
+          session_state: string | null
+          token_type: string | null
+          type: string
+          user_id: string
         }
         Insert: {
-          id: string
-          name?: string | null
-          email?: string | null
-          emailVerified?: string | null
-          image?: string | null
-          total_vacation_days?: number
-          province?: string
-          employment_type?: string
-          week_starts_on?: string
-          calendar_sync_enabled?: boolean
-          google_calendar_id?: string | null
+          access_token?: string | null
+          expires_at?: number | null
+          id?: string
+          id_token?: string | null
+          provider: string
+          provider_account_id: string
+          refresh_token?: string | null
+          scope?: string | null
+          session_state?: string | null
+          token_type?: string | null
+          type: string
+          user_id: string
         }
         Update: {
+          access_token?: string | null
+          expires_at?: number | null
           id?: string
-          name?: string | null
-          email?: string | null
-          emailVerified?: string | null
-          image?: string | null
-          total_vacation_days?: number
-          province?: string
-          employment_type?: string
-          week_starts_on?: string
-          calendar_sync_enabled?: boolean
-          google_calendar_id?: string | null
+          id_token?: string | null
+          provider?: string
+          provider_account_id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          session_state?: string | null
+          token_type?: string | null
+          type?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "users_id_fkey"
-            columns: ["id"]
+            foreignKeyName: "accounts_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          }
+          },
         ]
       }
-      vacation_bookings: {
+      google_tokens: {
         Row: {
-          id: string
-          userId: string
-          start_date: string
-          end_date: string
-          note: string | null
+          access_token: string
           created_at: string
-          is_half_day: boolean
-          half_day_portion: string | null
-          googleEventId: string | null
-          google_event_id: string | null
-          sync_status: string | null
-          last_sync_attempt: string | null
-          sync_error: string | null
+          expires_at: string
+          id: string
+          refresh_token: string
+          token_type: string | null
+          updated_at: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          userId: string
-          start_date: string
-          end_date: string
-          note?: string | null
+          access_token: string
           created_at?: string
-          is_half_day?: boolean
-          half_day_portion?: string | null
-          googleEventId?: string | null
-          google_event_id?: string | null
-          sync_status?: string | null
-          last_sync_attempt?: string | null
-          sync_error?: string | null
+          expires_at: string
+          id?: string
+          refresh_token: string
+          token_type?: string | null
+          updated_at?: string
+          user_id: string
         }
         Update: {
-          id?: string
-          userId?: string
-          start_date?: string
-          end_date?: string
-          note?: string | null
+          access_token?: string
           created_at?: string
-          is_half_day?: boolean
-          half_day_portion?: string | null
-          googleEventId?: string | null
-          google_event_id?: string | null
-          sync_status?: string | null
-          last_sync_attempt?: string | null
-          sync_error?: string | null
+          expires_at?: string
+          id?: string
+          refresh_token?: string
+          token_type?: string | null
+          updated_at?: string
+          user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "vacation_bookings_userId_fkey"
-            columns: ["userId"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
+        Relationships: []
       }
       holidays: {
         Row: {
-          id: string
+          created_at: string | null
           date: string
+          id: string
           name: string
           province: string | null
           type: string
         }
         Insert: {
-          id?: string
+          created_at?: string | null
           date: string
+          id?: string
           name: string
           province?: string | null
           type: string
         }
         Update: {
-          id?: string
+          created_at?: string | null
           date?: string
+          id?: string
           name?: string
           province?: string | null
           type?: string
         }
         Relationships: []
       }
-      accounts: {
-        Row: {
-          id: string
-          userId: string
-          type: string
-          provider: string
-          providerAccountId: string
-          refresh_token: string | null
-          access_token: string | null
-          expires_at: number | null
-          token_type: string | null
-          scope: string | null
-          id_token: string | null
-          session_state: string | null
-        }
-        Insert: {
-          id?: string
-          userId: string
-          type: string
-          provider: string
-          providerAccountId: string
-          refresh_token?: string | null
-          access_token?: string | null
-          expires_at?: number | null
-          token_type?: string | null
-          scope?: string | null
-          id_token?: string | null
-          session_state?: string | null
-        }
-        Update: {
-          id?: string
-          userId?: string
-          type?: string
-          provider?: string
-          providerAccountId?: string
-          refresh_token?: string | null
-          access_token?: string | null
-          expires_at?: number | null
-          token_type?: string | null
-          scope?: string | null
-          id_token?: string | null
-          session_state?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "accounts_userId_fkey"
-            columns: ["userId"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
-      }
       sessions: {
         Row: {
-          id: string
-          sessionToken: string
-          userId: string
           expires: string
+          id: string
+          session_token: string
+          user_id: string
         }
         Insert: {
-          id?: string
-          sessionToken: string
-          userId: string
           expires: string
+          id?: string
+          session_token: string
+          user_id: string
         }
         Update: {
-          id?: string
-          sessionToken?: string
-          userId?: string
           expires?: string
+          id?: string
+          session_token?: string
+          user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "sessions_userId_fkey"
-            columns: ["userId"]
+            foreignKeyName: "sessions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
             referencedRelation: "users"
             referencedColumns: ["id"]
-          }
+          },
+        ]
+      }
+      users: {
+        Row: {
+          calendar_sync_enabled: boolean
+          created_at: string | null
+          email: string | null
+          email_verified: string | null
+          employment_type: string
+          google_calendar_id: string | null
+          id: string
+          image: string | null
+          name: string | null
+          province: string
+          total_vacation_days: number
+          week_starts_on: string
+        }
+        Insert: {
+          calendar_sync_enabled?: boolean
+          created_at?: string | null
+          email?: string | null
+          email_verified?: string | null
+          employment_type?: string
+          google_calendar_id?: string | null
+          id?: string
+          image?: string | null
+          name?: string | null
+          province?: string
+          total_vacation_days?: number
+          week_starts_on?: string
+        }
+        Update: {
+          calendar_sync_enabled?: boolean
+          created_at?: string | null
+          email?: string | null
+          email_verified?: string | null
+          employment_type?: string
+          google_calendar_id?: string | null
+          id?: string
+          image?: string | null
+          name?: string | null
+          province?: string
+          total_vacation_days?: number
+          week_starts_on?: string
+        }
+        Relationships: []
+      }
+      vacation_bookings: {
+        Row: {
+          created_at: string | null
+          end_date: string
+          google_event_id: string | null
+          half_day_portion: string | null
+          id: string
+          is_half_day: boolean | null
+          last_sync_attempt: string | null
+          note: string | null
+          start_date: string
+          sync_error: string | null
+          sync_status: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          end_date: string
+          google_event_id?: string | null
+          half_day_portion?: string | null
+          id?: string
+          is_half_day?: boolean | null
+          last_sync_attempt?: string | null
+          note?: string | null
+          start_date: string
+          sync_error?: string | null
+          sync_status?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          end_date?: string
+          google_event_id?: string | null
+          half_day_portion?: string | null
+          id?: string
+          is_half_day?: boolean | null
+          last_sync_attempt?: string | null
+          note?: string | null
+          start_date?: string
+          sync_error?: string | null
+          sync_status?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vacation_bookings_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
         ]
       }
       verification_tokens: {
         Row: {
+          expires: string
           identifier: string
           token: string
-          expires: string
         }
         Insert: {
+          expires: string
           identifier: string
           token: string
-          expires: string
         }
         Update: {
+          expires?: string
           identifier?: string
           token?: string
-          expires?: string
         }
         Relationships: []
-      }
-      google_tokens: {
-        Row: {
-          id: string
-          user_id: string
-          access_token: string
-          refresh_token: string
-          token_type: string
-          scope: string
-          expires_at: string
-          created_at: string
-          updated_at: string
-        }
-        Insert: {
-          id?: string
-          user_id: string
-          access_token: string
-          refresh_token: string
-          token_type: string
-          scope: string
-          expires_at: string
-          created_at?: string
-          updated_at?: string
-        }
-        Update: {
-          id?: string
-          user_id?: string
-          access_token?: string
-          refresh_token?: string
-          token_type?: string
-          scope?: string
-          expires_at?: string
-          created_at?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "google_tokens_user_id_fkey"
-            columns: ["user_id"]
-            referencedRelation: "users"
-            referencedColumns: ["id"]
-          }
-        ]
       }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      upsert_google_token: {
+        Args: {
+          p_user_id: string
+          p_access_token: string
+          p_refresh_token: string
+          p_expires_at: number
+          p_token_type?: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
     }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
 }
+
+type PublicSchema = Database[Extract<keyof Database, "public">]
+
+export type Tables<
+  PublicTableNameOrOptions extends
+    | keyof (PublicSchema["Tables"] & PublicSchema["Views"])
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+        Database[PublicTableNameOrOptions["schema"]]["Views"])
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? (Database[PublicTableNameOrOptions["schema"]]["Tables"] &
+      Database[PublicTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+      Row: infer R
+    }
+    ? R
+    : never
+  : PublicTableNameOrOptions extends keyof (PublicSchema["Tables"] &
+        PublicSchema["Views"])
+    ? (PublicSchema["Tables"] &
+        PublicSchema["Views"])[PublicTableNameOrOptions] extends {
+        Row: infer R
+      }
+      ? R
+      : never
+    : never
+
+export type TablesInsert<
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Insert: infer I
+    }
+    ? I
+    : never
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+        Insert: infer I
+      }
+      ? I
+      : never
+    : never
+
+export type TablesUpdate<
+  PublicTableNameOrOptions extends
+    | keyof PublicSchema["Tables"]
+    | { schema: keyof Database },
+  TableName extends PublicTableNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicTableNameOrOptions["schema"]]["Tables"]
+    : never = never,
+> = PublicTableNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+      Update: infer U
+    }
+    ? U
+    : never
+  : PublicTableNameOrOptions extends keyof PublicSchema["Tables"]
+    ? PublicSchema["Tables"][PublicTableNameOrOptions] extends {
+        Update: infer U
+      }
+      ? U
+      : never
+    : never
+
+export type Enums<
+  PublicEnumNameOrOptions extends
+    | keyof PublicSchema["Enums"]
+    | { schema: keyof Database },
+  EnumName extends PublicEnumNameOrOptions extends { schema: keyof Database }
+    ? keyof Database[PublicEnumNameOrOptions["schema"]]["Enums"]
+    : never = never,
+> = PublicEnumNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicEnumNameOrOptions["schema"]]["Enums"][EnumName]
+  : PublicEnumNameOrOptions extends keyof PublicSchema["Enums"]
+    ? PublicSchema["Enums"][PublicEnumNameOrOptions]
+    : never
+
+export type CompositeTypes<
+  PublicCompositeTypeNameOrOptions extends
+    | keyof PublicSchema["CompositeTypes"]
+    | { schema: keyof Database },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
+    schema: keyof Database
+  }
+    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    : never = never,
+> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
+  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+  : PublicCompositeTypeNameOrOptions extends keyof PublicSchema["CompositeTypes"]
+    ? PublicSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
+    : never
