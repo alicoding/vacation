@@ -256,7 +256,7 @@ export default async function DashboardPage() {
           </Grid>
 
           <Grid item xs={12}>
-            <UpcomingVacationsCard vacations={upcomingVacations} />
+            <UpcomingVacationsCard />
           </Grid>
         </Grid>
       </Container>

@@ -59,10 +59,20 @@ export default function MiniCalendar({
   selectedDate: externalSelectedDate,
   vacationToExclude,
 }: MiniCalendarProps) {
-  const [currentMonth, setCurrentMonth] = useState(DateTime.now());
+  // Initialize currentMonth based on externalSelectedDate if available, otherwise use today
+  const [currentMonth, setCurrentMonth] = useState(
+    externalSelectedDate
+      ? externalSelectedDate.startOf('month')
+      : DateTime.now().startOf('month'),
+  );
   const [selectedDate, setSelectedDate] = useState(
     externalSelectedDate || DateTime.now(),
   );
+  console.log('[MiniCalendar] Rendering/Re-rendering', {
+    externalSelectedDate: externalSelectedDate?.toISO(),
+    currentMonth: currentMonth.toISO(),
+    selectedDate: selectedDate.toISO(),
+  });
   // Get user settings for week start day
   const { user } = useAuth();
   const weekStartsOn = user?.week_starts_on === 'monday' ? 1 : 0; // 0 for Sunday, 1 for Monday
@@ -77,10 +87,22 @@ export default function MiniCalendar({
 
   // Sync with external selected date when it changes
   useEffect(() => {
+    console.log('[MiniCalendar] Sync Effect RUNNING. Deps:', {
+      externalSelectedDate: externalSelectedDate?.toISO(),
+      currentMonth: currentMonth.toISO(),
+    });
     if (externalSelectedDate) {
       setSelectedDate(externalSelectedDate);
+      // Also update the displayed month if the external date's month is different
+      if (!externalSelectedDate.hasSame(currentMonth, 'month')) {
+        console.log(
+          '[MiniCalendar] Sync Effect: Updating currentMonth to match externalSelectedDate month',
+          externalSelectedDate.startOf('month').toISO(),
+        );
+        setCurrentMonth(externalSelectedDate.startOf('month'));
+      }
     }
-  }, [externalSelectedDate]);
+  }, [externalSelectedDate]); // ONLY trigger sync when the external date prop changes
 
   // Combine prop holidays with client-fetched holidays
   // const allHolidays = [...holidays, ...clientHolidays]; // Removed: Rely on hook directly
@@ -216,11 +238,21 @@ export default function MiniCalendar({
 
   // Navigation handlers
   const prevMonth = () => {
-    setCurrentMonth(currentMonth.minus({ months: 1 }));
+    const newMonth = currentMonth.minus({ months: 1 });
+    console.log(
+      '[MiniCalendar] prevMonth: Setting currentMonth to',
+      newMonth.toISO(),
+    );
+    setCurrentMonth(newMonth);
   };
 
   const nextMonth = () => {
-    setCurrentMonth(currentMonth.plus({ months: 1 }));
+    const newMonth = currentMonth.plus({ months: 1 });
+    console.log(
+      '[MiniCalendar] nextMonth: Setting currentMonth to',
+      newMonth.toISO(),
+    );
+    setCurrentMonth(newMonth);
   };
 
   // Handle date selection with callback to parent

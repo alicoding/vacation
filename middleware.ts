@@ -49,34 +49,15 @@ export async function middleware(req: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser();
 
-    // Add debug log to help troubleshoot authentication issues
-    console.log('Auth check in middleware:', {
-      path,
-      hasUser: !!user,
-      userEmail: user?.email || 'none',
-      redirectCount,
-    });
-
     // Handle public routes for authenticated users
     if (user && !authError) {
       // If user is authenticated and visiting home page or signin page, redirect to dashboard
       if (path === '/' || path === '/auth/signin') {
-        console.log(
-          'Authenticated user accessing public route, redirecting to dashboard',
-        );
         return NextResponse.redirect(new URL('/dashboard', req.url));
       }
 
       // Reset redirect count when a valid user is found
       res.cookies.set('auth_redirect_count', '0', { path: '/', maxAge: 0 });
-
-      // Add specific log for calendar sync path
-      if (path === '/api/calendar/sync') {
-        console.log('Middleware check specifically for /api/calendar/sync:', {
-          hasUser: !!user,
-          userEmail: user?.email || 'none',
-        });
-      }
       return res;
     }
 

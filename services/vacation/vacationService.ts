@@ -7,7 +7,7 @@ import {
   deleteVacationBooking,
 } from './vacationBookingService';
 
-import { calculateBusinessDays } from './vacationCalculationService';
+import { calculateBusinessDays } from './vacationCalculationUtils'; // Import from utils
 
 import { checkOverlappingBookings } from './vacationOverlapService';
 

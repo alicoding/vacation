@@ -275,8 +275,18 @@ export async function getHolidaysInRange(
     // Use the new helper
     const supabaseServer = await createAuthedServerClient();
 
-    const startDateStr = DateTime.fromJSDate(startDate).toISODate();
-    const endDateStr = DateTime.fromJSDate(endDate).toISODate();
+    // Force UTC zone when creating Luxon DateTime from JS Date
+    const startDateStr = DateTime.fromJSDate(startDate, {
+      zone: 'utc',
+    }).toISODate();
+    const endDateStr = DateTime.fromJSDate(endDate, {
+      zone: 'utc',
+    }).toISODate();
+    // --- BEGIN DEBUG LOGGING ---
+    console.log(
+      `[getHolidaysInRange] Querying for province: ${province}, range: ${startDateStr} to ${endDateStr}`,
+    );
+    // --- END DEBUG LOGGING ---
 
     const { data, error } = await supabaseServer
       .from('holidays')
@@ -290,11 +300,12 @@ export async function getHolidaysInRange(
       return [];
     }
 
-    // Log the raw data returned by the query
+    // --- BEGIN DEBUG LOGGING ---
     console.log(
-      `[getHolidaysInRange] Raw data returned for range ${startDateStr}-${endDateStr}, province ${province}:`,
+      `[getHolidaysInRange] Raw data received for ${province} (${startDateStr}-${endDateStr}):`,
       JSON.stringify(data),
     );
+    // --- END DEBUG LOGGING ---
 
     // Parse the JSON string 'type' back into string[]
     // Map and parse the type field, convert date string to Date object

@@ -5,7 +5,7 @@
  * It allows users to modify the start date, end date, and note for a vacation.
  */
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react'; // Add useMemo
 import { useForm, Controller } from 'react-hook-form';
 import {
   Dialog,
@@ -29,7 +29,7 @@ import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import HalfDaySettings, { HalfDayOption } from './HalfDaySettings';
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
 import useHolidays from '@/lib/hooks/useHolidays';
-import { Holiday } from '@/types';
+import { Holiday, VacationBooking } from '@/types'; // Import VacationBooking
 
 interface VacationEditDialogProps {
   open: boolean;
@@ -71,6 +71,8 @@ export default function VacationEditDialog({
   );
   const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [allVacations, setAllVacations] = useState<VacationBooking[]>([]); // State for all vacations
+  const [isLoadingVacations, setIsLoadingVacations] = useState(true); // Loading state for vacations
 
   // Get current year for holiday fetching
   const currentYear = new Date().getFullYear();
@@ -88,6 +90,35 @@ export default function VacationEditDialog({
       setHolidays(fetchedHolidays);
     }
   }, [fetchedHolidays]);
+
+  // Fetch all existing vacations
+  useEffect(() => {
+    async function fetchVacations() {
+      setIsLoadingVacations(true);
+      try {
+        const response = await fetch('/api/vacations');
+        if (response.ok) {
+          const vacationsData = await response.json();
+          setAllVacations(vacationsData);
+        } else {
+          console.error('Failed to fetch vacations:', response.status);
+          setError('Could not load existing vacation data.'); // Set error state
+        }
+      } catch (error) {
+        console.error('Error fetching vacations:', error);
+        setError(
+          error instanceof Error ? error.message : 'Failed to load vacations',
+        );
+      } finally {
+        setIsLoadingVacations(false);
+      }
+    }
+
+    if (open) {
+      // Only fetch when the dialog is open
+      void fetchVacations();
+    }
+  }, [open]); // Re-fetch if the dialog re-opens
 
   // Form setup with vacation data as default values
   const {
@@ -229,6 +260,13 @@ export default function VacationEditDialog({
     }
     return DateTime.now();
   };
+
+  // Filter out the current vacation being edited from the list of all vacations
+  const otherVacations = useMemo(() => {
+    if (!vacation) return allVacations;
+    return allVacations.filter((v) => v.id !== vacation.id);
+  }, [allVacations, vacation]);
+  // Removed extra brace and semicolon from here
 
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
@@ -385,18 +423,18 @@ export default function VacationEditDialog({
                   : 'Select End Date'}
               </Typography>
 
-              {holidaysLoading ? (
+              {holidaysLoading || isLoadingVacations ? ( // Check both loading states
                 <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
                   <CircularProgress size={24} />
                 </Box>
               ) : (
                 <MiniCalendar
                   holidays={holidays}
+                  vacations={otherVacations} // Pass the filtered list of other vacations
                   province={province}
                   onDateSelect={handleMiniCalendarDateSelect}
                   selectedDate={getActiveDate()}
-                  // For edit mode, exclude the current vacation from existing vacations
-                  vacationToExclude={vacation?.id}
+                  // vacationToExclude prop is not needed if we pass the filtered list
                 />
               )}
 

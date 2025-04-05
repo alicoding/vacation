@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react'; // Add useCallback
 import {
   Card,
   CardContent,
@@ -19,7 +19,8 @@ import {
 import { styled } from '@mui/material/styles';
 import { DateTime, Interval } from 'luxon';
 import Link from 'next/link';
-import { VacationBooking, Holiday } from '@/types';
+import { VacationBooking, Holiday, User } from '@/types'; // Use User type
+import { calculateBusinessDays } from '@/services/vacation/vacationCalculationUtils'; // Import from utils
 
 interface EnhancedVacation extends VacationBooking {
   isLongWeekend: boolean;
@@ -33,7 +34,7 @@ interface EnhancedVacation extends VacationBooking {
 }
 
 interface UpcomingVacationsCardProps {
-  vacations?: VacationBooking[];
+  // Remove vacations prop - will fetch client-side
   holidaysError?: string;
 }
 
@@ -51,7 +52,7 @@ const fetchHolidays = async (): Promise<Holiday[]> => {
   return await response.json();
 };
 export default function UpcomingVacationsCard({
-  vacations: initialVacations,
+  // vacations: initialVacations, // Removed prop
   holidaysError,
 }: UpcomingVacationsCardProps) {
   const [vacations, setVacations] = useState<VacationBooking[]>([]);
@@ -59,34 +60,32 @@ export default function UpcomingVacationsCard({
     EnhancedVacation[]
   >([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [loading, setLoading] = useState(!initialVacations);
+  const [loading, setLoading] = useState(true); // Start loading true
+  const [province, setProvince] = useState<string | null>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch vacations if not provided
+  // Fetch vacations client-side on mount
   useEffect(() => {
-    if (initialVacations) {
-      setVacations(initialVacations);
-      setLoading(false);
-    } else {
-      const getVacations = async () => {
-        try {
-          setLoading(true);
-          setError(null);
-          const data = await fetchVacations();
-          setVacations(data);
-        } catch (error) {
-          console.error('Error fetching vacations:', error);
-          setError(
-            error instanceof Error ? error.message : 'Failed to load vacations',
-          );
-        } finally {
-          setLoading(false);
-        }
-      };
+    const getVacations = async () => {
+      try {
+        setLoading(true); // Ensure loading is true at start
+        setError(null);
+        const data = await fetchVacations(); // Use the existing fetch function
+        setVacations(data);
+      } catch (error) {
+        console.error('Error fetching vacations client-side:', error);
+        setError(
+          error instanceof Error ? error.message : 'Failed to load vacations',
+        );
+        setVacations([]); // Set empty array on error
+      } finally {
+        setLoading(false);
+      }
+    };
 
-      void getVacations();
-    }
-  }, [initialVacations]);
+    void getVacations();
+  }, []); // Empty dependency array ensures this runs only once on mount
 
   // Fetch holidays
   useEffect(() => {
@@ -102,169 +101,263 @@ export default function UpcomingVacationsCard({
     void getHolidays();
   }, []);
 
-  // Enhance vacations with additional information when vacations or holidays change
+  // Fetch user settings to get province
   useEffect(() => {
-    if (vacations.length === 0 || holidays.length === 0) return;
-
-    const enhanced = vacations.map((vacation) => {
-      const startDate = new Date(vacation.start_date);
-      const endDate = new Date(vacation.end_date);
-
-      // Calculate total days off (including weekends)
-      const totalDaysOff = Interval.fromDateTimes(
-        DateTime.fromJSDate(startDate),
-        DateTime.fromJSDate(endDate).plus({ days: 1 }),
-      ).length('days');
-
-      // Check if this is a long weekend
-      // Long weekend is defined as:
-      // - Taking 1-2 days off
-      // - That connect with a weekend (either before or after)
-      let isLongWeekend = false;
-      let adjacentWeekend = false;
-      let adjacentToHolidays = false;
-      let extendedTimeOffMessage = null;
-
-      // Check if vacation connects to a weekend
-      const startDateTime = DateTime.fromJSDate(startDate);
-      const endDateTime = DateTime.fromJSDate(endDate);
-      const dayBeforeStart = startDateTime.minus({ days: 1 });
-      const dayAfterEnd = endDateTime.plus({ days: 1 });
-
-      const isWeekendDay = (date: DateTime) => [6, 7].includes(date.weekday);
-
-      // Check if vacation is adjacent to weekend
-      if (isWeekendDay(dayBeforeStart) || isWeekendDay(dayAfterEnd)) {
-        adjacentWeekend = true;
-      }
-
-      // Find adjacent holidays
-      const adjacentHolidays = holidays.filter((holiday) => {
-        const holidayDateTime = DateTime.fromISO(holiday.date);
-
-        // Check if holiday is directly before or after the vacation dates
-        return (
-          holidayDateTime.hasSame(dayBeforeStart, 'day') ||
-          holidayDateTime.hasSame(dayAfterEnd, 'day')
+    const fetchSettings = async () => {
+      setLoadingSettings(true);
+      try {
+        const response = await fetch('/api/user/settings');
+        if (!response.ok) {
+          throw new Error('Failed to fetch user settings');
+        }
+        const settings: User = await response.json(); // Use User type
+        setProvince(settings.province || 'ON'); // Default to ON if not set
+      } catch (err) {
+        console.error('Error fetching user settings:', err);
+        setError(
+          err instanceof Error ? err.message : 'Could not load user province',
         );
-      });
+        setProvince('ON'); // Default on error
+      } finally {
+        setLoadingSettings(false);
+      }
+    };
+    void fetchSettings();
+  }, []);
 
-      // Check if vacation is adjacent to holidays
-      if (adjacentHolidays.length > 0) {
-        adjacentToHolidays = true;
+  // Effect to calculate enhanced vacations when data changes and loading is complete
+  useEffect(() => {
+    // Define the async calculation function directly inside the effect
+    const performCalculation = () => {
+      // Remove async
+      console.log('[UpcomingVacationsCard] Running calculation effect...'); // Log effect run
+
+      // Ensure all data is loaded and available
+      if (loading || loadingSettings || !province || !vacations || !holidays) {
+        console.log(
+          '[UpcomingVacationsCard] Calculation skipped: Data not ready.',
+          {
+            loading,
+            loadingSettings,
+            province: !!province,
+            vacations: vacations?.length,
+            holidays: holidays?.length,
+          },
+        );
+        return; // Don't run calculation if still loading or data missing
       }
 
-      // Calculate working days (excluding weekends and holidays)
-      let workingDaysOff = 0;
-      let current = DateTime.fromJSDate(startDate);
-      const lastDay = DateTime.fromJSDate(endDate);
-
-      while (current <= lastDay) {
-        if (![6, 7].includes(current.weekday)) {
-          // Not a weekend
-          const isHoliday = holidays.some((holiday) =>
-            DateTime.fromISO(holiday.date).hasSame(current, 'day'),
-          );
-
-          if (!isHoliday) {
-            workingDaysOff++;
-          }
-        }
-        current = current.plus({ days: 1 });
-      }
-
-      // Create extended time off message if vacation connects to weekend or holiday
-      if (totalDaysOff <= 2 && (adjacentWeekend || adjacentToHolidays)) {
-        isLongWeekend = true;
-
-        // Calculate the total consecutive days off (vacation + weekend + holidays)
-        let consecutiveDaysOff = totalDaysOff;
-
-        // Add weekend days if adjacent
-        if (adjacentWeekend) {
-          if (isWeekendDay(dayBeforeStart)) {
-            // If the day before is Sunday (Luxon weekday 7), add 2 days (both Sat and Sun)
-            if (dayBeforeStart.weekday === 7) {
-              consecutiveDaysOff += 2;
-            }
-            // If the day before is Saturday (Luxon weekday 6), add 2 days (both Sat and Sun)
-            else if (dayBeforeStart.weekday === 6) {
-              consecutiveDaysOff += 2;
-            }
-          }
-          if (isWeekendDay(dayAfterEnd)) {
-            // If the day after is Saturday (Luxon weekday 6), add 2 days (both Sat and Sun)
-            if (dayAfterEnd.weekday === 6) {
-              consecutiveDaysOff += 2;
-            }
-            // If the day after is Sunday (Luxon weekday 7), add 1 day (just Sun)
-            else if (dayAfterEnd.weekday === 7) {
-              consecutiveDaysOff += 1;
-            }
-          }
-        }
-
-        // Add holiday days if adjacent
-        if (adjacentToHolidays) {
-          consecutiveDaysOff += adjacentHolidays.length;
-        }
-
-        // Create appropriate message
-        if (adjacentWeekend && adjacentToHolidays) {
-          extendedTimeOffMessage = `Extended break: ${consecutiveDaysOff} days off including weekends & holidays`;
-        } else if (adjacentWeekend) {
-          extendedTimeOffMessage = `Long weekend: ${consecutiveDaysOff} days off including weekend`;
-        } else if (adjacentToHolidays) {
-          extendedTimeOffMessage = `Extended break: ${consecutiveDaysOff} days off including holidays`;
-        }
-      } else if (totalDaysOff > 2) {
-        // For longer vacations, calculate total time away
-        extendedTimeOffMessage = `Total time off: ${totalDaysOff} days (${workingDaysOff} working days)`;
-      }
-
-      // Determine vacation type for color coding
-      let vacationType: 'regular' | 'long-weekend' | 'holiday-adjacent' =
-        'regular';
-      if (isLongWeekend) {
-        vacationType = 'long-weekend';
-      } else if (adjacentHolidays.length > 0) {
-        vacationType = 'holiday-adjacent';
-      }
-
-      // Include half-day information if available
-      const isHalfDay = vacation.is_half_day || false;
-      const halfDayPortion = vacation.half_day_portion as
-        | 'AM'
-        | 'PM'
-        | undefined;
-
-      return {
-        ...vacation,
-        isLongWeekend,
-        adjacentHolidays,
-        totalDaysOff,
-        workingDaysOff,
-        isHalfDay,
-        halfDayPortion,
-        vacationType,
-        extendedTimeOffMessage,
-      };
-    });
-
-    // Sort by start date (upcoming first)
-    const sortedVacations = enhanced
-      .filter((vacation) => new Date(vacation.end_date) >= new Date()) // Only show future or current vacations
-      .sort(
-        (a, b) =>
-          new Date(a.start_date).getTime() - new Date(b.start_date).getTime(),
+      console.log(
+        '[UpcomingVacationsCard] Data ready, proceeding with calculation.',
       );
 
-    // Take at most 5 vacations to display on the dashboard
-    // This ensures we show multiple cards if they exist, but not too many
-    const limitedVacations = sortedVacations.slice(0, 5);
+      try {
+        // Map asynchronously because calculateBusinessDays is async
+        const enhancedResults = vacations.map(
+          (vacation): EnhancedVacation | null => {
+            // Remove async/Promise, rename variable
+            console.log(
+              `[UpcomingVacationsCard] Calculating for Vacation ID: ${vacation.id}, Start: ${vacation.start_date.toString()}, End: ${vacation.end_date.toString()}`,
+            ); // Log start of calculation for specific vacation
+            // Parse ISO strings directly using Luxon in UTC, ensuring start of day, to avoid timezone shifts
+            const startDate = DateTime.fromISO(String(vacation.start_date), {
+              zone: 'utc',
+            })
+              .startOf('day')
+              .toJSDate();
+            const endDate = DateTime.fromISO(String(vacation.end_date), {
+              zone: 'utc',
+            })
+              .startOf('day')
+              .toJSDate();
 
-    setEnhancedVacations(limitedVacations);
-  }, [vacations, holidays]);
+            // Calculate total days off (including weekends)
+            const totalDaysOff = Interval.fromDateTimes(
+              DateTime.fromJSDate(startDate),
+              DateTime.fromJSDate(endDate).plus({ days: 1 }),
+            ).length('days');
+
+            // --- Calculate working days using the service ---
+            let workingDaysOff = 0;
+            try {
+              // Convert the component's 'holidays' state (which are {id, date: string, ...})
+              // to the { date: Date, type: string[] } format expected by calculateBusinessDays
+              const holidaysForCalc: { date: Date; type: string[] }[] = holidays
+                .map((h) => {
+                  const dt = DateTime.fromISO(h.date, { zone: 'utc' });
+                  return dt.isValid
+                    ? { date: dt.toJSDate(), type: h.type || [] }
+                    : null;
+                })
+                .filter((h): h is { date: Date; type: string[] } => h !== null);
+
+              console.log(
+                `[UpcomingVacationsCard] Passing ${holidaysForCalc.length} holidays to calculateBusinessDays for vacation ID ${vacation.id}`,
+              ); // Log holidays passed
+              // Call the synchronous function
+              const calculatedDays = calculateBusinessDays(
+                // Remove await
+                startDate,
+                endDate,
+                holidaysForCalc, // Pass the formatted holidays array
+                vacation.is_half_day || false, // Pass the actual half-day status
+              );
+              // Let the service handle the half-day logic based on the flag passed above
+              workingDaysOff = Math.max(0, calculatedDays);
+              console.log(
+                `[UpcomingVacationsCard] Vacation ID: ${vacation.id} - Frontend calculated: ${calculatedDays}, Adjusted: ${workingDaysOff}`,
+              ); // Log frontend result only
+            } catch (calcError) {
+              console.error(
+                `Error calculating business days for vacation ${vacation.id}:`,
+                calcError,
+              );
+              // Removed log referencing non-existent backend value
+              return null;
+            }
+            // --- End working days calculation ---
+
+            // --- Adjacency and message logic ---
+            let isLongWeekend = false;
+            let adjacentWeekend = false;
+            let adjacentToHolidays = false;
+            let extendedTimeOffMessage = null;
+            const startDateTime = DateTime.fromJSDate(startDate);
+            const endDateTime = DateTime.fromJSDate(endDate);
+            const dayBeforeStart = startDateTime.minus({ days: 1 });
+            const dayAfterEnd = endDateTime.plus({ days: 1 });
+            const isWeekendDay = (date: DateTime) =>
+              [6, 7].includes(date.weekday);
+
+            if (isWeekendDay(dayBeforeStart) || isWeekendDay(dayAfterEnd)) {
+              adjacentWeekend = true;
+            }
+
+            const adjacentHolidays = holidays.filter((holiday) => {
+              const holidayDateStr = holiday.date;
+              if (!holidayDateStr) return false;
+              const holidayDateTime = DateTime.fromISO(holidayDateStr);
+              return (
+                holidayDateTime.hasSame(dayBeforeStart, 'day') ||
+                holidayDateTime.hasSame(dayAfterEnd, 'day')
+              );
+            });
+
+            if (adjacentHolidays.length > 0) {
+              adjacentToHolidays = true;
+            }
+
+            // Calculate consecutive days off for message
+            if (totalDaysOff <= 2 && (adjacentWeekend || adjacentToHolidays)) {
+              isLongWeekend = true;
+              let consecutiveDaysOff = totalDaysOff;
+              if (adjacentWeekend) {
+                if (isWeekendDay(dayBeforeStart))
+                  consecutiveDaysOff +=
+                    dayBeforeStart.weekday === 7
+                      ? 2
+                      : dayBeforeStart.weekday === 6
+                        ? 2
+                        : 0;
+                if (isWeekendDay(dayAfterEnd))
+                  consecutiveDaysOff +=
+                    dayAfterEnd.weekday === 6
+                      ? 2
+                      : dayAfterEnd.weekday === 7
+                        ? 1
+                        : 0;
+              }
+              if (adjacentToHolidays)
+                consecutiveDaysOff += adjacentHolidays.length;
+
+              if (adjacentWeekend && adjacentToHolidays)
+                extendedTimeOffMessage = `Extended break: ${consecutiveDaysOff} days off including weekends & holidays`;
+              else if (adjacentWeekend)
+                extendedTimeOffMessage = `Long weekend: ${consecutiveDaysOff} days off including weekend`;
+              else if (adjacentToHolidays)
+                extendedTimeOffMessage = `Extended break: ${consecutiveDaysOff} days off including holidays`;
+            } else if (totalDaysOff > 2) {
+              extendedTimeOffMessage = `Total time off: ${totalDaysOff} days (${workingDaysOff} working days)`;
+            }
+
+            // Determine vacation type
+            let vacationType: 'regular' | 'long-weekend' | 'holiday-adjacent' =
+              'regular';
+            if (isLongWeekend) vacationType = 'long-weekend';
+            else if (adjacentHolidays.length > 0)
+              vacationType = 'holiday-adjacent';
+
+            // Return the enhanced object
+            return {
+              ...vacation,
+              isLongWeekend,
+              adjacentHolidays,
+              totalDaysOff,
+              workingDaysOff,
+              isHalfDay: vacation.is_half_day || false,
+              halfDayPortion: vacation.half_day_portion as
+                | 'AM'
+                | 'PM'
+                | undefined,
+              vacationType,
+              extendedTimeOffMessage,
+            };
+          },
+        ); // End of vacations.map
+
+        // Wait for all async map operations to complete
+        const results = enhancedResults; // Remove await Promise.all, use the direct results
+        // Filter out any null results from calculation errors
+        const successfulEnhanced: EnhancedVacation[] = results.filter(
+          (v): v is EnhancedVacation => v !== null,
+        );
+        // Sort and limit
+        const sortedVacations = successfulEnhanced
+          // Add explicit types for filter/sort parameters
+          .filter(
+            (vacation: EnhancedVacation) =>
+              new Date(vacation.end_date) >= new Date(),
+          )
+          .sort(
+            (a: EnhancedVacation, b: EnhancedVacation) =>
+              new Date(a.start_date).getTime() -
+              new Date(b.start_date).getTime(),
+          );
+        const limitedVacations = sortedVacations.slice(0, 5);
+
+        // Only update state if the result is actually different (shallow compare stringified)
+        // This helps prevent loops if dependencies change reference but not content
+        if (
+          JSON.stringify(limitedVacations) !== JSON.stringify(enhancedVacations)
+        ) {
+          console.log(
+            '[UpcomingVacationsCard] Setting new enhanced vacations state.',
+          );
+          setEnhancedVacations(limitedVacations);
+        } else {
+          console.log(
+            '[UpcomingVacationsCard] Enhanced vacations unchanged, skipping state update.',
+          );
+        }
+        setError(null);
+      } catch (err) {
+        console.error('Error processing enhanced vacations:', err);
+        setError(
+          err instanceof Error
+            ? err.message
+            : 'Failed to process vacation data',
+        );
+        setEnhancedVacations([]);
+      }
+    }; // End of performCalculation function definition
+
+    // Call the calculation function
+    performCalculation(); // Remove void
+
+    // Dependencies: Run effect when data or loading states change
+  }, [vacations, holidays, province, loading, loadingSettings]); // Re-run only when input data or loading state changes
+
+  // Removed erroneous useEffect block that was calling a non-existent function
 
   // Function to format a date range
   const formatDateRange = (
@@ -464,4 +557,4 @@ export default function UpcomingVacationsCard({
       </CardContent>
     </Card>
   );
-}
+} // Closing parenthesis for the UpcomingVacationsCard component function

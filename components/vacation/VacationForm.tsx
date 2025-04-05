@@ -1,13 +1,11 @@
 /**
  * VacationForm Component for booking vacations.
- *
- * This component provides a form for users to select a start date, end date,
- * and add an optional note when booking a vacation.
+ * Refactored to use custom hooks for state management and data fetching.
  */
 'use client';
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Controller } from 'react-hook-form';
 import {
   TextField,
   Button,
@@ -25,31 +23,35 @@ import {
 } from '@mui/material';
 import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterLuxon } from '@mui/x-date-pickers/AdapterLuxon';
-import { DateTime, Interval } from 'luxon';
+import { DateTime } from 'luxon';
 import { useRouter } from 'next/navigation';
-import useHolidays from '@/lib/hooks/useHolidays';
+import useHolidays from '@/lib/hooks/useHolidays'; // Keep client-side holiday fetching
 import { createVacationBooking } from '@/lib/client/vacationClient';
 import VacationSummary from './VacationSummary';
-import HalfDaySettings, { HalfDayOption } from './HalfDaySettings';
-import HolidayDisplay from './HolidayDisplay';
+import HalfDaySettings from './HalfDaySettings';
+import HolidayDisplay from './HolidayDisplay'; // Keep if needed for display
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import MiniCalendar from '@/components/dashboard/MiniCalendar';
 import {
   generateBankHolidayMap,
-  createShouldDisableDate,
+  // createShouldDisableDate, // Moved to useExistingVacations hook
 } from './VacationDateUtils';
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
 import { Holiday, VacationBooking } from '@/types';
+import { useExistingVacations } from './hooks/useExistingVacations'; // Import new hook
+import { useVacationFormState } from './hooks/useVacationFormState'; // Import new hook
 
 interface VacationFormProps {
   userId: string;
   province: string;
+  // Prop holidays are still needed for initial SSR/server data
   holidays: {
     date: Date | string;
     name: string;
     province: string | null;
     type: 'bank' | 'provincial';
   }[];
+  // Prop existingVacations are still needed for initial SSR/server data
   existingVacations?: {
     start_date: Date | string;
     end_date: Date | string;
@@ -58,779 +60,503 @@ interface VacationFormProps {
   onSuccess?: () => void;
 }
 
-interface FormValues {
-  startDate: DateTime | null;
-  endDate: DateTime | null;
-  note: string;
-  isHalfDay: boolean;
-  halfDayPortion: string;
-  halfDayDate: DateTime | null;
-  halfDayDates: Record<string, HalfDayOption>;
-}
-
 export default function VacationForm({
   userId,
   province,
-  holidays = [],
+  holidays: propHolidays = [],
   existingVacations: initialVacations = [],
   onSuccess,
 }: VacationFormProps) {
-  // Refs for date input fields for proper popover positioning
-  const startDateRef = useRef<HTMLDivElement>(null);
-  const endDateRef = useRef<HTMLDivElement>(null);
-
+  console.log('[VacationForm] Rendering/Re-rendering'); // Log form render
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
-  const [calendarAnchorEl, setCalendarAnchorEl] = useState<HTMLElement | null>(
-    null,
-  );
-  const [activeField, setActiveField] = useState<'start' | 'end' | null>(null);
-  const [normalizedHolidays, setNormalizedHolidays] = useState<Holiday[]>([]);
-  const [existingVacations, setExistingVacations] = useState<VacationBooking[]>(
-    initialVacations as VacationBooking[],
-  );
-  const [isLoadingVacations, setIsLoadingVacations] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [submitSuccess, setSubmitSuccess] = useState(false);
 
-  // Fetch existing vacations from the API
-  useEffect(() => {
-    async function fetchVacations() {
-      setIsLoadingVacations(true);
-      try {
-        const response = await fetch('/api/vacations');
-        if (response.ok) {
-          const vacationsData = await response.json();
-          console.log(
-            'Fetched vacations from API:',
-            vacationsData.length,
-            'entries',
-          );
-          setExistingVacations(vacationsData);
-        } else {
-          console.error('Failed to fetch vacations:', response.status);
-          // Fall back to any vacations passed as props
-          if (initialVacations.length > 0) {
-            console.log(
-              'Using prop-provided vacations:',
-              initialVacations.length,
-              'entries',
-            );
-            setExistingVacations(initialVacations as VacationBooking[]);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching vacations:', error);
-        // Fall back to any vacations passed as props
-        if (initialVacations.length > 0) {
-          console.log(
-            'Using prop-provided vacations after error:',
-            initialVacations.length,
-            'entries',
-          );
-          setExistingVacations(initialVacations as VacationBooking[]);
-        }
-      } finally {
-        setIsLoadingVacations(false);
-      }
-    }
-
-    void fetchVacations();
-  }, [initialVacations]);
-
-  // Get current year for holiday fetching
+  // --- Holiday Management ---
   const currentYear = new Date().getFullYear();
-
-  // Use our useHolidays hook to fetch holidays from the client side
   const {
     holidays: clientHolidays,
     loading: holidaysLoading,
-    error: holidaysError,
+    error: holidaysFetchError, // Renamed to avoid clash
   } = useHolidays(currentYear, province);
 
-  // Form setup
-  const {
-    register,
-    handleSubmit,
-    control,
-    formState: { errors },
-    watch,
-    reset,
-    setValue,
-  } = useForm<FormValues>({
-    defaultValues: {
-      startDate: null,
-      endDate: null,
-      note: '',
-      isHalfDay: false,
-      halfDayPortion: 'AM',
-      halfDayDate: null,
-      halfDayDates: {},
-    },
-  });
+  const [normalizedHolidays, setNormalizedHolidays] = useState<Holiday[]>([]);
 
-  // Watch form fields
-  const watchIsHalfDay = watch('isHalfDay');
-  const watchHalfDayPortion = watch('halfDayPortion');
-  const watchStartDate = watch('startDate');
-  const watchEndDate = watch('endDate');
-  const watchHalfDayDate = watch('halfDayDate');
-  const watchHalfDayDates = watch('halfDayDates');
-
-  // Combine holidays from both sources to ensure we have data
+  // Combine and normalize holidays from props and client fetch
   useEffect(() => {
-    // Normalize holidays from the hook to match the Holiday interface
-    // Normalize holidays from props to match the Holiday interface
-    // 1. Normalize holidays from props to match the Holiday interface
-    const normalizedPropHolidays: Holiday[] = holidays.map((propHoliday, index): Holiday => {
-      // Normalize date (string | Date -> string)
-      const holidayDate = typeof propHoliday.date === 'string'
-        ? DateTime.fromISO(propHoliday.date)
-        : DateTime.fromJSDate(propHoliday.date);
-      const holidayDateStr = holidayDate.isValid ? holidayDate.toISODate() : null; // Get ISO date string or null
+    const normalizedPropHolidays: Holiday[] = propHolidays.map(
+      (propHoliday, index): Holiday => {
+        const holidayDate =
+          typeof propHoliday.date === 'string'
+            ? DateTime.fromISO(propHoliday.date)
+            : DateTime.fromJSDate(propHoliday.date);
+        const holidayDateStr = holidayDate.isValid
+          ? holidayDate.toISODate()
+          : null;
+        if (!holidayDateStr)
+          console.warn(
+            `[VacationForm] Could not parse date for prop holiday:`,
+            propHoliday,
+          );
+        return {
+          name: propHoliday.name,
+          id: `prop-holiday-${index}-${holidayDateStr || 'invalid-date'}`,
+          date: holidayDateStr || '',
+          type: [propHoliday.type],
+          province: propHoliday.province || undefined,
+          description: undefined,
+        };
+      },
+    );
 
-      if (!holidayDateStr) {
-        console.warn(`[VacationForm] Could not parse date for prop holiday:`, propHoliday);
-      }
-
-      // Normalize type ('bank' | 'provincial' -> string[])
-      const holidayTypeArr: string[] = [propHoliday.type];
-
-      // Normalize province (string | null -> string | undefined)
-      const holidayProvince = propHoliday.province || undefined;
-
-      return {
-        // Base properties from propHoliday
-        name: propHoliday.name,
-        // Normalized properties for Holiday interface
-        id: `prop-holiday-${index}-${holidayDateStr || 'invalid-date'}`, // Use normalized date in ID
-        date: holidayDateStr || '', // Use valid ISO string or empty string
-        type: holidayTypeArr,
-        province: holidayProvince,
-        description: undefined, // Prop type doesn't have description
-      };
-    });
-
-    // Start combined list with normalized prop holidays
     const combinedHolidays: Holiday[] = [...normalizedPropHolidays];
 
-    // Add client holidays if they're not duplicates
     if (clientHolidays && clientHolidays.length > 0) {
       clientHolidays.forEach((clientHoliday) => {
-        // Check if this holiday already exists in the combined list
         const exists = combinedHolidays.some((h) => {
           const hDate =
             typeof h.date === 'string'
               ? DateTime.fromISO(h.date).toISODate()
               : DateTime.fromJSDate(h.date).toISODate();
-
           const clientDate =
             typeof clientHoliday.date === 'string'
               ? DateTime.fromISO(clientHoliday.date).toISODate()
               : DateTime.fromJSDate(clientHoliday.date as Date).toISODate();
-
           return hDate === clientDate && h.name === clientHoliday.name;
         });
-
         if (!exists) {
-          // Add the client holiday with an id
-          // 2. Normalize clientHoliday (from useHolidays hook) before pushing
-          // Ensure it strictly conforms to the Holiday interface
-          const clientDate = DateTime.fromISO(clientHoliday.date); // Date should already be string
-          const clientDateStr = clientDate.isValid ? clientDate.toISODate() : null; // Get ISO date string or null
-
-          if (!clientDateStr) {
-             console.warn(`[VacationForm] Could not parse date for client holiday:`, clientHoliday);
-          }
-
+          const clientDate = DateTime.fromISO(clientHoliday.date);
+          const clientDateStr = clientDate.isValid
+            ? clientDate.toISODate()
+            : null;
+          if (!clientDateStr)
+            console.warn(
+              `[VacationForm] Could not parse date for client holiday:`,
+              clientHoliday,
+            );
           combinedHolidays.push({
-            // Explicitly define properties based on Holiday interface
-            id: clientHoliday.id || `client-holiday-${combinedHolidays.length}-${clientDateStr || 'invalid-date'}`, // Ensure ID exists
-            date: clientDateStr || '', // Use valid ISO string or empty string
-            name: clientHoliday.name, // Assume name exists
-            description: clientHoliday.description || undefined, // Ensure undefined if null/missing
-            type: Array.isArray(clientHoliday.type) ? clientHoliday.type : [], // Ensure type is array, default to empty
-            province: clientHoliday.province || undefined, // Ensure undefined if null/missing
+            id:
+              clientHoliday.id ||
+              `client-holiday-${combinedHolidays.length}-${clientDateStr || 'invalid-date'}`,
+            date: clientDateStr || '',
+            name: clientHoliday.name,
+            description: clientHoliday.description || undefined,
+            type: Array.isArray(clientHoliday.type) ? clientHoliday.type : [],
+            province: clientHoliday.province || undefined,
           });
         }
       });
     }
-
-    // Update the normalized holidays state
-    // Type assertion is now less critical but kept for clarity
-    // 3. Update state with the fully normalized list
     setNormalizedHolidays(combinedHolidays);
-  }, [holidays, clientHolidays]);
+  }, [propHolidays, clientHolidays]);
 
-  // Create a map of bank holiday dates for efficient lookup
-  const bankHolidayMap = generateBankHolidayMap(normalizedHolidays);
-
-  // Create shouldDisableDate function using the fetched vacations
-  const shouldDisableDate = useMemo(
-    () => createShouldDisableDate(bankHolidayMap, existingVacations),
-    [bankHolidayMap, existingVacations],
+  // Create bank holiday map (needed by useExistingVacations)
+  const bankHolidayMap = useMemo(
+    () => generateBankHolidayMap(normalizedHolidays),
+    [normalizedHolidays],
   );
 
-  // Convert existingVacations to VacationBooking type for MiniCalendar
-  const formattedVacations: VacationBooking[] = useMemo(() => {
-    // Add debug logging for existingVacations
-    console.log(
-      'VacationForm received existingVacations:',
-      existingVacations.length,
-      'entries',
-    );
-    if (existingVacations.length > 0) {
-      console.log('First vacation:', existingVacations[0]);
-    }
+  // --- Existing Vacations Hook ---
+  const {
+    // existingVacations, // Raw data if needed elsewhere
+    formattedVacations, // Formatted for MiniCalendar
+    shouldDisableDate,
+    isLoadingVacations,
+    vacationsError,
+  } = useExistingVacations({
+    initialVacations: initialVacations,
+    userId,
+    bankHolidayMap, // Pass the map here
+  });
 
-    return existingVacations.map((vacation, index) => {
-      // Format vacation with proper date handling
-      const formattedVacation = {
-        id: `vacation-${index}`,
-        start_date: vacation.start_date,
-        end_date: vacation.end_date,
-        is_half_day: vacation.is_half_day,
-        created_at: new Date().toISOString(),
-        userId: userId,
-      };
+  // --- Form State Hook ---
+  const {
+    formMethods,
+    control,
+    watchStartDate,
+    watchEndDate,
+    watchIsHalfDay, // Keep watching this for the summary/logic
+    watchHalfDayPortion, // Keep watching this
+    watchHalfDayDates,
+    calendarAnchorEl,
+    activeField,
+    startDateRef,
+    endDateRef,
+    handleOpenStartDate,
+    handleOpenEndDate,
+    handleCloseCalendar,
+    handleMiniCalendarDateSelect,
+    // getWorkingDays, // Not directly needed in component if logic is in hook/summary
+    toggleHalfDayForDate,
+    setHalfDayPortionForDate,
+    getActiveDateForCalendar,
+  } = useVacationFormState({ shouldDisableDate }); // Pass shouldDisableDate
 
-      // Verify the date conversion for the first item
-      if (index === 0) {
-        console.log('Formatted vacation dates:', {
-          original_start: vacation.start_date,
-          original_end: vacation.end_date,
-          formatted: formattedVacation,
-        });
-      }
+  const { handleSubmit, setValue } = formMethods; // Get handleSubmit from formMethods
 
-      return formattedVacation;
-    });
-  }, [existingVacations, userId]);
-
-  // Open calendar popover for Start Date
-  const handleOpenStartDate = (event: React.MouseEvent<HTMLDivElement>) => {
-    setCalendarAnchorEl(event.currentTarget);
-    setActiveField('start');
-  };
-
-  // Open calendar popover for End Date
-  const handleOpenEndDate = (event: React.MouseEvent<HTMLDivElement>) => {
-    if (!watchStartDate) {
-      // If no start date, select that first
-      handleOpenStartDate(event);
-      return;
-    }
-    setCalendarAnchorEl(event.currentTarget);
-    setActiveField('end');
-  };
-
-  // Close calendar popover
-  const handleCloseCalendar = () => {
-    setCalendarAnchorEl(null);
-    setActiveField(null);
-  };
-
-  // Handle date selection from MiniCalendar
-  const handleMiniCalendarDateSelect = (date: DateTime) => {
-    if (activeField === 'start') {
-      setValue('startDate', date);
-
-      // If end date is before start date, reset it
-      if (watchEndDate && watchEndDate < date) {
-        setValue('endDate', null);
-      }
-
-      // If selecting start date and we don't have an end date yet,
-      // switch to end date selection automatically
-      if (!watchEndDate || watchEndDate < date) {
-        setActiveField('end');
-      } else {
-        // Close calendar if both dates are set
-        handleCloseCalendar();
-      }
-    } else if (activeField === 'end') {
-      // Ensure end date is not before start date
-      if (watchStartDate && date >= watchStartDate) {
-        setValue('endDate', date);
-        handleCloseCalendar();
-      }
-    }
-  };
-
-  // Initialize halfDayDates when workingDays change
-  useEffect(() => {
-    if (watchStartDate && watchEndDate) {
-      // Get the working days
-      const workingDays = getWorkingDays();
-
-      if (workingDays.length > 0) {
-        // Create default half-day settings for each working day
-        const halfDaySettings: Record<string, HalfDayOption> = {};
-
-        workingDays.forEach((day) => {
-          const dateKey = day.toISODate();
-          if (dateKey && !watchHalfDayDates[dateKey]) {
-            halfDaySettings[dateKey] = { isHalfDay: false, portion: 'AM' };
-          }
-        });
-
-        // Only update if there are new days
-        if (Object.keys(halfDaySettings).length > 0) {
-          setValue('halfDayDates', {
-            ...watchHalfDayDates,
-            ...halfDaySettings,
-          });
-        }
-      }
-    }
-  }, [watchStartDate, watchEndDate, setValue, watchHalfDayDates]);
-
-  // Generate the list of working days
-  const getWorkingDays = (): DateTime[] => {
-    const startDate = watchStartDate;
-    const endDate = watchEndDate;
-    if (!startDate || !endDate) {
-      return [];
-    }
-
-    const workingDays = [];
-
-    // Iterate through each day in the interval
-    let currentDate = startDate.startOf('day');
-    while (currentDate <= endDate) {
-      if (!shouldDisableDate(currentDate)) {
-        workingDays.push(currentDate);
-      }
-      currentDate = currentDate.plus({ days: 1 });
-    }
-
-    return workingDays;
-  };
-
-  // Toggle half-day for a specific date
-  const toggleHalfDay = (dateKey: string) => {
-    const currentSettings = watchHalfDayDates[dateKey];
-    if (currentSettings) {
-      const newHalfDayDates = { ...watchHalfDayDates };
-      newHalfDayDates[dateKey] = {
-        ...currentSettings,
-        isHalfDay: !currentSettings.isHalfDay,
-      };
-      setValue('halfDayDates', newHalfDayDates);
-    }
-  };
-
-  // Set half-day portion for a specific date
-  const setHalfDayPortion = (dateKey: string, portion: string) => {
-    const currentSettings = watchHalfDayDates[dateKey];
-    if (currentSettings) {
-      const newHalfDayDates = { ...watchHalfDayDates };
-      newHalfDayDates[dateKey] = {
-        ...currentSettings,
-        portion,
-      };
-      setValue('halfDayDates', newHalfDayDates);
-    }
-  };
-
-  // Calculate vacation duration (excluding weekends and holidays)
-  const calculateWorkingDays = () => {
-    const startDate = watchStartDate;
-    const endDate = watchEndDate;
-    if (!startDate || !endDate) {
-      return 0;
-    }
-
-    let days = 0;
-
-    // Create an interval between the dates
-    const interval = Interval.fromDateTimes(
-      startDate.startOf('day'),
-      endDate.endOf('day'),
-    );
-
-    // Iterate through each day in the interval
-    let currentDate = startDate.startOf('day');
-    while (currentDate <= endDate) {
-      // Only count weekdays (not weekends)
-      if (![6, 7].includes(currentDate.weekday)) {
-        days++;
-      }
-      currentDate = currentDate.plus({ days: 1 });
-    }
-
-    // Adjust for multiple half days if applicable
-    if (watchIsHalfDay) {
-      // Count how many half days are selected
-      const halfDayCount = Object.values(watchHalfDayDates).filter(
-        (day) => day.isHalfDay,
-      ).length;
-      if (halfDayCount > 0) {
-        days -= halfDayCount * 0.5;
-      } else {
-        // Fallback to old behavior if no specific days are selected
-        days -= 0.5;
-      }
-    }
-
-    return days;
-  };
-
-  // Form submission handler
-  const onSubmit = async (data: FormValues) => {
+  // --- Form Submission ---
+  // Use the correct form values type from the hook
+  const onSubmit = async (
+    data: import('./hooks/useVacationFormState').VacationFormValues,
+  ) => {
     setIsSubmitting(true);
-    setError(null);
+    setSubmitError(null);
+    setSubmitSuccess(false);
 
-    const { startDate, endDate } = data;
+    const { startDate, endDate, note } = data; // Get data from hook's state via watch or form data
 
     if (!startDate || !endDate) {
-      setError('Please select both start and end dates.');
+      setSubmitError('Please select both start and end dates.');
       setIsSubmitting(false);
       return;
     }
 
     try {
       // Prepare half-day dates for submission
-      const halfDayDates = data.isHalfDay
-        ? Object.entries(data.halfDayDates)
+      const halfDayInfo = data.isHalfDay
+        ? Object.entries(
+            data.halfDayDates as Record<
+              string,
+              { isHalfDay: boolean; portion: string }
+            >,
+          )
             .filter(([_, settings]) => settings.isHalfDay)
             .map(([dateStr, settings]) => ({
-              date: DateTime.fromISO(dateStr).toJSDate(),
+              date: DateTime.fromISO(dateStr).toJSDate(), // Convert back to JS Date for API
               portion: settings.portion,
             }))
-        : [];
+        : []; // Empty array if not a half-day booking overall
 
-      await createVacationBooking({
-        userId,
-        startDate: startDate.toJSDate(),
-        endDate: endDate.toJSDate(),
-        note: data.note || null,
-        isHalfDay: data.isHalfDay || false,
-        halfDayPortion: data.isHalfDay ? data.halfDayPortion : null,
-        halfDayDate:
-          data.isHalfDay && data.halfDayDate
-            ? data.halfDayDate.toJSDate()
-            : null,
-        halfDayDates: halfDayDates,
-      });
+      // Construct bookingData according to VacationBookingInput type
+      const bookingData: import('@/services/vacation/vacationTypes').VacationBookingInput =
+        {
+          userId,
+          startDate: startDate.toJSDate(), // Use JS Date object
+          endDate: endDate.toJSDate(), // Use JS Date object
+          note: data.note || null,
+          isHalfDay: data.isHalfDay,
+          // Pass the detailed half-day info if available
+          halfDayDates: halfDayInfo.length > 0 ? halfDayInfo : undefined,
+          // halfDayPortion and halfDayDate are likely not needed if halfDayDates is used
+        };
 
-      setSuccess(true);
-      reset();
+      console.log(
+        'Submitting vacation booking (VacationBookingInput):',
+        bookingData,
+      );
 
+      const result = await createVacationBooking(bookingData);
+
+      console.log('Vacation booking successful:', result);
+      setSubmitSuccess(true);
       if (onSuccess) {
         onSuccess();
       } else {
-        router.push('/dashboard');
-        router.refresh();
+        // Redirect to dashboard or vacation list page after success
+        router.push('/dashboard/vacations');
       }
-    } catch (err) {
-      // Check if it's a validation error specifically for overlapping dates
-      if (err instanceof Error && err.message.includes('overlaps')) {
-        setError(err.message);
-      } else {
-        setError('Failed to book vacation. Please try again.');
-      }
-      console.error(err);
+      // Optionally reset form: reset();
+    } catch (error: any) {
+      console.error('Error booking vacation:', error);
+      setSubmitError(
+        error.message || 'An unexpected error occurred while booking.',
+      );
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // Determine if it's a single day vacation
-  const isSingleDay =
-    watchStartDate &&
-    watchEndDate &&
-    watchStartDate.hasSame(watchEndDate, 'day');
+  // Determine if the selected range is a single day
+  const isSingleDay = useMemo(() => {
+    return (
+      watchStartDate &&
+      watchEndDate &&
+      watchStartDate.hasSame(watchEndDate, 'day')
+    );
+  }, [watchStartDate, watchEndDate]);
 
-  const workingDays = getWorkingDays();
-  const hasMultipleWorkingDays = workingDays.length > 1;
+  // Convert normalized holidays for VacationSummary (expects Date objects)
+  const summaryHolidays = useMemo(() => {
+    return normalizedHolidays
+      .map((holiday) => {
+        const date = DateTime.fromISO(holiday.date);
+        return date.isValid ? { ...holiday, date: date.toJSDate() } : null;
+      })
+      .filter((h): h is Holiday & { date: Date } => h !== null);
+  }, [normalizedHolidays]);
 
-  // Create processed holidays with consistent Date objects for VacationSummary
-  const processedHolidays = useMemo(() => {
-    return holidays.map((holiday) => ({
-      ...holiday,
-      // Convert any string dates to Date objects
-      date:
-        typeof holiday.date === 'string'
-          ? new Date(holiday.date)
-          : holiday.date,
-    }));
-  }, [holidays]);
+  // Memoize props for VacationSummary to prevent unnecessary re-renders/effects
+  const summaryStartDate = useMemo(
+    () => watchStartDate?.toJSDate() ?? null,
+    [watchStartDate],
+  );
+  const summaryEndDate = useMemo(
+    () => watchEndDate?.toJSDate() ?? null,
+    [watchEndDate],
+  );
+  const summaryHalfDayDates = useMemo(() => {
+    return Object.entries(watchHalfDayDates)
+      .filter(([_, settings]) => settings.isHalfDay)
+      .map(([dateStr, settings]) => ({
+        date: DateTime.fromISO(dateStr).toJSDate(),
+        portion: settings.portion,
+      }));
+  }, [watchHalfDayDates]);
 
-  // Is calendar popover open
-  const isCalendarOpen = Boolean(calendarAnchorEl);
-
-  // Get active date for MiniCalendar
-  const getActiveDate = () => {
-    if (activeField === 'start') {
-      return watchStartDate || DateTime.now();
-    } else if (activeField === 'end') {
-      return (
-        watchEndDate ||
-        (watchStartDate ? watchStartDate.plus({ days: 1 }) : DateTime.now())
-      );
-    }
-    return DateTime.now();
-  };
-
+  // --- Render ---
+  // --- Render ---
   return (
-    <form
-      onSubmit={(e) => {
-        void handleSubmit(onSubmit)(e);
-      }}
-    >
-      <div className="space-y-4">
-        {/* Holiday information display */}
-        <HolidayDisplay
-          holidays={normalizedHolidays}
-          loading={holidaysLoading}
-          error={holidaysError}
-        />
+    <LocalizationProvider dateAdapter={AdapterLuxon}>
+      <form
+        onSubmit={(e) => {
+          void handleSubmit(onSubmit)(e); // Use handleSubmit from hook
+        }}
+      >
+        <div className="space-y-4">
+          {/* Display loading/error states */}
+          {holidaysLoading && (
+            <Alert severity="info">Loading holidays...</Alert>
+          )}
+          {holidaysFetchError && (
+            <Alert severity="error">
+              Error loading holidays: {holidaysFetchError}
+            </Alert>
+          )}
+          {isLoadingVacations && (
+            <Alert severity="info">Loading existing vacations...</Alert>
+          )}
+          {vacationsError && (
+            <Alert severity="error">
+              Error loading existing vacations: {vacationsError}
+            </Alert>
+          )}
 
-        <Grid container spacing={2}>
-          <Grid item xs={12} md={6}>
-            <Controller
-              name="startDate"
-              control={control}
-              rules={{ required: 'Start date is required' }}
-              render={({ field, fieldState }) => (
-                <TextField
-                  label="Start Date"
-                  fullWidth
-                  inputRef={startDateRef}
-                  onClick={handleOpenStartDate}
-                  value={field.value ? field.value.toFormat('MMM d, yyyy') : ''}
-                  InputProps={{
-                    readOnly: true,
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          edge="end"
-                          onClick={(e) => handleOpenStartDate(e as any)}
-                        >
-                          <CalendarTodayIcon />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  sx={{
-                    cursor: 'pointer',
-                    '& .MuiInputBase-root': {
+          {/* Date Inputs */}
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="startDate"
+                control={control} // Use control from hook
+                rules={{ required: 'Start date is required' }}
+                render={({ field, fieldState }) => (
+                  <TextField
+                    label="Start Date"
+                    fullWidth
+                    inputRef={startDateRef} // Use ref from hook
+                    onClick={(e) => handleOpenStartDate(e as any)} // Use handler from hook
+                    value={
+                      field.value ? field.value.toFormat('MMM d, yyyy') : ''
+                    }
+                    InputProps={{
+                      readOnly: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            edge="end"
+                            onClick={(e) => handleOpenStartDate(e as any)} // Use handler from hook
+                          >
+                            <CalendarTodayIcon />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                    error={!!fieldState.error}
+                    helperText={fieldState.error?.message}
+                    sx={{
                       cursor: 'pointer',
-                    },
-                  }}
-                />
-              )}
-            />
-          </Grid>
-
-          <Grid item xs={12} md={6}>
-            <Controller
-              name="endDate"
-              control={control}
-              rules={{ required: 'End date is required' }}
-              render={({ field, fieldState }) => (
-                <TextField
-                  label="End Date"
-                  fullWidth
-                  inputRef={endDateRef}
-                  onClick={handleOpenEndDate}
-                  value={field.value ? field.value.toFormat('MMM d, yyyy') : ''}
-                  InputProps={{
-                    readOnly: true,
-                    endAdornment: (
-                      <InputAdornment position="end">
-                        <IconButton
-                          edge="end"
-                          onClick={(e) => handleOpenEndDate(e as any)}
-                        >
-                          <CalendarTodayIcon />
-                        </IconButton>
-                      </InputAdornment>
-                    ),
-                  }}
-                  error={!!fieldState.error}
-                  helperText={fieldState.error?.message}
-                  sx={{
-                    cursor: 'pointer',
-                    '& .MuiInputBase-root': {
-                      cursor: 'pointer',
-                    },
-                  }}
-                />
-              )}
-            />
-          </Grid>
-        </Grid>
-
-        {/* MiniCalendar Popover */}
-        <Popover
-          open={isCalendarOpen}
-          anchorEl={calendarAnchorEl}
-          onClose={handleCloseCalendar}
-          anchorOrigin={{
-            vertical: 'bottom',
-            horizontal: 'left',
-          }}
-          transformOrigin={{
-            vertical: 'top',
-            horizontal: 'left',
-          }}
-          sx={{
-            mt: 1,
-            '& .MuiPopover-paper': {
-              boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.2)',
-              borderRadius: 1,
-            },
-          }}
-        >
-          <Box sx={{ p: 1, width: 280 }}>
-            <Typography variant="subtitle2" sx={{ mb: 1 }}>
-              {activeField === 'start'
-                ? 'Select Start Date'
-                : 'Select End Date'}
-            </Typography>
-
-            {isLoadingVacations ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : (
-              <MiniCalendar
-                holidays={normalizedHolidays}
-                vacations={existingVacations}
-                province={province}
-                onDateSelect={handleMiniCalendarDateSelect}
-                selectedDate={getActiveDate()}
+                      '& .MuiInputBase-root': { cursor: 'pointer' },
+                    }}
+                  />
+                )}
               />
-            )}
+            </Grid>
 
-            <Box
-              sx={{ mt: 2, display: 'flex', flexDirection: 'column', gap: 0.5 }}
-            >
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    bgcolor: CALENDAR_COLORS.VACATION.FULL_DAY,
-                    border: `1px solid ${CALENDAR_COLORS.VACATION.TEXT}`,
-                  }}
-                />
-                <Typography variant="caption" color="text.secondary">
-                  Already booked vacation (not selectable)
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Box
-                  sx={{
-                    width: 12,
-                    height: 12,
-                    borderRadius: '50%',
-                    bgcolor: CALENDAR_COLORS.HOLIDAY.BANK,
-                    border: `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT}`,
-                  }}
-                />
-                <Typography variant="caption" color="text.secondary">
-                  Holiday
-                </Typography>
-              </Box>
-            </Box>
-          </Box>
-        </Popover>
+            <Grid item xs={12} md={6}>
+              <Controller
+                name="endDate"
+                control={control} // Use control from hook
+                rules={{ required: 'End date is required' }}
+                render={({ field, fieldState }) => (
+                  <TextField
+                    label="End Date"
+                    fullWidth
+                    inputRef={endDateRef} // Use ref from hook
+                    onClick={(e) => handleOpenEndDate(e as any)} // Use handler from hook
+                    value={
+                      field.value ? field.value.toFormat('MMM d, yyyy') : ''
+                    }
+                    InputProps={{
+                      readOnly: true,
+                      endAdornment: (
+                        <InputAdornment position="end">
+                          <IconButton
+                            edge="end"
+                            onClick={(e) => handleOpenEndDate(e as any)} // Use handler from hook
+                            disabled={!watchStartDate} // Disable if no start date
+                          >
+                            <CalendarTodayIcon />
+                          </IconButton>
+                        </InputAdornment>
+                      ),
+                    }}
+                    error={!!fieldState.error}
+                    helperText={fieldState.error?.message}
+                    disabled={!watchStartDate} // Disable field if no start date
+                    sx={{
+                      cursor: 'pointer',
+                      '& .MuiInputBase-root': { cursor: 'pointer' },
+                    }}
+                  />
+                )}
+              />
+            </Grid>
+          </Grid>
 
-        {/* Half-day vacation settings */}
-        <HalfDaySettings
-          startDate={watchStartDate}
-          endDate={watchEndDate}
-          halfDayData={{
-            isHalfDay: watchIsHalfDay,
-            halfDayPortion: watchHalfDayPortion,
-            halfDayDate: watchHalfDayDate,
-            halfDayDates: watchHalfDayDates,
-          }}
-          onToggleHalfDay={(enabled) => setValue('isHalfDay', enabled)}
-          onHalfDayPortionChange={(portion) =>
-            setValue('halfDayPortion', portion)
-          }
-          onToggleDateHalfDay={toggleHalfDay}
-          onDatePortionChange={setHalfDayPortion}
-          shouldDisableDate={shouldDisableDate}
-        />
-
-        {isSingleDay && !watchIsHalfDay && (
-          <FormHelperText>
-            For a single day, consider selecting the &quot;Enable half-day
-            vacation(s)&quot; option if you&apos;re only taking half a day off.
-          </FormHelperText>
-        )}
-
-        <TextField
-          label="Note (Optional)"
-          fullWidth
-          multiline
-          rows={2}
-          placeholder="Add any details about your vacation..."
-          {...register('note')}
-        />
-
-        {/* Display summary of selected dates */}
-        {watchStartDate && watchEndDate && (
-          <VacationSummary
-            startDate={watchStartDate.toJSDate()}
-            endDate={watchEndDate.toJSDate()}
-            workingDays={calculateWorkingDays()}
-            isHalfDay={watchIsHalfDay}
-            halfDayPortion={watchHalfDayPortion}
-            halfDayDate={
-              watchHalfDayDate ? watchHalfDayDate.toJSDate() : undefined
-            }
-            halfDayDates={Object.entries(watchHalfDayDates)
-              .filter(([_, settings]) => settings.isHalfDay)
-              .map(([dateStr, settings]) => ({
-                date: DateTime.fromISO(dateStr).toJSDate(),
-                portion: settings.portion,
-              }))}
-            holidays={processedHolidays}
-          />
-        )}
-
-        {/* Error and success messages */}
-        {error && (
-          <Alert severity="error" sx={{ mt: 2 }}>
-            {error}
-          </Alert>
-        )}
-
-        {success && (
-          <Alert severity="success" sx={{ mt: 2 }}>
-            Vacation booked successfully!
-          </Alert>
-        )}
-
-        <Box sx={{ mt: 3 }}>
-          <Button
-            type="submit"
-            variant="contained"
-            disabled={isSubmitting || !watchStartDate || !watchEndDate}
-            sx={{ mr: 2 }}
-          >
-            {isSubmitting ? 'Booking...' : 'Book Vacation'}
-          </Button>
-
-          <Button
-            type="button"
-            onClick={() => {
-              reset();
+          {/* MiniCalendar Popover */}
+          <Popover
+            open={Boolean(calendarAnchorEl)} // Use state from hook
+            anchorEl={calendarAnchorEl} // Use state from hook
+            onClose={handleCloseCalendar} // Use handler from hook
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+            sx={{
+              mt: 1,
+              '& .MuiPopover-paper': {
+                boxShadow: '0px 5px 15px rgba(0, 0, 0, 0.2)',
+                borderRadius: 1,
+              },
             }}
           >
-            Reset
-          </Button>
-        </Box>
-      </div>
-    </form>
+            <Box sx={{ p: 1, width: 280 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                {activeField === 'start'
+                  ? 'Select Start Date'
+                  : 'Select End Date'}
+              </Typography>
+              {isLoadingVacations || holidaysLoading ? ( // Check both loading states
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={24} />
+                </Box>
+              ) : (
+                <MiniCalendar
+                  holidays={normalizedHolidays} // Pass normalized holidays
+                  vacations={formattedVacations} // Pass formatted vacations from hook
+                  province={province}
+                  onDateSelect={handleMiniCalendarDateSelect} // Use handler from hook
+                  selectedDate={getActiveDateForCalendar()} // Use getter from hook
+                  // No need for vacationToExclude if formattedVacations is correct
+                />
+              )}
+              {/* Legend */}
+              <Box
+                sx={{
+                  mt: 2,
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: 0.5,
+                }}
+              >
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      bgcolor: CALENDAR_COLORS.VACATION.FULL_DAY,
+                      border: `1px solid ${CALENDAR_COLORS.VACATION.TEXT}`,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Already booked
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Box
+                    sx={{
+                      width: 12,
+                      height: 12,
+                      borderRadius: '50%',
+                      bgcolor: CALENDAR_COLORS.HOLIDAY.BANK,
+                      border: `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT}`,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary">
+                    Holiday
+                  </Typography>
+                </Box>
+              </Box>
+            </Box>
+          </Popover>
+
+          {/* Half Day Settings */}
+          <HalfDaySettings
+            startDate={watchStartDate}
+            endDate={watchEndDate}
+            halfDayData={{
+              // Pass data from hook state
+              isHalfDay: watchIsHalfDay,
+              halfDayPortion: watchHalfDayPortion,
+              halfDayDate: null, // Deprecated?
+              halfDayDates: watchHalfDayDates,
+            }}
+            onToggleHalfDay={(enabled) => setValue('isHalfDay', enabled)} // Use setValue from hook
+            onHalfDayPortionChange={(portion) =>
+              setValue('halfDayPortion', portion)
+            } // Use setValue from hook (maybe remove if only using date-specific)
+            onToggleDateHalfDay={toggleHalfDayForDate} // Use handler from hook
+            onDatePortionChange={setHalfDayPortionForDate} // Use handler from hook
+            simplified={false} // Use detailed mode
+          />
+
+          {/* Note Field */}
+          <TextField
+            label="Note (Optional)"
+            fullWidth
+            multiline
+            rows={3}
+            placeholder="Add any details about your vacation..."
+            {...formMethods.register('note')} // Use register from hook's formMethods
+          />
+
+          {/* Vacation Summary */}
+          {watchStartDate && watchEndDate && (
+            <VacationSummary
+              startDate={summaryStartDate} // Use memoized value
+              endDate={summaryEndDate} // Use memoized value
+              province={province}
+              // isHalfDay={watchIsHalfDay} // Not directly needed
+              halfDayDates={summaryHalfDayDates} // Use memoized value
+              // holidays prop removed, summary fetches its own
+            />
+          )}
+
+          {/* Submission Feedback */}
+          {submitError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {submitError}
+            </Alert>
+          )}
+          {submitSuccess && (
+            <Alert severity="success" sx={{ mt: 2 }}>
+              Vacation booked successfully!
+            </Alert>
+          )}
+
+          {/* Action Buttons */}
+          <Box sx={{ mt: 3 }}>
+            <Button
+              type="submit"
+              variant="contained"
+              color="primary"
+              disabled={isSubmitting || !watchStartDate || !watchEndDate}
+              fullWidth
+            >
+              {isSubmitting ? 'Booking...' : 'Book Vacation'}
+            </Button>
+          </Box>
+        </div>
+      </form>
+    </LocalizationProvider>
   );
 }

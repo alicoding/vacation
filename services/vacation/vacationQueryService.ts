@@ -2,7 +2,8 @@
 // Remove unused cookies import
 import { createAuthedServerClient } from '@/lib/supabase.server'; // Import the correct helper
 import { VacationBooking, VacationServiceError } from './vacationTypes';
-import { calculateBusinessDays } from './vacationCalculationService';
+import { calculateBusinessDays } from './vacationCalculationUtils'; // Import from utils
+import { getHolidaysByYear } from '../holiday/holidayService'; // Import holiday fetching function
 import { DateTime } from 'luxon';
 
 /**
@@ -141,6 +142,12 @@ export async function getVacationDaysUsed(
       throw new VacationServiceError(error.message, 'DATABASE_ERROR');
     }
 
+    // Fetch holidays for the year and province first
+    const holidays = await getHolidaysByYear(year, province);
+    console.log(
+      `[getVacationDaysUsed] Fetched ${holidays.length} holidays for ${province} in ${year}.`,
+    );
+
     // Calculate total business days for each booking
     let totalDays = 0;
     console.log(
@@ -151,11 +158,13 @@ export async function getVacationDaysUsed(
       const startDate = DateTime.fromISO(vacation.start_date).toJSDate();
       const endDate = DateTime.fromISO(vacation.end_date).toJSDate();
 
-      const businessDays = await calculateBusinessDays(
+      // Pass the fetched holidays array, not the province string
+      // Remove await as the function is now synchronous
+      const businessDays = calculateBusinessDays(
         startDate,
         endDate,
-        province,
-        vacation.is_half_day ?? undefined, // Convert null to undefined
+        holidays, // Pass the fetched holidays array
+        vacation.is_half_day ?? false, // Pass boolean, default to false
       );
 
       console.log(
