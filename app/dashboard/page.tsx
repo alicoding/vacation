@@ -9,8 +9,11 @@ import { VacationBooking, Holiday } from '@/types'; // Add Holiday type
 // Remove getVacationDaysUsed import
 import { getServerSession } from '@/lib/auth-helpers.server';
 import type { Database } from '@/types/supabase';
-import { calculateVacationStats } from '@/services/vacation/vacationCalculationService'; // Import centralized function
-import { getHolidaysByYear, HolidayWithTypeArray } from '@/services/holiday/holidayService'; // Import getHolidaysByYear and HolidayWithTypeArray
+import { calculateVacationStats } from '@/services/vacation/vacationCalculationUtils'; // Import centralized function
+import {
+  getHolidaysByYear,
+  HolidayWithTypeArray,
+} from '@/services/holiday/holidayService'; // Import getHolidaysByYear and HolidayWithTypeArray
 import { DateTime } from 'luxon';
 // Removed createServerClient from @supabase/ssr
 import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
@@ -173,7 +176,8 @@ export default async function DashboardPage() {
   }
 
   // Calculate vacation stats using the centralized function
-  const vacationStats = await calculateVacationStats( // Add await here
+  const vacationStats = calculateVacationStats(
+    // Add await here
     user.total_vacation_days, // Use total days from user data
     user.vacationBookings, // Use bookings from user data
     holidays, // Use fetched holidays

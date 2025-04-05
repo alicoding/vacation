@@ -29,7 +29,7 @@ import CogIcon from '@heroicons/react/24/outline/CogIcon';
 import MiniCalendar from './MiniCalendar';
 import { VacationBooking } from '@/types'; // Keep VacationBooking from @/types
 import { DateTime } from 'luxon';
-import { calculateVacationStats } from '@/services/vacation/vacationCalculationService'; // Import the centralized function
+import { calculateVacationStats } from '@/services/vacation/vacationCalculationUtils'; // Import the centralized function
 import { HolidayWithTypeArray } from '@/services/holiday/holidayService'; // Import HolidayWithTypeArray
 
 // Custom type for extended session user with total_vacation_days
@@ -93,12 +93,20 @@ export default function DashboardSidebar() {
         if (holidaysResponse.ok) {
           const holidaysData = await holidaysResponse.json();
           // Map fetched data (assuming string dates) to HolidayWithTypeArray (with Date objects)
-          const holidaysWithDateObjects: HolidayWithTypeArray[] = holidaysData.map((h: any) => ({
-            ...h,
-            date: DateTime.fromISO(String(h.date), { zone: 'utc' }).toJSDate(), // Convert string to Date
-            // Ensure 'type' is an array, handle potential string data from API
-            type: typeof h.type === 'string' ? [h.type] : (Array.isArray(h.type) ? h.type : [])
-          }));
+          const holidaysWithDateObjects: HolidayWithTypeArray[] =
+            holidaysData.map((h: any) => ({
+              ...h,
+              date: DateTime.fromISO(String(h.date), {
+                zone: 'utc',
+              }).toJSDate(), // Convert string to Date
+              // Ensure 'type' is an array, handle potential string data from API
+              type:
+                typeof h.type === 'string'
+                  ? [h.type]
+                  : Array.isArray(h.type)
+                    ? h.type
+                    : [],
+            }));
           setHolidays(holidaysWithDateObjects);
         } else {
           console.error(
@@ -134,10 +142,10 @@ export default function DashboardSidebar() {
   // useEffect for calculating stats using the centralized function
   useEffect(() => {
     // Define an async function inside useEffect to handle the async calculation
-    const calculateAndSetStats = async () => {
+    const calculateAndSetStats = () => {
       if (user?.total_vacation_days && holidays && vacations) {
         // Call the centralized async function with await
-        const stats = await calculateVacationStats(
+        const stats = calculateVacationStats(
           user.total_vacation_days,
           vacations,
           holidays, // Pass the state which is now HolidayWithTypeArray[]
@@ -169,10 +177,10 @@ export default function DashboardSidebar() {
 
   // Get upcoming holidays (next 3) using the Date objects directly
   const upcomingHolidays = holidays
-    .map(holiday => ({
+    .map((holiday) => ({
       ...holiday,
       // Convert Date object to Luxon DateTime for comparison/formatting
-      luxonDate: DateTime.fromJSDate(holiday.date, { zone: 'utc' })
+      luxonDate: DateTime.fromJSDate(holiday.date, { zone: 'utc' }),
     }))
     .filter(
       (holiday) =>
