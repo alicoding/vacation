@@ -23,9 +23,6 @@ export default function Header() {
   const { user, isAuthenticated, isLoading, signOut: authSignOut } = useAuth();
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null);
 
-  // Add debug logging to understand the auth state
-  console.log('Header auth state:', { user, isAuthenticated, isLoading });
-
   const handleOpenMenu = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
   };
