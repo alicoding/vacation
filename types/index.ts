@@ -5,7 +5,7 @@ export interface Holiday {
   date: string;
   name: string;
   description?: string;
-  type: 'bank' | 'provincial';
+  type: string[]; // Nager API provides an array of types (e.g., ["Public", "Bank"])
   province?: string;
 }
 

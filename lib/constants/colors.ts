@@ -13,9 +13,16 @@ export const CALENDAR_COLORS = {
 
   // Holiday colors
   HOLIDAY: {
+    // Using Orange/Amber for Public/Bank/Provincial
+    PUBLIC: 'rgba(255, 152, 0, 0.15)', // Light amber/orange (Same as Bank)
     BANK: 'rgba(255, 152, 0, 0.15)', // Light amber/orange
     PROVINCIAL: 'rgba(255, 152, 0, 0.1)', // Lighter amber/orange
-    TEXT: '#ed6c02', // Dark orange
+    TEXT_PUBLIC: '#ed6c02', // Dark orange (Same as TEXT)
+    TEXT: '#ed6c02', // Dark orange (Default/Bank/Provincial)
+
+    // Using Blue for Federal
+    FEDERAL: 'rgba(25, 118, 210, 0.15)', // Light blue (Similar to Today)
+    TEXT_FEDERAL: '#1976d2', // Dark blue (Similar to Today)
   },
 
   // Today highlight

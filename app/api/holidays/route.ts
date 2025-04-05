@@ -90,15 +90,41 @@ export async function GET(request: NextRequest) {
     const year = yearParam ? parseInt(yearParam, 10) : new Date().getFullYear();
 
     // Get user's province from user metadata instead of the users table
-    const userProvince = user.user_metadata?.province || 'ON'; // Default to Ontario if not set
+    const userProvince = user.user_metadata?.province || 'ON'; // Default to Ontario
+    const employmentType = user.user_metadata?.employment_type || 'standard'; // Default to standard
 
     try {
       // Use the service function instead of direct database query
-      const holidays = await getHolidaysForYear(year, userProvince);
+      let holidays = await getHolidaysForYear(year, userProvince); // Returns HolidayWithTypeArray[]
 
-      // Log the retrieved holidays for debugging
+      // Log the retrieved holidays before filtering
       console.log(
-        `Retrieved ${holidays.length} holidays for year ${year} and province ${userProvince}`,
+        `Retrieved ${holidays.length} holidays for year ${year}, province ${userProvince} before filtering for employment type ${employmentType}`,
+      );
+
+      // Filter holidays based on employment type
+      holidays = holidays.filter((holiday) => {
+        // Always include 'Public' holidays
+        if (holiday.type.includes('Public')) {
+          return true;
+        }
+        // Include 'Bank' holidays for 'bank' employees
+        if (employmentType === 'bank' && holiday.type.includes('Bank')) {
+          return true;
+        }
+        // Include 'Federal' holidays for 'federal' employees (assuming 'Federal' is a type)
+        // Adjust 'Federal' if the Nager API uses a different term
+        if (employmentType === 'federal' && holiday.type.includes('Federal')) {
+          return true;
+        }
+        // Add other type checks if necessary (e.g., 'Optional', 'Observance')
+
+        return false; // Exclude if none of the conditions match
+      });
+
+      // Log after filtering
+      console.log(
+        `Returning ${holidays.length} holidays after filtering for employment type ${employmentType}`,
       );
 
       // If no holidays found, try to sync from external API
@@ -107,7 +133,16 @@ export async function GET(request: NextRequest) {
         await syncHolidaysForYear(year);
 
         // Try fetching again after sync
-        const syncedHolidays = await getHolidaysForYear(year, userProvince);
+        let syncedHolidays = await getHolidaysForYear(year, userProvince);
+        // Apply filtering to synced holidays as well
+        syncedHolidays = syncedHolidays.filter((holiday) => {
+          if (holiday.type.includes('Public')) return true;
+          if (employmentType === 'bank' && holiday.type.includes('Bank'))
+            return true;
+          if (employmentType === 'federal' && holiday.type.includes('Federal'))
+            return true;
+          return false;
+        });
         return NextResponse.json(syncedHolidays || []);
       }
 

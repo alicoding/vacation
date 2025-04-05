@@ -17,8 +17,8 @@ import {
   Alert,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
-import { DateTime } from 'luxon';
-import { VacationBooking, Holiday } from '@/types';
+import { DateTime, Interval } from 'luxon'; // Import Interval
+import { VacationBooking, Holiday } from '@/types'; // Holiday type has date: string | Date, type: string[]
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
 import { useAuth } from '@/components/auth/AuthProvider'; // Use AuthProvider context
 // ExtendedUser and ExtendedSession interfaces removed as we use the user from useAuth directly
@@ -39,8 +39,17 @@ const CalendarCell = styled(TableCell)(({ theme }) => ({
   '&.today': {
     backgroundColor: CALENDAR_COLORS.TODAY.BACKGROUND,
   },
-  '&.holiday': {
+  // '&.holiday': { // Remove generic holiday class style
+  //   backgroundColor: CALENDAR_COLORS.HOLIDAY.BANK,
+  // },
+  '&.holiday-public': {
+    backgroundColor: CALENDAR_COLORS.HOLIDAY.PUBLIC,
+  },
+  '&.holiday-bank': {
     backgroundColor: CALENDAR_COLORS.HOLIDAY.BANK,
+  },
+  '&.holiday-federal': {
+    backgroundColor: CALENDAR_COLORS.HOLIDAY.FEDERAL,
   },
   '&.vacation': {
     position: 'relative',
@@ -82,7 +91,7 @@ interface FullCalendarProps {
 
 export default function FullCalendar({
   currentDate,
-  vacations,
+  vacations, // Log this
   holidays,
   loading,
   error,
@@ -134,21 +143,48 @@ export default function FullCalendar({
 
   // Helper to check if a date has a vacation
   const getVacationsForDate = (date: DateTime) => {
+    const dateISO = date.toISODate(); // Get the ISO date string 'YYYY-MM-DD'
+    if (!dateISO) return []; // Guard against invalid dates
+
+    // console.log(`Checking vacations for date: ${dateISO}`);
+
     return vacations.filter((vacation) => {
-      const startDate = DateTime.fromISO(vacation.start_date.toString());
-      const endDate = DateTime.fromISO(vacation.end_date.toString());
-      return date >= startDate.startOf('day') && date <= endDate.endOf('day');
+      // Parse dates explicitly in UTC and compare start of day
+      const startDate = DateTime.fromISO(vacation.start_date.toString(), {
+        zone: 'utc',
+      }).startOf('day');
+      // Adjust the end date to include the whole day
+      const endDate = DateTime.fromISO(vacation.end_date.toString(), {
+        zone: 'utc',
+      }).endOf('day');
+      // Use Interval.fromDateTimes for robust range checking
+      const interval = Interval.fromDateTimes(startDate, endDate);
+      const containsDate = interval.contains(date); // Check contains
+
+      return containsDate;
     });
   };
 
-  // Helper to check if a date is a holiday
-  const getHolidayForDate = (date: DateTime) => {
+  // Helper to check if a date is a holiday and return the holiday object
+  // Assumes 'holidays' prop contains HolidayWithTypeArray objects
+  // Helper to check if a date is a holiday and return the holiday object
+  // Assumes 'holidays' prop contains Holiday objects from @/types
+  const getHolidayForDate = (date: DateTime): Holiday | undefined => {
+    const dateISO = date.toISODate();
+    if (!dateISO) return undefined;
+
     return holidays.find((holiday) => {
-      // Convert both dates to UTC for consistent comparison
-      const holidayDate = DateTime.fromISO(holiday.date, { zone: 'utc' });
-      const dateInUtc = date.toUTC();
-      // Compare the dates ignoring timezone differences
-      return dateInUtc.hasSame(holidayDate, 'day');
+      // Handle both string and Date types for holiday.date
+      let holidayLuxonDate: DateTime;
+      // Parse holiday date explicitly in UTC
+      if (typeof holiday.date === 'string') {
+        holidayLuxonDate = DateTime.fromISO(holiday.date, { zone: 'utc' });
+      } else {
+        // Assume it's a Date object
+        holidayLuxonDate = DateTime.fromJSDate(holiday.date, { zone: 'utc' });
+      }
+      const holidayDate = holidayLuxonDate.toISODate();
+      return holidayDate === dateISO;
     });
   };
 
@@ -251,14 +287,27 @@ export default function FullCalendar({
                 <TableRow key={weekIndex}>
                   {week.map((day, dayIndex) => {
                     const dayVacations = getVacationsForDate(day);
-                    const holiday = getHolidayForDate(day);
+                    const holiday = getHolidayForDate(day); // Now returns HolidayWithTypeArray | undefined
 
                     // Determine cell classname based on conditions
+                    let holidayClass = '';
+                    if (holiday) {
+                      // Prioritize Bank > Federal > Public
+                      if (holiday.type.includes('Bank')) {
+                        holidayClass = 'holiday-bank';
+                      } else if (holiday.type.includes('Federal')) {
+                        holidayClass = 'holiday-federal';
+                      } else if (holiday.type.length > 0) {
+                        // Default to public if any type exists
+                        holidayClass = 'holiday-public';
+                      }
+                    }
+
                     const cellClasses = [
                       isWeekend(day) ? 'weekend' : '',
                       !isCurrentMonth(day) ? 'other-month' : '',
                       isToday(day) ? 'today' : '',
-                      holiday ? 'holiday' : '',
+                      holidayClass, // Add the specific holiday class
                       dayVacations.length > 0 ? 'vacation' : '',
                     ]
                       .filter(Boolean)
@@ -274,7 +323,16 @@ export default function FullCalendar({
                           <EventChip
                             size="small"
                             label={holiday.name}
-                            color="warning"
+                            // Use color based on type, default to warning
+                            color={
+                              holiday.type.includes('Bank')
+                                ? 'warning'
+                                : holiday.type.includes('Federal')
+                                  ? 'info' // Assuming 'info' for blue
+                                  : holiday.type.includes('Public')
+                                    ? 'warning' // Orange/Amber for public
+                                    : 'default'
+                            }
                             variant="outlined"
                           />
                         )}

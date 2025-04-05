@@ -393,9 +393,19 @@ export default function DashboardSidebar() {
                         </Typography>
                       </Box>
                       <Chip
-                        label={holiday.type === 'bank' ? 'Bank' : 'Prov'}
+                        label={
+                          holiday.type.includes('Bank')
+                            ? 'Bank'
+                            : holiday.type.includes('Public')
+                              ? 'Public'
+                              : holiday.type[0] || 'Holiday'
+                        }
                         color={
-                          holiday.type === 'bank' ? 'warning' : 'secondary'
+                          holiday.type.includes('Bank')
+                            ? 'warning'
+                            : holiday.type.includes('Public')
+                              ? 'secondary'
+                              : 'default'
                         }
                         size="small"
                         variant="outlined"

@@ -14,7 +14,7 @@ export interface UseHolidaysResult {
   isHoliday: (dateString: string) => {
     isHoliday: boolean;
     name?: string;
-    type?: 'bank' | 'provincial';
+    type?: string[]; // Return the actual array of types
   };
   getHoliday: (dateString: string) => Holiday | undefined;
 }
@@ -123,12 +123,16 @@ export function useHolidays(
           try {
             if (typeof h.date === 'string') {
               // Handle ISO string
-              formattedDate = DateTime.fromISO(h.date).toISO() || h.date;
+              // Handle ISO string - interpret as UTC
+              formattedDate =
+                DateTime.fromISO(h.date, { zone: 'utc' }).toISO() || h.date;
             } else if (typeof h.date === 'object' && h.date !== null) {
               // Handle Date object
               formattedDate =
-                DateTime.fromJSDate(new Date(h.date)).toISO() ||
-                new Date(h.date).toISOString();
+                // Handle Date object - interpret as UTC
+                DateTime.fromJSDate(new Date(h.date), {
+                  zone: 'utc',
+                }).toISO() || new Date(h.date).toISOString();
             } else {
               console.error('[useHolidays] Invalid date format:', h.date);
               formattedDate = new Date().toISOString(); // Default to today as fallback
@@ -147,7 +151,7 @@ export function useHolidays(
             date: formattedDate,
             // Ensure all required fields are present
             id: h.id || `holiday-${h.name}-${formattedDate}`,
-            type: h.type || 'bank',
+            type: h.type || [], // Use the type array from API, default to empty array if missing
             name: h.name || 'Unknown Holiday',
           };
         })
@@ -259,12 +263,13 @@ export function useHolidays(
 
       try {
         if (typeof h.date === 'string') {
-          holidayDate = DateTime.fromISO(h.date).toISODate();
+          holidayDate = DateTime.fromISO(h.date, { zone: 'utc' }).toISODate(); // Ensure UTC interpretation here too
         } else {
           // Use type checking without instanceof for better TypeScript support
           const dateObj = typeof h.date === 'object' ? h.date : new Date();
           holidayDate = DateTime.fromJSDate(
             new Date(dateObj as any),
+            { zone: 'utc' }, // Ensure UTC interpretation here too
           ).toISODate();
         }
       } catch (e) {

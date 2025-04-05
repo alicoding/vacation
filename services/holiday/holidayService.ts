@@ -7,6 +7,40 @@ import { createAuthedServerClient } from '@/lib/supabase.server';
 import { createServiceClient } from '@/lib/supabase.shared';
 // Remove cookies import
 // import { cookies } from 'next/headers';
+// Helper function to safely parse JSON strings
+function safeJsonParse(jsonString: string | null | undefined): string[] {
+  if (!jsonString) return [];
+  try {
+    const parsed = JSON.parse(jsonString);
+    // Ensure the parsed result is an array of strings
+    if (
+      Array.isArray(parsed) &&
+      parsed.every((item) => typeof item === 'string')
+    ) {
+      return parsed;
+    }
+    // Handle cases where it's a single string (maybe old data?)
+    if (typeof parsed === 'string') {
+      return [parsed];
+    }
+    return []; // Return empty array if not an array of strings
+  } catch (e) {
+    console.error('Failed to parse holiday type JSON:', jsonString, e);
+    // Handle cases where the string might not be valid JSON array
+    // Return it as a single-element array if it's just a plain string? Or empty?
+    return typeof jsonString === 'string' ? [jsonString] : [];
+  }
+}
+
+// Define the return type expected by components (with type as string[])
+// Moved this interface definition higher for clarity
+export interface HolidayWithTypeArray {
+  id: string;
+  date: Date; // Use Date object for consistency in return types
+  name: string;
+  province: string | null;
+  type: string[];
+}
 
 export interface HolidayInfo {
   isHoliday: boolean;
@@ -94,7 +128,7 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
     date: string; // Changed from Date to string to match Supabase schema requirements
     name: string;
     province: string | null;
-    type: string;
+    type: string; // Store as JSON string in DB
   }
 
   // Transform the Nager holidays to our database format
@@ -120,7 +154,7 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
           date: dateStr,
           name: holiday.localName,
           province: null, // National holiday
-          type: isBank ? 'bank' : 'provincial',
+          type: JSON.stringify(holiday.types), // Store as JSON string
         },
       ];
     }
@@ -131,7 +165,7 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
         date: dateStr,
         name: holiday.localName,
         province: county, // Provincial specific
-        type: isBank ? 'bank' : 'provincial',
+        type: JSON.stringify(holiday.types), // Store as JSON string
       }));
     }
 
@@ -142,7 +176,10 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
         date: dateStr,
         name: holiday.localName,
         province: null,
-        type: 'provincial',
+        // Default to Public if types array is empty, store as JSON string
+        type: JSON.stringify(
+          holiday.types.length > 0 ? holiday.types : ['Public'],
+        ),
       },
     ];
   });
@@ -221,7 +258,7 @@ interface Holiday {
   date: string | Date;
   name: string;
   province: string | null;
-  type: string;
+  type: string[]; // Represents the parsed type after retrieval
 }
 
 /**
@@ -231,7 +268,8 @@ export async function getHolidaysInRange(
   startDate: Date,
   endDate: Date,
   province: string,
-): Promise<Holiday[]> {
+  // Return type should reflect the parsed data structure using HolidayWithTypeArray
+): Promise<HolidayWithTypeArray[]> {
   try {
     noStore(); // Opt out of caching for this function
     // Use the new helper
@@ -258,7 +296,15 @@ export async function getHolidaysInRange(
       JSON.stringify(data),
     );
 
-    return data || [];
+    // Parse the JSON string 'type' back into string[]
+    // Map and parse the type field, convert date string to Date object
+    return (data || []).map(
+      (h): HolidayWithTypeArray => ({
+        ...h,
+        date: new Date(h.date), // Convert date string to Date object
+        type: safeJsonParse(h.type), // Parse JSON string to string[]
+      }),
+    );
   } catch (error) {
     console.error('Error fetching holidays:', error);
     return [];
@@ -271,7 +317,8 @@ export async function getHolidaysInRange(
 export async function getHolidaysByYear(
   year: number,
   province: string,
-): Promise<Holiday[]> {
+  // Return type should reflect the parsed data structure using HolidayWithTypeArray
+): Promise<HolidayWithTypeArray[]> {
   try {
     // Use the new helper
     const supabaseServer = await createAuthedServerClient();
@@ -291,7 +338,15 @@ export async function getHolidaysByYear(
       return [];
     }
 
-    return data || [];
+    // Parse the JSON string 'type' back into string[]
+    // Map and parse the type field, convert date string to Date object
+    return (data || []).map(
+      (h): HolidayWithTypeArray => ({
+        ...h,
+        date: new Date(h.date), // Convert date string to Date object
+        type: safeJsonParse(h.type), // Parse JSON string to string[]
+      }),
+    );
   } catch (error) {
     console.error('Error fetching holidays:', error);
     return [];
@@ -343,37 +398,53 @@ export async function importHolidays(
 
     // Insert new holidays - convert any Date objects to strings for Supabase
     if (holidays.length > 0) {
-      // Ensure all date values are strings as required by Supabase
+      // Map holidays to the insertion format: convert date and stringify type
       const holidaysToInsert = holidays
         .map((holiday) => {
           // Convert Date objects to ISO date strings
           let dateStr: string | null = null;
           if (typeof holiday.date === 'string') {
-            dateStr = holiday.date;
+            // Attempt to parse and reformat to ensure consistency
+            try {
+              dateStr = DateTime.fromISO(holiday.date).toISODate();
+            } catch {
+              dateStr = null;
+            } // Handle invalid string dates
           } else if (holiday.date instanceof Date) {
             dateStr = DateTime.fromJSDate(holiday.date).toISODate();
           }
 
           // Skip holidays with invalid dates
           if (!dateStr) {
-            console.error('Invalid date for holiday:', holiday.name);
+            console.error(
+              'Invalid or unparseable date for holiday:',
+              holiday.name,
+              holiday.date,
+            );
             return null;
           }
 
+          // Stringify the type array for database insertion
+          const typeStr = JSON.stringify(holiday.type);
+
           return {
-            ...holiday,
+            // Return structure matching HolidayInsert (date: string, type: string)
             date: dateStr,
+            name: holiday.name,
+            province: holiday.province,
+            type: typeStr, // Use the JSON stringified type
           };
         })
-        // Filter out holidays with invalid dates (null values)
+        // Filter out holidays that became null due to invalid dates
         .filter(
           (
             holiday,
+            // Type predicate now matches the HolidayInsert structure
           ): holiday is {
             date: string;
             name: string;
             province: string | null;
-            type: string;
+            type: string; // Check type is string (JSON stringified)
           } => holiday !== null,
         );
 
@@ -458,26 +529,16 @@ export async function getHolidaysForYear(year: number, province: string) {
 /**
  * Fetches and returns holidays from the database for a specific date range and province
  */
+/**
+ * Fetches and returns holidays from the database for a specific date range and province.
+ * This function now directly uses getHolidaysInRange which handles parsing.
+ */
 export async function getHolidays(
   startDate: Date,
   endDate: Date,
   province: string,
-): Promise<
-  {
-    id: string;
-    date: Date;
-    name: string;
-    province: string | null;
-    type: 'bank' | 'provincial';
-  }[]
-> {
-  const holidays = await getHolidaysInRange(startDate, endDate, province);
-
-  // Convert string dates to Date objects to match the expected return type
-  return holidays.map((holiday) => ({
-    ...holiday,
-    date:
-      typeof holiday.date === 'string' ? new Date(holiday.date) : holiday.date,
-    type: holiday.type as 'bank' | 'provincial',
-  }));
+): Promise<HolidayWithTypeArray[]> {
+  // getHolidaysInRange already returns Promise<HolidayWithTypeArray[]>
+  // with date as Date object and type as string[]
+  return getHolidaysInRange(startDate, endDate, province);
 }

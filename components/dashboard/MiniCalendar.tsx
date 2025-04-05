@@ -7,6 +7,7 @@ import { styled } from '@mui/material/styles';
 import ChevronLeftIcon from '@heroicons/react/24/outline/ChevronLeftIcon';
 import ChevronRightIcon from '@heroicons/react/24/outline/ChevronRightIcon';
 import useHolidays from '@/lib/hooks/useHolidays';
+import { useAuth } from '@/components/auth/AuthProvider'; // Import useAuth
 import { CALENDAR_COLORS } from '@/lib/constants/colors';
 
 interface MiniCalendarProps {
@@ -62,13 +63,16 @@ export default function MiniCalendar({
   const [selectedDate, setSelectedDate] = useState(
     externalSelectedDate || DateTime.now(),
   );
+  // Get user settings for week start day
+  const { user } = useAuth();
+  const weekStartsOn = user?.week_starts_on === 'monday' ? 1 : 0; // 0 for Sunday, 1 for Monday
 
   // Use our useHolidays hook to fetch holidays directly
   const {
     holidays: clientHolidays,
     loading: holidaysLoading,
-    isHoliday: checkIsHoliday,
-    getHoliday,
+    isHoliday: checkIsHoliday, // Keep this, it uses ISO strings
+    getHoliday, // Keep this, it uses ISO strings
   } = useHolidays(currentMonth.year, province);
 
   // Sync with external selected date when it changes
@@ -79,15 +83,15 @@ export default function MiniCalendar({
   }, [externalSelectedDate]);
 
   // Combine prop holidays with client-fetched holidays
-  const allHolidays = [...holidays, ...clientHolidays];
+  // const allHolidays = [...holidays, ...clientHolidays]; // Removed: Rely on hook directly
 
-  // Parse holiday dates using Luxon DateTime with UTC
-  const holidayDates = allHolidays.map((h) => {
-    // Create a DateTime from the holiday date string
-    return typeof h.date === 'string'
-      ? DateTime.fromISO(h.date, { zone: 'utc' })
-      : DateTime.fromJSDate(h.date as Date, { zone: 'utc' });
-  });
+  // Removed: Redundant parsing, rely on hook directly
+  // const holidayDates = allHolidays.map((h) => {
+  //   // Create a DateTime from the holiday date string
+  //   return typeof h.date === 'string'
+  //     ? DateTime.fromISO(h.date, { zone: 'utc' })
+  //     : DateTime.fromJSDate(h.date as Date, { zone: 'utc' });
+  // });
 
   // Parse vacation date ranges using Luxon DateTime
   const vacationDateRanges = vacations.map((v) => {
@@ -104,46 +108,53 @@ export default function MiniCalendar({
     return { start: startDate, end: endDate };
   });
 
-  // Check if a date is a holiday
-  const isHoliday = (date: DateTime): boolean => {
-    // First check the direct holiday dates array
-    const directMatch = holidayDates.some((holidayDate) =>
-      date.hasSame(holidayDate, 'day'),
-    );
-
-    if (directMatch) return true;
-
-    // Then use the hook's isHoliday method which has proper date normalization
-    const isoString = date.toISO();
-    return isoString ? checkIsHoliday(isoString).isHoliday : false;
-  };
+  // Removed: Redundant internal isHoliday check, rely on hook's getHoliday below
+  // const isHoliday = (date: DateTime): boolean => {
+  //   // First check the direct holiday dates array
+  //   const directMatch = holidayDates.some((holidayDate) =>
+  //     date.toUTC().hasSame(holidayDate.toUTC(), 'day'), // Compare UTC dates
+  //   );
+  //
+  //   if (directMatch) return true;
+  //
+  //   // Then use the hook's isHoliday method which has proper date normalization
+  //   const isoString = date.toISO();
+  //   return isoString ? checkIsHoliday(isoString).isHoliday : false;
+  // };
 
   // Get holiday name if it exists
-  const getHolidayName = (date: DateTime): string | undefined => {
-    // First check direct holiday list
-    const holiday = allHolidays.find((h) => {
-      const holidayDate =
-        typeof h.date === 'string'
-          ? DateTime.fromISO(h.date, { zone: 'utc' })
-          : DateTime.fromJSDate(h.date as Date, { zone: 'utc' });
-
-      return date.hasSame(holidayDate, 'day');
-    });
-
-    if (holiday) return holiday.name;
-    // Then try the hook's method
-    const isoString = date.toISO();
-    if (!isoString) return undefined;
-
-    const hookHoliday = getHoliday(isoString);
-    return hookHoliday?.name;
-  };
+  // Removed: Redundant internal getHolidayName, rely on hook's getHoliday below
+  // const getHolidayName = (date: DateTime): string | undefined => {
+  //   // First check direct holiday list
+  //   const holiday = allHolidays.find((h) => {
+  //     const holidayDate =
+  //       typeof h.date === 'string'
+  //         ? DateTime.fromISO(h.date, { zone: 'utc' })
+  //         : DateTime.fromJSDate(h.date as Date, { zone: 'utc' });
+  //
+  //     return date.toUTC().hasSame(holidayDate.toUTC(), 'day'); // Compare UTC dates
+  //   });
+  //
+  //   if (holiday) return holiday.name;
+  //   // Then try the hook's method
+  //   const isoString = date.toISO();
+  //   if (!isoString) return undefined;
+  //
+  //   const hookHoliday = getHoliday(isoString);
+  //   return hookHoliday?.name;
+  // };
 
   // Check if a date is within a vacation
   const isVacation = (date: DateTime): boolean => {
-    return vacationDateRanges.some(
-      (range) => date >= range.start && date <= range.end,
-    );
+    return vacationDateRanges.some((range) => {
+      // Use Interval.contains for robust range checking
+      // Adjust end date to be inclusive
+      const interval = Interval.fromDateTimes(
+        range.start,
+        range.end.endOf('day'),
+      );
+      return interval.contains(date);
+    });
   };
 
   // Get vacation info if it exists for a date
@@ -159,7 +170,11 @@ export default function MiniCalendar({
           ? DateTime.fromISO(v.end_date, { zone: 'utc' })
           : DateTime.fromJSDate(v.end_date, { zone: 'utc' });
 
-      return date >= startDate && date <= endDate;
+      // Compare start of day to avoid timezone/time issues
+      // Use Interval.contains for robust range checking
+      // Adjust end date to be inclusive
+      const interval = Interval.fromDateTimes(startDate, endDate.endOf('day'));
+      return interval.contains(date);
     });
 
     if (!vacation) return undefined;
@@ -178,10 +193,22 @@ export default function MiniCalendar({
     const monthStart = currentMonth.startOf('month');
     const monthEnd = currentMonth.endOf('month');
 
-    const startOffset = monthStart.weekday % 7;
-    const endOffset = (7 - (monthEnd.weekday % 7)) % 7;
+    // Calculate offset based on user's week start preference
+    let startOffset;
+    if (weekStartsOn === 0) {
+      // Sunday start (Luxon weekday 7)
+      const dayOfWeek = monthStart.weekday; // 1-7
+      startOffset = dayOfWeek === 7 ? 0 : dayOfWeek; // If Sunday, offset 0, else offset is weekday number
+    } else {
+      // Monday start (Luxon weekday 1)
+      const dayOfWeek = monthStart.weekday; // 1-7
+      startOffset = dayOfWeek === 1 ? 0 : dayOfWeek - 1; // If Monday, offset 0, else offset is weekday number - 1
+    }
+
+    // Calculate end offset (simpler way: ensure 42 days total)
     const calendarStart = monthStart.minus({ days: startOffset });
-    const calendarEnd = monthEnd.plus({ days: endOffset });
+    // Ensure we always display 6 weeks (42 days)
+    const calendarEnd = calendarStart.plus({ days: 41 });
 
     // Get all days in this range
     return eachDayOfInterval(calendarStart, calendarEnd);
@@ -214,7 +241,7 @@ export default function MiniCalendar({
     day: DateTime,
     isSelected: boolean,
     isOutsideMonth: boolean,
-    isHolidayDay: boolean,
+    holidayType: string[] | undefined, // Pass the type array instead of boolean
     isVacationDay: boolean,
   ) => {
     // Base styles
@@ -234,10 +261,23 @@ export default function MiniCalendar({
       styles.backgroundColor =
         CALENDAR_COLORS.VACATION.FULL_DAY || 'rgba(46, 125, 50, 0.15)';
       styles.border = `1px solid ${CALENDAR_COLORS.VACATION.TEXT || '#2e7d32'}`;
-    } else if (isHolidayDay) {
-      styles.backgroundColor =
-        CALENDAR_COLORS.HOLIDAY.BANK || 'rgba(211, 47, 47, 0.15)';
-      styles.border = `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT || '#d32f2f'}`;
+    } else if (holidayType && holidayType.length > 0) {
+      // Apply styles based on holiday type priority: Bank > Federal > Public
+      if (holidayType.includes('Bank')) {
+        styles.backgroundColor =
+          CALENDAR_COLORS.HOLIDAY.BANK || 'rgba(211, 47, 47, 0.15)'; // Reddish
+        styles.border = `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT || '#d32f2f'}`;
+      } else if (holidayType.includes('Federal')) {
+        // Assuming a Federal color exists, otherwise fallback
+        styles.backgroundColor =
+          CALENDAR_COLORS.HOLIDAY.FEDERAL || 'rgba(25, 118, 210, 0.15)'; // Bluish
+        styles.border = `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT_FEDERAL || '#1976d2'}`; // Adjust color name if needed
+      } else {
+        // Default to Public style if any type exists
+        styles.backgroundColor =
+          CALENDAR_COLORS.HOLIDAY.PUBLIC || 'rgba(245, 124, 0, 0.15)'; // Orangish
+        styles.border = `1px solid ${CALENDAR_COLORS.HOLIDAY.TEXT_PUBLIC || '#f57c00'}`; // Adjust color name if needed
+      }
     } else {
       styles.backgroundColor = 'transparent';
     }
@@ -271,10 +311,14 @@ export default function MiniCalendar({
 
       {/* Day headers */}
       <Grid container spacing={0} sx={{ mb: 0.5 }}>
-        {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, index) => (
+        {/* Generate day headers based on week start */}
+        {(weekStartsOn === 0
+          ? ['S', 'M', 'T', 'W', 'T', 'F', 'S']
+          : ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+        ).map((dayHeader, index) => (
           <Grid item xs={12 / 7} key={index} sx={{ textAlign: 'center' }}>
             <Typography variant="caption" color="text.secondary">
-              {day}
+              {dayHeader}
             </Typography>
           </Grid>
         ))}
@@ -283,8 +327,10 @@ export default function MiniCalendar({
       {/* Calendar days */}
       <Grid container spacing={0}>
         {daysToDisplay().map((day, index) => {
-          const isHolidayDay = isHoliday(day);
-          const holidayName = isHolidayDay ? getHolidayName(day) : '';
+          // Get the full holiday object to access its type
+          const holiday = getHoliday(day.toISO() || '');
+          const isHolidayDay = !!holiday;
+          const holidayName = holiday ? holiday.name : '';
           const isVacationDay = isVacation(day);
           const vacationInfo = isVacationDay ? getVacationInfo(day) : '';
           const isOutsideMonth = !day.hasSame(currentMonth, 'month');
@@ -307,7 +353,7 @@ export default function MiniCalendar({
                     day,
                     isSelected,
                     isOutsideMonth,
-                    isHolidayDay,
+                    holiday?.type, // Pass the type array
                     isVacationDay,
                   )}
                 >
