@@ -1,6 +1,7 @@
 'use server';
 
 import { DateTime } from 'luxon';
+import { unstable_noStore as noStore } from 'next/cache'; // Import noStore
 // Import the new helper, remove the old one if not needed
 import { createAuthedServerClient } from '@/lib/supabase.server';
 import { createServiceClient } from '@/lib/supabase.shared';
@@ -149,7 +150,6 @@ export async function syncHolidaysForYear(year: number): Promise<void> {
   // Delete existing holidays for this year to avoid duplicates
   const startOfYear = new Date(year, 0, 1);
   const endOfYear = new Date(year, 11, 31, 23, 59, 59);
-
   const { error: deleteError } = await supabaseServer
     .from('holidays')
     .delete()
@@ -233,6 +233,7 @@ export async function getHolidaysInRange(
   province: string,
 ): Promise<Holiday[]> {
   try {
+    noStore(); // Opt out of caching for this function
     // Use the new helper
     const supabaseServer = await createAuthedServerClient();
 
@@ -247,9 +248,15 @@ export async function getHolidaysInRange(
       .or(`province.is.null,province.eq.${province}`);
 
     if (error) {
-      console.error('Error fetching holidays:', error);
+      console.error('[getHolidaysInRange] Error fetching holidays:', error);
       return [];
     }
+
+    // Log the raw data returned by the query
+    console.log(
+      `[getHolidaysInRange] Raw data returned for range ${startDateStr}-${endDateStr}, province ${province}:`,
+      JSON.stringify(data),
+    );
 
     return data || [];
   } catch (error) {

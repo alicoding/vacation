@@ -23,18 +23,41 @@ export async function calculateBusinessDays(
       province,
     );
 
-    const holidayDates = holidays.map((h) =>
-      DateTime.fromJSDate(new Date(h.date)).toISODate(),
-    );
+    console.log(
+      '[calculateBusinessDays] Raw holidays from getHolidaysInRange:',
+      JSON.stringify(holidays),
+    ); // Add log
+
+    const holidayDates = holidays
+      .map((h) => {
+        // Ensure h.date is treated as a string before parsing
+        const dateStr = typeof h.date === 'string' ? h.date : String(h.date);
+        // Parse directly using Luxon in UTC to avoid timezone issues
+        const dt = DateTime.fromISO(dateStr, { zone: 'utc' });
+        if (!dt.isValid) {
+          console.error(
+            `[calculateBusinessDays] Invalid date encountered in holiday mapping: ${dateStr}`,
+          );
+          return null; // Handle invalid dates
+        }
+        return dt.toISODate(); // Return 'YYYY-MM-DD' string
+      })
+      .filter((d): d is string => d !== null); // Filter out any nulls from invalid dates
+    console.log(
+      '[calculateBusinessDays] Processed holidayDates for check:',
+      JSON.stringify(holidayDates),
+    ); // Add log
 
     let count = 0;
     let current = start;
 
     while (current <= end) {
       // Skip weekends (6 = Saturday, 7 = Sunday)
-      if (current.weekday < 6) {
+      const currentDateStr = current.toISODate(); // Get ISO date string
+      if (current.weekday < 6 && currentDateStr) {
+        // Check if it's a weekday AND the date string is valid
         // Skip holidays
-        if (!holidayDates.includes(current.toISODate())) {
+        if (!holidayDates.includes(currentDateStr)) {
           count++;
         }
       }

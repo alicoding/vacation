@@ -80,13 +80,9 @@ export default function DashboardSidebar() {
     pathname === path ||
     (path !== '/dashboard' && (pathname || '').startsWith(path));
 
-  // Get properly typed user
-  // Remove this line - use 'user' directly from useAuth() hook on line 41
-
-  // Fetch holidays and vacation data
+  // useEffect for fetching data
   useEffect(() => {
     async function fetchData() {
-      // Use isAuthenticated and user from useAuth context
       if (!isAuthenticated || !user?.id) return;
 
       try {
@@ -95,6 +91,12 @@ export default function DashboardSidebar() {
         if (holidaysResponse.ok) {
           const holidaysData = await holidaysResponse.json();
           setHolidays(holidaysData);
+        } else {
+          console.error(
+            'Failed to fetch holidays:',
+            holidaysResponse.statusText,
+          );
+          setHolidays([]); // Reset or handle error state
         }
 
         // Fetch vacation bookings
@@ -102,59 +104,114 @@ export default function DashboardSidebar() {
         if (vacationsResponse.ok) {
           const vacationsData = await vacationsResponse.json();
           setVacations(vacationsData);
-
-          // Calculate vacation stats
-          if (user.total_vacation_days) {
-            const totalDays = user.total_vacation_days;
-            let bookedDays = 0;
-
-            // Calculate total booked days
-            vacationsData.forEach((vacation: VacationBooking) => {
-              const startDate = new Date(vacation.start_date);
-              const endDate = new Date(vacation.end_date);
-              const diff =
-                Math.ceil(
-                  (endDate.getTime() - startDate.getTime()) /
-                    (1000 * 60 * 60 * 24),
-                ) + 1;
-              bookedDays += diff;
-            });
-
-            setVacationStats({
-              used: 0, // This would come from a more complex calculation
-              booked: bookedDays,
-              remaining: totalDays - bookedDays,
-            });
-          }
+        } else {
+          console.error(
+            'Failed to fetch vacations:',
+            vacationsResponse.statusText,
+          );
+          setVacations([]); // Reset or handle error state
         }
       } catch (error) {
         console.error('Error fetching sidebar data:', error);
+        // Optionally reset states on error
+        setHolidays([]);
+        setVacations([]);
       }
     }
 
     void fetchData();
-  }, [isAuthenticated, user?.id, user?.total_vacation_days]); // Add isAuthenticated dependency
+  }, [isAuthenticated, user?.id]); // Dependencies for fetching
+
+  // useEffect for calculating stats when data is ready
+  useEffect(() => {
+    // Calculate only when necessary data is available
+    if (
+      user?.total_vacation_days &&
+      holidays.length > 0 &&
+      vacations.length > 0
+    ) {
+      const totalDays = user.total_vacation_days;
+      let usedBusinessDays = 0;
+
+      const holidayDateStrings = new Set(
+        holidays
+          .map((h: Holiday) => {
+            const dateStr =
+              typeof h.date === 'string' ? h.date : String(h.date);
+            const dt = DateTime.fromISO(dateStr, { zone: 'utc' });
+            return dt.isValid ? dt.toISODate() : null;
+          })
+          .filter((d: string | null): d is string => d !== null),
+      );
+
+      vacations.forEach((vacation: VacationBooking) => {
+        const start = DateTime.fromISO(String(vacation.start_date), {
+          zone: 'utc',
+        }).startOf('day');
+        const end = DateTime.fromISO(String(vacation.end_date), {
+          zone: 'utc',
+        }).startOf('day');
+        let current = start;
+        let vacationDuration = 0;
+
+        while (current <= end) {
+          const currentDateStr = current.toISODate();
+          const isWeekday = current.weekday >= 1 && current.weekday <= 5;
+          const isHoliday = currentDateStr
+            ? holidayDateStrings.has(currentDateStr)
+            : false;
+
+          if (isWeekday && currentDateStr && !isHoliday) {
+            vacationDuration += 1;
+          }
+          current = current.plus({ days: 1 });
+        }
+        usedBusinessDays += vacationDuration;
+      });
+
+      setVacationStats({
+        used: usedBusinessDays,
+        booked: usedBusinessDays,
+        remaining: totalDays - usedBusinessDays,
+      });
+    } else if (user?.total_vacation_days) {
+      // If user data is present but holidays/vacations aren't (yet), show initial state
+      setVacationStats({
+        used: 0,
+        booked: 0,
+        remaining: user.total_vacation_days,
+      });
+    }
+    // Recalculate when holidays, vacations, or total days change
+  }, [holidays, vacations, user?.total_vacation_days]);
 
   // Fix: Parse holiday dates correctly using UTC
   const parseHolidayDate = (dateString: string) => {
-    return DateTime.fromISO(dateString, { zone: 'utc' });
+    // Ensure input is a string before parsing
+    const dt = DateTime.fromISO(String(dateString), { zone: 'utc' });
+    if (!dt.isValid) {
+      console.warn(
+        `[parseHolidayDate] Invalid date encountered: ${dateString}`,
+      );
+      // Return a clearly invalid date or handle as needed
+      return DateTime.invalid('Invalid date provided');
+    }
+    return dt;
   };
 
   // Get upcoming holidays (next 3)
   const upcomingHolidays = holidays
-    .filter((holiday) => {
-      // Use Luxon to correctly handle dates in UTC
-      const holidayDate = parseHolidayDate(holiday.date);
-      const today = DateTime.now();
-      return holidayDate >= today;
-    })
-    .sort((a, b) => {
-      // Sort by date using Luxon
-      return (
-        parseHolidayDate(a.date).toMillis() -
-        parseHolidayDate(b.date).toMillis()
-      );
-    })
+    .map((holiday) => ({
+      ...holiday,
+      // Pre-parse dates for filtering/sorting, handle potential invalid dates
+      parsedDate: parseHolidayDate(holiday.date),
+    }))
+    .filter(
+      (holiday) =>
+        holiday.parsedDate.isValid &&
+        holiday.parsedDate >= DateTime.now().startOf('day'),
+    )
+    .sort((a, b) => a.parsedDate.toMillis() - b.parsedDate.toMillis())
     .slice(0, 3);
 
   // Create a wrapper component to handle HeroIcon with MUI props
@@ -256,50 +313,47 @@ export default function DashboardSidebar() {
 
       {!collapsed && user?.total_vacation_days && (
         <Box sx={{ p: 1.5, borderTop: 1, borderColor: 'divider' }}>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-            Your vacation days
-          </Typography>
+          {(() => {
+            // Display logic uses vacationStats state, which is updated by the calculation useEffect
+            const totalDays = user.total_vacation_days || 0;
+            const usedDays = vacationStats.used; // Use calculated 'used' days
+            const remainingDays = vacationStats.remaining;
+            const usedPercentage =
+              totalDays > 0
+                ? Math.min(100, Math.round((usedDays / totalDays) * 100))
+                : 0;
+            const remainingPercentage =
+              totalDays > 0
+                ? Math.min(100, Math.round((remainingDays / totalDays) * 100))
+                : 0;
 
-          <Stack spacing={1}>
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">
-                Total:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="medium"
-                color="primary.main"
-              >
-                {user.total_vacation_days} days
-              </Typography>
-            </Box>
+            return (
+              <>
+                <Typography variant="subtitle2" gutterBottom>
+                  Total Vacation Days
+                </Typography>
+                <Typography variant="h4" color="primary.main" sx={{ mb: 2 }}>
+                  {totalDays}
+                </Typography>
 
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">
-                Booked:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="medium"
-                color="warning.main"
-              >
-                {vacationStats.booked} days
-              </Typography>
-            </Box>
+                <Stack spacing={1}>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="body2">Used</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {usedDays} days ({usedPercentage}%)
+                    </Typography>
+                  </Box>
 
-            <Box display="flex" justifyContent="space-between">
-              <Typography variant="body2" color="text.secondary">
-                Remaining:
-              </Typography>
-              <Typography
-                variant="body2"
-                fontWeight="medium"
-                color="success.main"
-              >
-                {vacationStats.remaining} days
-              </Typography>
-            </Box>
-          </Stack>
+                  <Box display="flex" justifyContent="space-between">
+                    <Typography variant="body2">Remaining</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {remainingDays} days ({remainingPercentage}%)
+                    </Typography>
+                  </Box>
+                </Stack>
+              </>
+            );
+          })()}
         </Box>
       )}
 
@@ -311,38 +365,45 @@ export default function DashboardSidebar() {
 
           {upcomingHolidays.length > 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              {upcomingHolidays.map((holiday) => (
-                <Box
-                  key={holiday.id}
-                  sx={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    p: 1,
-                    borderRadius: 1,
-                    bgcolor: 'background.paper',
-                    border: '1px solid',
-                    borderColor: 'divider',
-                    opacity: 1,
-                  }}
-                >
-                  <Box>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                      {holiday.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {parseHolidayDate(holiday.date).toFormat('M/d/yyyy')}
-                    </Typography>
-                  </Box>
-                  <Chip
-                    label={holiday.type === 'bank' ? 'Bank' : 'Prov'}
-                    color={holiday.type === 'bank' ? 'warning' : 'secondary'}
-                    size="small"
-                    variant="outlined"
-                    sx={{ height: 20, fontSize: '0.675rem' }}
-                  />
-                </Box>
-              ))}
+              {upcomingHolidays.map(
+                (holiday) =>
+                  // Check if parsedDate is valid before rendering
+                  holiday.parsedDate.isValid && (
+                    <Box
+                      key={holiday.id}
+                      sx={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'flex-start',
+                        p: 1,
+                        borderRadius: 1,
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        opacity: 1,
+                      }}
+                    >
+                      <Box>
+                        <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                          {holiday.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {/* Format the pre-parsed date */}
+                          {holiday.parsedDate.toFormat('M/d/yyyy')}
+                        </Typography>
+                      </Box>
+                      <Chip
+                        label={holiday.type === 'bank' ? 'Bank' : 'Prov'}
+                        color={
+                          holiday.type === 'bank' ? 'warning' : 'secondary'
+                        }
+                        size="small"
+                        variant="outlined"
+                        sx={{ height: 20, fontSize: '0.675rem' }}
+                      />
+                    </Box>
+                  ),
+              )}
             </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">

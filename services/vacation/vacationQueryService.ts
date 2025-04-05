@@ -143,7 +143,9 @@ export async function getVacationDaysUsed(
 
     // Calculate total business days for each booking
     let totalDays = 0;
-
+    console.log(
+      `[getVacationDaysUsed] Found ${vacations?.length || 0} bookings for user ${userId} in year ${year}.`,
+    );
     for (const vacation of vacations || []) {
       // Use Luxon DateTime for better edge compatibility
       const startDate = DateTime.fromISO(vacation.start_date).toJSDate();
@@ -156,9 +158,15 @@ export async function getVacationDaysUsed(
         vacation.is_half_day ?? undefined, // Convert null to undefined
       );
 
+      console.log(
+        `[getVacationDaysUsed] Booking ${vacation.id} (${DateTime.fromISO(vacation.start_date).toISODate()} - ${DateTime.fromISO(vacation.end_date).toISODate()}): Calculated ${businessDays} business days.`,
+      );
       totalDays += businessDays;
     }
 
+    console.log(
+      `[getVacationDaysUsed] Total calculated business days for year ${year}: ${totalDays}`,
+    );
     return totalDays;
   } catch (error) {
     console.error('Error getting vacation days used:', error);
