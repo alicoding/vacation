@@ -58,7 +58,7 @@ export default function HolidayOverviewCard({
 
         // Apply employment type filter if needed
         const matchesType =
-          employmentType === 'bank' ? holiday.type === 'bank' : true;
+          employmentType === 'bank' ? holiday.type.includes('bank') : true;
 
         return isUpcoming && matchesType;
       })
@@ -145,12 +145,12 @@ export default function HolidayOverviewCard({
                           <Chip
                             size="small"
                             label={
-                              holiday.type === 'bank'
+                              holiday.type.includes('bank')
                                 ? 'Bank Holiday'
                                 : 'Provincial'
                             }
                             color={
-                              holiday.type === 'bank' ? 'primary' : 'secondary'
+                              holiday.type.includes('bank') ? 'primary' : 'secondary'
                             }
                             sx={{ ml: 1, height: 20 }}
                           />

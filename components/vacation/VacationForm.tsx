@@ -179,12 +179,40 @@ export default function VacationForm({
 
   // Combine holidays from both sources to ensure we have data
   useEffect(() => {
-    const combinedHolidays = [...holidays].map((holiday, index) => ({
-      ...holiday,
-      id: `holiday-${index}-${typeof holiday.date === 'string' ? holiday.date : DateTime.fromJSDate(holiday.date).toISODate()}`,
-      // Ensure province is string | null, not string | undefined
-      province: holiday.province || null,
-    }));
+    // Normalize holidays from the hook to match the Holiday interface
+    // Normalize holidays from props to match the Holiday interface
+    // 1. Normalize holidays from props to match the Holiday interface
+    const normalizedPropHolidays: Holiday[] = holidays.map((propHoliday, index): Holiday => {
+      // Normalize date (string | Date -> string)
+      const holidayDate = typeof propHoliday.date === 'string'
+        ? DateTime.fromISO(propHoliday.date)
+        : DateTime.fromJSDate(propHoliday.date);
+      const holidayDateStr = holidayDate.isValid ? holidayDate.toISODate() : null; // Get ISO date string or null
+
+      if (!holidayDateStr) {
+        console.warn(`[VacationForm] Could not parse date for prop holiday:`, propHoliday);
+      }
+
+      // Normalize type ('bank' | 'provincial' -> string[])
+      const holidayTypeArr: string[] = [propHoliday.type];
+
+      // Normalize province (string | null -> string | undefined)
+      const holidayProvince = propHoliday.province || undefined;
+
+      return {
+        // Base properties from propHoliday
+        name: propHoliday.name,
+        // Normalized properties for Holiday interface
+        id: `prop-holiday-${index}-${holidayDateStr || 'invalid-date'}`, // Use normalized date in ID
+        date: holidayDateStr || '', // Use valid ISO string or empty string
+        type: holidayTypeArr,
+        province: holidayProvince,
+        description: undefined, // Prop type doesn't have description
+      };
+    });
+
+    // Start combined list with normalized prop holidays
+    const combinedHolidays: Holiday[] = [...normalizedPropHolidays];
 
     // Add client holidays if they're not duplicates
     if (clientHolidays && clientHolidays.length > 0) {
@@ -206,18 +234,32 @@ export default function VacationForm({
 
         if (!exists) {
           // Add the client holiday with an id
+          // 2. Normalize clientHoliday (from useHolidays hook) before pushing
+          // Ensure it strictly conforms to the Holiday interface
+          const clientDate = DateTime.fromISO(clientHoliday.date); // Date should already be string
+          const clientDateStr = clientDate.isValid ? clientDate.toISODate() : null; // Get ISO date string or null
+
+          if (!clientDateStr) {
+             console.warn(`[VacationForm] Could not parse date for client holiday:`, clientHoliday);
+          }
+
           combinedHolidays.push({
-            ...clientHoliday,
-            id: `client-holiday-${clientHoliday.id || combinedHolidays.length}`,
-            // Ensure province is string | null, not string | undefined
-            province: clientHoliday.province || null,
+            // Explicitly define properties based on Holiday interface
+            id: clientHoliday.id || `client-holiday-${combinedHolidays.length}-${clientDateStr || 'invalid-date'}`, // Ensure ID exists
+            date: clientDateStr || '', // Use valid ISO string or empty string
+            name: clientHoliday.name, // Assume name exists
+            description: clientHoliday.description || undefined, // Ensure undefined if null/missing
+            type: Array.isArray(clientHoliday.type) ? clientHoliday.type : [], // Ensure type is array, default to empty
+            province: clientHoliday.province || undefined, // Ensure undefined if null/missing
           });
         }
       });
     }
 
     // Update the normalized holidays state
-    setNormalizedHolidays(combinedHolidays as Holiday[]);
+    // Type assertion is now less critical but kept for clarity
+    // 3. Update state with the fully normalized list
+    setNormalizedHolidays(combinedHolidays);
   }, [holidays, clientHolidays]);
 
   // Create a map of bank holiday dates for efficient lookup

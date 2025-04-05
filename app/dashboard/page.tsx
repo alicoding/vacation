@@ -5,10 +5,12 @@ import VacationStatsCard from '@/components/dashboard/VacationStatsCard';
 import UpcomingVacationsCard from '@/components/dashboard/UpcomingVacationsCard';
 import Link from 'next/link';
 import { Box, Typography, Grid, Paper, Container, Button } from '@mui/material';
-import { VacationBooking } from '@/types';
-import { getVacationDaysUsed } from '@/services/vacation/vacationService';
+import { VacationBooking, Holiday } from '@/types'; // Add Holiday type
+// Remove getVacationDaysUsed import
 import { getServerSession } from '@/lib/auth-helpers.server';
 import type { Database } from '@/types/supabase';
+import { calculateVacationStats } from '@/services/vacation/vacationCalculationService'; // Import centralized function
+import { getHolidaysByYear, HolidayWithTypeArray } from '@/services/holiday/holidayService'; // Import getHolidaysByYear and HolidayWithTypeArray
 import { DateTime } from 'luxon';
 // Removed createServerClient from @supabase/ssr
 import { createSupabaseServerClient } from '@/lib/supabase-utils'; // Import the new utility
@@ -79,47 +81,7 @@ async function getUserData(userId: string): Promise<UserData | null> {
   }
 }
 
-// Update the getVacationBalance function to match the table structure
-async function getVacationBalance(userId: string, province: string) {
-  try {
-    // Use the centralized function for edge-compatible Supabase client
-    const supabase = await createSupabaseServerClient(); // Use the new utility
-
-    // Get current year using Luxon instead of native Date
-    const currentYear = DateTime.now().year;
-
-    // Get used vacation days for current year
-    const usedDays = await getVacationDaysUsed(userId, currentYear);
-
-    // Get user metadata directly with getUser
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error(
-        'Error fetching user data for vacation balance:',
-        userError,
-      );
-      return { total: 20, used: usedDays, remaining: 20 - usedDays }; // Default
-    }
-
-    const totalDays = user.user_metadata?.total_vacation_days || 20; // Default to 20 days
-
-    // Calculate remaining days
-    const remainingDays = Math.max(0, totalDays - usedDays);
-
-    return {
-      total: totalDays,
-      used: usedDays,
-      remaining: remainingDays,
-    };
-  } catch (error) {
-    console.error('Error calculating vacation balance:', error);
-    return { total: 20, used: 0, remaining: 20 }; // Default fallback
-  }
-}
+// Remove the old getVacationBalance function as it's replaced by calculateVacationStats
 
 export default async function DashboardPage() {
   // Get user session
@@ -198,16 +160,24 @@ export default async function DashboardPage() {
     })
     .slice(0, 3);
 
-  // Get vacation balance using the service that properly accounts for holidays
-  const province = user.province || 'ON';
-  const vacationBalance = await getVacationBalance(session.user.id, province);
+  // Fetch holidays for the user's province (or default)
+  const province = user.province || 'ON'; // Use fetched province or default
+  let holidays: HolidayWithTypeArray[] = []; // Use the correct type from holidayService
+  try {
+    // Fetch holidays for the current year using getHolidaysByYear
+    const currentYear = DateTime.now().year;
+    holidays = await getHolidaysByYear(currentYear, province); // Correct function call
+  } catch (error) {
+    console.error(`Error fetching holidays for province ${province}:`, error);
+    // Proceed without holidays if fetching fails, stats might be less accurate
+  }
 
-  // Define vacationStats with appropriate values from the service
-  const vacationStats = {
-    total: vacationBalance.total,
-    used: vacationBalance.used,
-    remaining: vacationBalance.remaining,
-  };
+  // Calculate vacation stats using the centralized function
+  const vacationStats = await calculateVacationStats( // Add await here
+    user.total_vacation_days, // Use total days from user data
+    user.vacationBookings, // Use bookings from user data
+    holidays, // Use fetched holidays
+  );
 
   return (
     <Box component="main" sx={{ py: 3 }}>

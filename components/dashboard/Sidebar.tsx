@@ -27,8 +27,10 @@ import HomeIcon from '@heroicons/react/24/outline/HomeIcon';
 import CalendarIcon from '@heroicons/react/24/outline/CalendarIcon';
 import CogIcon from '@heroicons/react/24/outline/CogIcon';
 import MiniCalendar from './MiniCalendar';
-import { Holiday, VacationBooking } from '@/types';
+import { VacationBooking } from '@/types'; // Keep VacationBooking from @/types
 import { DateTime } from 'luxon';
+import { calculateVacationStats } from '@/services/vacation/vacationCalculationService'; // Import the centralized function
+import { HolidayWithTypeArray } from '@/services/holiday/holidayService'; // Import HolidayWithTypeArray
 
 // Custom type for extended session user with total_vacation_days
 interface ExtendedUser {
@@ -55,7 +57,7 @@ export default function DashboardSidebar() {
   const { user, isLoading, isAuthenticated, signOut } = useAuth(); // Use values from useAuth
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [holidays, setHolidays] = useState<HolidayWithTypeArray[]>([]); // Use HolidayWithTypeArray for state
   const [vacations, setVacations] = useState<VacationBooking[]>([]);
   const [vacationStats, setVacationStats] = useState({
     used: 0,
@@ -90,7 +92,14 @@ export default function DashboardSidebar() {
         const holidaysResponse = await fetch('/api/holidays');
         if (holidaysResponse.ok) {
           const holidaysData = await holidaysResponse.json();
-          setHolidays(holidaysData);
+          // Map fetched data (assuming string dates) to HolidayWithTypeArray (with Date objects)
+          const holidaysWithDateObjects: HolidayWithTypeArray[] = holidaysData.map((h: any) => ({
+            ...h,
+            date: DateTime.fromISO(String(h.date), { zone: 'utc' }).toJSDate(), // Convert string to Date
+            // Ensure 'type' is an array, handle potential string data from API
+            type: typeof h.type === 'string' ? [h.type] : (Array.isArray(h.type) ? h.type : [])
+          }));
+          setHolidays(holidaysWithDateObjects);
         } else {
           console.error(
             'Failed to fetch holidays:',
@@ -122,96 +131,55 @@ export default function DashboardSidebar() {
     void fetchData();
   }, [isAuthenticated, user?.id]); // Dependencies for fetching
 
-  // useEffect for calculating stats when data is ready
+  // useEffect for calculating stats using the centralized function
   useEffect(() => {
-    // Calculate only when necessary data is available
-    if (
-      user?.total_vacation_days &&
-      holidays.length > 0 &&
-      vacations.length > 0
-    ) {
-      const totalDays = user.total_vacation_days;
-      let usedBusinessDays = 0;
+    // Define an async function inside useEffect to handle the async calculation
+    const calculateAndSetStats = async () => {
+      if (user?.total_vacation_days && holidays && vacations) {
+        // Call the centralized async function with await
+        const stats = await calculateVacationStats(
+          user.total_vacation_days,
+          vacations,
+          holidays, // Pass the state which is now HolidayWithTypeArray[]
+        );
 
-      const holidayDateStrings = new Set(
-        holidays
-          .map((h: Holiday) => {
-            const dateStr =
-              typeof h.date === 'string' ? h.date : String(h.date);
-            const dt = DateTime.fromISO(dateStr, { zone: 'utc' });
-            return dt.isValid ? dt.toISODate() : null;
-          })
-          .filter((d: string | null): d is string => d !== null),
-      );
+        // Update the state with the awaited stats
+        setVacationStats({
+          used: stats.used,
+          booked: stats.used, // Assuming booked is the same as used business days
+          remaining: stats.remaining,
+        });
+      } else if (user?.total_vacation_days) {
+        // Handle the case where data isn't fully loaded yet (keep this part)
+        setVacationStats({
+          used: 0,
+          booked: 0,
+          remaining: user.total_vacation_days,
+        });
+      }
+    };
 
-      vacations.forEach((vacation: VacationBooking) => {
-        const start = DateTime.fromISO(String(vacation.start_date), {
-          zone: 'utc',
-        }).startOf('day');
-        const end = DateTime.fromISO(String(vacation.end_date), {
-          zone: 'utc',
-        }).startOf('day');
-        let current = start;
-        let vacationDuration = 0;
-
-        while (current <= end) {
-          const currentDateStr = current.toISODate();
-          const isWeekday = current.weekday >= 1 && current.weekday <= 5;
-          const isHoliday = currentDateStr
-            ? holidayDateStrings.has(currentDateStr)
-            : false;
-
-          if (isWeekday && currentDateStr && !isHoliday) {
-            vacationDuration += 1;
-          }
-          current = current.plus({ days: 1 });
-        }
-        usedBusinessDays += vacationDuration;
-      });
-
-      setVacationStats({
-        used: usedBusinessDays,
-        booked: usedBusinessDays,
-        remaining: totalDays - usedBusinessDays,
-      });
-    } else if (user?.total_vacation_days) {
-      // If user data is present but holidays/vacations aren't (yet), show initial state
-      setVacationStats({
-        used: 0,
-        booked: 0,
-        remaining: user.total_vacation_days,
-      });
-    }
-    // Recalculate when holidays, vacations, or total days change
+    // Call the inner async function
+    void calculateAndSetStats();
+    // The original else if condition is handled inside calculateAndSetStats, so remove the duplicated block below
+    // Dependencies remain the same: recalculate when holidays, vacations, or total days change
   }, [holidays, vacations, user?.total_vacation_days]);
 
-  // Fix: Parse holiday dates correctly using UTC
-  const parseHolidayDate = (dateString: string) => {
-    // Ensure input is a string before parsing
-    const dt = DateTime.fromISO(String(dateString), { zone: 'utc' });
-    if (!dt.isValid) {
-      console.warn(
-        `[parseHolidayDate] Invalid date encountered: ${dateString}`,
-      );
-      // Return a clearly invalid date or handle as needed
-      return DateTime.invalid('Invalid date provided');
-    }
-    return dt;
-  };
+  // Remove parseHolidayDate function as dates in state are now Date objects
 
-  // Get upcoming holidays (next 3)
+  // Get upcoming holidays (next 3) using the Date objects directly
   const upcomingHolidays = holidays
-    .map((holiday) => ({
+    .map(holiday => ({
       ...holiday,
-      // Pre-parse dates for filtering/sorting, handle potential invalid dates
-      parsedDate: parseHolidayDate(holiday.date),
+      // Convert Date object to Luxon DateTime for comparison/formatting
+      luxonDate: DateTime.fromJSDate(holiday.date, { zone: 'utc' })
     }))
     .filter(
       (holiday) =>
-        holiday.parsedDate.isValid &&
-        holiday.parsedDate >= DateTime.now().startOf('day'),
+        holiday.luxonDate.isValid && // Check validity
+        holiday.luxonDate >= DateTime.now().startOf('day'), // Compare with now
     )
-    .sort((a, b) => a.parsedDate.toMillis() - b.parsedDate.toMillis())
+    .sort((a, b) => a.luxonDate.toMillis() - b.luxonDate.toMillis()) // Sort using Luxon objects
     .slice(0, 3);
 
   // Create a wrapper component to handle HeroIcon with MUI props
@@ -368,7 +336,8 @@ export default function DashboardSidebar() {
               {upcomingHolidays.map(
                 (holiday) =>
                   // Check if parsedDate is valid before rendering
-                  holiday.parsedDate.isValid && (
+                  // Use the luxonDate property for validity check
+                  holiday.luxonDate.isValid && (
                     <Box
                       key={holiday.id}
                       sx={{
@@ -389,7 +358,8 @@ export default function DashboardSidebar() {
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
                           {/* Format the pre-parsed date */}
-                          {holiday.parsedDate.toFormat('M/d/yyyy')}
+                          {/* Format the Luxon DateTime object */}
+                          {holiday.luxonDate.toFormat('M/d/yyyy')}
                         </Typography>
                       </Box>
                       <Chip

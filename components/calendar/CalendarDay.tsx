@@ -141,7 +141,11 @@ export default function CalendarDay({
     isHalfDay && vacations.find((v) => v.is_half_day)?.half_day_portion;
 
   // Holiday type for color coding
-  const holidayType = holiday?.type || null;
+  const holidayType = holiday?.type
+    ? holiday.type.includes('bank')
+      ? 'bank'
+      : 'provincial' // Default to provincial if type exists but isn't bank
+    : null;
 
   // Format vacation label with half-day information
   const getVacationLabel = (vacation: VacationBooking) => {
@@ -157,7 +161,7 @@ export default function CalendarDay({
 
     // Use more descriptive labels for holiday types
     const typeLabel =
-      holiday.type === 'bank'
+      holiday.type.includes('bank')
         ? 'Bank Holiday (non-bookable)'
         : 'Provincial Holiday (informational)';
 
@@ -183,7 +187,7 @@ export default function CalendarDay({
           <EventChip
             size="small"
             label={holiday.name}
-            color={holiday.type === 'bank' ? 'warning' : 'secondary'}
+            color={holiday.type.includes('bank') ? 'warning' : 'secondary'}
             variant="outlined"
           />
         </Tooltip>
