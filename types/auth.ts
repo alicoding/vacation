@@ -11,6 +11,13 @@ export interface Session {
   expires: string;
 }
 
+export interface UserMetadata {
+  total_vacation_days?: number;
+  province?: string;
+  employment_type?: string;
+  week_starts_on?: string;
+}
+
 /**
  * User interface compatible with components that expect next-auth-like users
  */

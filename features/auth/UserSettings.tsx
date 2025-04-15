@@ -102,29 +102,42 @@ export default function UserSettings() {
 
     try {
       const response = await fetch('/api/user');
+      const rawData: unknown = await response.json();
 
-      if (response.ok) {
-        const userData = await response.json();
-        // Update state with fetched user data - don't use OR fallback to ensure 0 is respected
-        setVacationDays(
-          userData.total_vacation_days !== undefined
-            ? userData.total_vacation_days
-            : 2,
-        );
-        setProvince(userData.province || 'ON');
-        setEmploymentType(userData.employment_type || 'standard');
-        setWeekStartsOn(userData.week_starts_on || 'sunday');
-        setCalendarSyncEnabled(!!userData.calendar_sync_enabled);
-        setDataLoaded(true); // Mark data as loaded
-      } else {
-        console.error(
-          'Error fetching user data:',
-          response.status,
-          response.statusText,
-        );
-        setErrorMessage(`Failed to load user settings (${response.status})`);
-        setDataLoaded(false); // Indicate data load failed
+      if (!response.ok) {
+        const message =
+          typeof rawData === 'object' &&
+          rawData !== null &&
+          typeof (rawData as any).error === 'string'
+            ? (rawData as any).error
+            : `Failed to load user settings (${response.status})`;
+
+        console.error('Error fetching user data:', response.status, message);
+        setErrorMessage(message);
+        setDataLoaded(false);
+        return;
       }
+
+      if (
+        typeof rawData !== 'object' ||
+        rawData === null ||
+        typeof (rawData as any).id !== 'string'
+      ) {
+        throw new Error('Invalid user data format received from API');
+      }
+
+      const userData = rawData as ExtendedUser;
+
+      setVacationDays(
+        userData.total_vacation_days !== undefined
+          ? userData.total_vacation_days
+          : 2,
+      );
+      setProvince(userData.province || 'ON');
+      setEmploymentType(userData.employment_type || 'standard');
+      setWeekStartsOn(userData.week_starts_on || 'sunday');
+      setCalendarSyncEnabled(!!userData.calendar_sync_enabled);
+      setDataLoaded(true);
     } catch (error) {
       console.error('Error fetching user data:', error);
       setErrorMessage('An error occurred while loading user settings.');
@@ -175,9 +188,30 @@ export default function UserSettings() {
         // Try to parse error message from backend
         let errorMsg = `Failed to update settings (status: ${response.status})`;
         try {
-          const errorData = await response.json();
-          if (errorData.error) {
-            errorMsg = errorData.error;
+          const response = await fetch('/api/user/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({
+              total_vacation_days: vacationDays,
+              province,
+              employment_type: employmentType,
+              week_starts_on: weekStartsOn,
+              calendar_sync_enabled: calendarSyncEnabled,
+            }),
+          });
+
+          const rawData: unknown = await response.json();
+
+          if (!response.ok) {
+            const errorMsg =
+              typeof rawData === 'object' &&
+              rawData !== null &&
+              typeof (rawData as any).error === 'string'
+                ? (rawData as any).error
+                : `Failed to update settings (status: ${response.status})`;
+
+            throw new Error(errorMsg);
           }
         } catch (parseError) {
           // Ignore if response body is not JSON or empty

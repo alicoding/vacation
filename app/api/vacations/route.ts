@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createApiClient } from '@/utils/supabase-api';
 import { createVacationBooking } from '@/services/vacation/vacationService';
+import type { VacationBookingInput } from '@/services/vacation/vacationTypes';
 
 export const runtime = 'edge';
 
@@ -24,9 +25,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Parse request body
-    const body = await req.json();
+    const body: Omit<VacationBookingInput, 'userId'> = await req.json();
 
+    // Parse request body
     // Validate inputs
     if (!body.startDate || !body.endDate) {
       return NextResponse.json(
@@ -54,15 +55,13 @@ export async function POST(req: NextRequest) {
         { status: 400 },
       );
     }
-
-    // Create the vacation booking
     const booking = await createVacationBooking(
       user.id,
-      startDate,
-      endDate,
-      body.note || null,
+      new Date(body.startDate),
+      new Date(body.endDate),
+      body.note ?? undefined, // ✅ fix here
       body.isHalfDay || false,
-      body.halfDayPortion || null,
+      body.halfDayPortion ?? undefined, // ✅ and here if needed
     );
 
     return NextResponse.json(booking, { status: 201 });

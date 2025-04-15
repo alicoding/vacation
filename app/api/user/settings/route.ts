@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 // Import createServerClient and CookieOptions
 import { createServerClient, type CookieOptions } from '@supabase/ssr';
 import { cookies } from 'next/headers'; // Import cookies to read from request
+import type { UserMetadata } from '@/types/auth';
 
 // Assuming getRequiredEnvVar is correctly defined elsewhere (e.g., in supabase.shared)
 import { getRequiredEnvVar } from '@/lib/supabase.shared';
@@ -115,7 +116,7 @@ export async function PUT(request: NextRequest) {
   }
 
   try {
-    const body = await request.json();
+    const body: UserMetadata = await request.json();
 
     // Validate body content here if necessary
 

@@ -13,6 +13,12 @@ export async function POST(_request: NextRequest) {
     error: authError,
   } = await supabase.auth.getUser();
 
+  interface GoogleTokenResponse {
+    access_token: string;
+    expires_in: number;
+    // Potentially add other fields like token_type, scope if needed
+  }
+
   if (authError || !user) {
     return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
   }
@@ -66,9 +72,11 @@ export async function POST(_request: NextRequest) {
 
       clearTimeout(timeoutId);
 
-      const tokens = await response.json();
+      const tokens: GoogleTokenResponse = await response.json();
 
       if (!response.ok) {
+        // Now 'tokens' might contain error details, handle appropriately
+        // For now, we'll assume it has a structure we can log/return
         console.error('Token refresh failed:', tokens);
         return NextResponse.json(
           { error: 'Failed to refresh token', details: tokens },
@@ -77,27 +85,31 @@ export async function POST(_request: NextRequest) {
       }
 
       // Calculate new expiry time using Luxon for timestamp compatibility
+      // 'tokens.expires_in' is now correctly typed as number
       const expiresAt = DateTime.now()
         .plus({ seconds: tokens.expires_in })
         .toISO();
 
       // Update the token in the database
+      // 'tokens.access_token' is now correctly typed as string, no need for String() or 'as any'
       const { error: updateError } = await supabase
         .from('google_tokens')
         .update({
-          access_token: String(tokens.access_token),
+          access_token: tokens.access_token,
           expires_at: expiresAt,
-        } as any) // Use type assertion to avoid type error temporarily
-        .filter('user_id', 'eq', user.id);
+        })
+        .filter('user_id', 'eq', user.id); // Matched the filter method from the current file
 
       if (updateError) {
-        console.error('Failed to update token in database:', updateError);
+        console.error('Failed to update token in database:', updateError); // Matched the error message
         return NextResponse.json(
-          { error: 'Database update failed' },
+          { error: 'Database update failed' }, // Matched the error message
           { status: 500 },
         );
       }
 
+      // Return the new access token and expiry time
+      // 'tokens.access_token' is now correctly typed as string
       return NextResponse.json({
         access_token: tokens.access_token,
         expires_at: expiresAt,

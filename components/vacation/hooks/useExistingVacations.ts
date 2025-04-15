@@ -35,15 +35,9 @@ export function useExistingVacations({
       setVacationsError(null);
       try {
         const response = await fetch('/api/vacations');
-        if (response.ok) {
-          const vacationsData = await response.json();
-          console.log(
-            '[useExistingVacations] Fetched vacations:',
-            vacationsData.length,
-            'entries',
-          );
-          setExistingVacations(vacationsData);
-        } else {
+        const rawData: unknown = await response.json();
+
+        if (!response.ok) {
           console.error(
             '[useExistingVacations] Failed to fetch vacations:',
             response.status,
@@ -51,7 +45,7 @@ export function useExistingVacations({
           setVacationsError(
             `Failed to load existing vacations (${response.status})`,
           );
-          // Fall back to initial props if fetch fails
+
           if (initialVacations.length > 0) {
             console.log(
               '[useExistingVacations] Using prop-provided vacations after fetch failure:',
@@ -60,9 +54,34 @@ export function useExistingVacations({
             );
             setExistingVacations(initialVacations as VacationBooking[]);
           } else {
-            setExistingVacations([]); // Ensure it's an empty array if fetch fails and no initial data
+            setExistingVacations([]);
           }
+          return;
         }
+
+        if (!Array.isArray(rawData)) {
+          throw new Error('Invalid vacation data format from API');
+        }
+
+        const vacationsData: VacationBooking[] = rawData.map((v: any) => {
+          if (
+            typeof v.id !== 'string' ||
+            typeof v.user_id !== 'string' ||
+            typeof v.start_date !== 'string' ||
+            typeof v.end_date !== 'string'
+          ) {
+            throw new Error('Invalid vacation record structure');
+          }
+
+          return v as VacationBooking;
+        });
+
+        console.log(
+          '[useExistingVacations] Fetched vacations:',
+          vacationsData.length,
+          'entries',
+        );
+        setExistingVacations(vacationsData);
       } catch (error) {
         console.error(
           '[useExistingVacations] Error fetching vacations:',
@@ -73,7 +92,7 @@ export function useExistingVacations({
             ? error.message
             : 'An unknown error occurred fetching vacations',
         );
-        // Fall back to initial props if fetch fails
+
         if (initialVacations.length > 0) {
           console.log(
             '[useExistingVacations] Using prop-provided vacations after error:',
@@ -82,7 +101,7 @@ export function useExistingVacations({
           );
           setExistingVacations(initialVacations as VacationBooking[]);
         } else {
-          setExistingVacations([]); // Ensure it's an empty array if fetch fails and no initial data
+          setExistingVacations([]);
         }
       } finally {
         setIsLoadingVacations(false);

@@ -12,13 +12,26 @@ export const runtime = 'edge';
 import { NextResponse } from 'next/server';
 import { getHolidays } from '@/services/holiday/holidayService';
 
+interface HolidayRangeRequestBody {
+  startDate: string;
+  endDate: string;
+  province: string; // Consider using a more specific type like a union of province codes if possible
+}
+
 export async function POST(request: Request) {
   try {
-    const { startDate, endDate, province } = await request.json();
+    // Cast the JSON body to the defined interface
+    const { startDate, endDate, province }: HolidayRangeRequestBody =
+      await request.json();
 
-    if (!startDate) {
+    // Validate required parameters
+    if (!startDate || !endDate || !province) {
+      const missingParams = [];
+      if (!startDate) missingParams.push('startDate');
+      if (!endDate) missingParams.push('endDate');
+      if (!province) missingParams.push('province');
       return NextResponse.json(
-        { error: 'startDate parameter is required' },
+        { error: `Missing required parameter(s): ${missingParams.join(', ')}` },
         { status: 400 },
       );
     }

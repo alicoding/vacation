@@ -1,3 +1,4 @@
+// path: types/index.ts
 export const runtime = 'edge';
 
 export interface Holiday {

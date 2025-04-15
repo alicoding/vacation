@@ -1,7 +1,5 @@
-/**
- * Client-side functions for holiday-related operations
- * These make API calls to server endpoints instead of using database clients directly
- */
+// filepath: lib/clients/holidayClient.ts (or similar)
+
 import { Holiday as GlobalHoliday } from '@/types';
 
 export interface HolidayInfo {
@@ -10,10 +8,10 @@ export interface HolidayInfo {
   type: string | null;
 }
 
-// Update this interface to match the global Holiday type
+// Local Holiday type aligned with GlobalHoliday from backend
 export interface Holiday {
   id: string;
-  date: string; // Changed from Date to string to match types/index.ts
+  date: string; // Matches DB and API response format
   name: string;
   province?: string | null;
   type: 'bank' | 'provincial';
@@ -22,7 +20,7 @@ export interface Holiday {
 
 export function isWeekend(date: Date): boolean {
   const day = date.getDay();
-  return day === 0 || day === 6; // 0 is Sunday, 6 is Saturday
+  return day === 0 || day === 6; // Sunday or Saturday
 }
 
 export async function checkIsHoliday(
@@ -39,15 +37,21 @@ export async function checkIsHoliday(
   );
 
   if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ error: response.statusText }));
-    throw new Error(
-      `Failed to check holiday: ${errorData.error || response.statusText}`,
-    );
+    const errorData: unknown = await response.json().catch(() => ({
+      error: response.statusText,
+    }));
+
+    const errorMessage =
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      typeof (errorData as any).error === 'string'
+        ? (errorData as any).error
+        : response.statusText;
+
+    throw new Error(`Failed to check holiday: ${errorMessage}`);
   }
 
-  return response.json();
+  return await response.json();
 }
 
 export async function fetchHolidays(
@@ -61,9 +65,7 @@ export async function fetchHolidays(
 
   const response = await fetch('/api/holidays/range', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       startDate: startDate.toISOString(),
       endDate: endDate.toISOString(),
@@ -72,19 +74,40 @@ export async function fetchHolidays(
   });
 
   if (!response.ok) {
-    const errorData = await response
-      .json()
-      .catch(() => ({ error: response.statusText }));
-    throw new Error(
-      `Failed to fetch holidays: ${errorData.error || response.statusText}`,
-    );
+    const errorData: unknown = await response.json().catch(() => ({
+      error: response.statusText,
+    }));
+
+    const errorMessage =
+      typeof errorData === 'object' &&
+      errorData !== null &&
+      typeof (errorData as any).error === 'string'
+        ? (errorData as any).error
+        : response.statusText;
+
+    throw new Error(`Failed to fetch holidays: ${errorMessage}`);
   }
 
-  const holidays = await response.json();
-  return holidays.map((h: any) => ({
-    ...h,
-    date: new Date(h.date),
-  }));
+  const rawData: unknown = await response.json();
+
+  if (!Array.isArray(rawData)) {
+    throw new Error('Invalid holidays response format');
+  }
+
+  return rawData.map((h) => {
+    if (
+      typeof h !== 'object' ||
+      h === null ||
+      typeof h.id !== 'string' ||
+      typeof h.date !== 'string' ||
+      typeof h.name !== 'string' ||
+      (typeof h.type !== 'string' && !Array.isArray(h.type))
+    ) {
+      throw new Error('Malformed holiday entry');
+    }
+
+    return h as Holiday;
+  });
 }
 
 interface GetHolidaysInRangeProps {
@@ -94,9 +117,6 @@ interface GetHolidaysInRangeProps {
 }
 
 class HolidayClient {
-  /**
-   * Get all holidays for a specific year
-   */
   async getHolidaysForYear(
     year: number,
     province?: string,
@@ -104,57 +124,66 @@ class HolidayClient {
     try {
       const url = new URL('/api/holidays', window.location.origin);
       url.searchParams.append('year', year.toString());
-      if (province) {
-        url.searchParams.append('province', province);
-      }
+      if (province) url.searchParams.append('province', province);
 
       const response = await fetch(url.toString());
 
       if (!response.ok) {
-        throw new Error('Failed to fetch holidays');
+        const errorData: unknown = await response
+          .json()
+          .catch(() => ({ error: response.statusText }));
+
+        const errorMessage =
+          typeof errorData === 'object' &&
+          errorData !== null &&
+          typeof (errorData as any).error === 'string'
+            ? (errorData as any).error
+            : response.statusText;
+
+        throw new Error(`Failed to fetch holidays: ${errorMessage}`);
       }
 
-      const data = await response.json();
-      return data;
-    } catch (error: any) {
+      const data: unknown = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid holiday data format received');
+      }
+
+      return data as GlobalHoliday[];
+    } catch (error) {
       console.error('Error fetching holidays for year:', error);
       return [];
     }
   }
 
-  /**
-   * Fetches holidays for a given date range
-   */
   async getHolidaysInRange({
     startDate,
     endDate,
     province,
   }: GetHolidaysInRangeProps): Promise<GlobalHoliday[]> {
     try {
-      // Use POST request with JSON body as expected by the server endpoint
       const response = await fetch('/api/holidays/range', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          startDate,
-          endDate,
-          province,
-        }),
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, province }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to fetch holidays');
       }
 
-      return await response.json();
-    } catch (error: any) {
+      const data = await response.json();
+
+      if (!Array.isArray(data)) {
+        throw new Error('Invalid data format');
+      }
+
+      return data;
+    } catch (error) {
       console.error('Error fetching holidays:', error);
       return [];
     }
   }
 }
 
-// Export a singleton instance
 export const holidayClient = new HolidayClient();

@@ -97,13 +97,32 @@ export default function VacationEditDialog({
       setIsLoadingVacations(true);
       try {
         const response = await fetch('/api/vacations');
-        if (response.ok) {
-          const vacationsData = await response.json();
-          setAllVacations(vacationsData);
-        } else {
+        const rawData: unknown = await response.json();
+
+        if (!response.ok) {
           console.error('Failed to fetch vacations:', response.status);
-          setError('Could not load existing vacation data.'); // Set error state
+          setError('Could not load existing vacation data.');
+          return;
         }
+
+        if (!Array.isArray(rawData)) {
+          throw new Error('Invalid vacations data format');
+        }
+
+        const vacationsData: VacationBooking[] = rawData.map((v: any) => {
+          if (
+            typeof v.id !== 'string' ||
+            typeof v.user_id !== 'string' ||
+            typeof v.start_date !== 'string' ||
+            typeof v.end_date !== 'string'
+          ) {
+            throw new Error('Invalid vacation record structure');
+          }
+
+          return v as VacationBooking;
+        });
+
+        setAllVacations(vacationsData);
       } catch (error) {
         console.error('Error fetching vacations:', error);
         setError(
@@ -228,11 +247,20 @@ export default function VacationEditDialog({
         }),
       });
 
+      const rawData: unknown = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to update vacation');
+        const errorMessage =
+          typeof rawData === 'object' &&
+          rawData !== null &&
+          typeof (rawData as any).error === 'string'
+            ? (rawData as any).error
+            : 'Failed to update vacation';
+
+        throw new Error(errorMessage);
       }
 
+      // Optionally validate successful response structure here if needed
       onSuccess();
       onClose();
     } catch (error) {

@@ -17,6 +17,14 @@ export class DatabaseError extends VacationServiceError {
   }
 }
 
+export interface VacationUpdateInput {
+  start_date: string;
+  end_date: string;
+  note?: string;
+  is_half_day?: boolean;
+  half_day_portion?: 'AM' | 'PM' | null;
+}
+
 export class ValidationError extends VacationServiceError {
   constructor(message: string) {
     super(message, 'VALIDATION_ERROR');

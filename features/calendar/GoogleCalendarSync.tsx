@@ -74,11 +74,26 @@ export default function GoogleCalendarSync({
     try {
       setIsCheckingAuth(true);
       // API call to check if user has authorized Google Calendar
-      const response = await fetch('/api/calendar/auth/check');
-      if (response.ok) {
-        const { authorized } = await response.json();
+      try {
+        const response = await fetch('/api/calendar/auth/check');
+        const rawData: unknown = await response.json();
+
+        if (!response.ok) {
+          setHasAuthorization(false);
+          return;
+        }
+
+        const authorized =
+          typeof rawData === 'object' &&
+          rawData !== null &&
+          'authorized' in rawData &&
+          typeof (rawData as any).authorized === 'boolean'
+            ? (rawData as any).authorized
+            : false;
+
         setHasAuthorization(authorized);
-      } else {
+      } catch (error) {
+        console.error('Error checking calendar auth:', error);
         setHasAuthorization(false);
       }
     } catch (error) {
@@ -125,6 +140,7 @@ export default function GoogleCalendarSync({
 
     try {
       setIsSyncing(true);
+
       const response = await fetch('/api/calendar/sync', {
         method: 'POST',
         headers: {
@@ -133,35 +149,49 @@ export default function GoogleCalendarSync({
         body: JSON.stringify({ enabled: newEnabledState }), // Send the new state to API
       });
 
+      const rawData: unknown = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
+        const message =
+          typeof rawData === 'object' &&
+          rawData !== null &&
+          typeof (rawData as any).message === 'string'
+            ? (rawData as any).message
+            : 'Failed to sync calendar';
 
         if (
           response.status === 401 ||
-          errorData.message?.includes('not authorized')
+          message.toLowerCase().includes('not authorized')
         ) {
           setHasAuthorization(false);
           throw new Error('Google Calendar access not authorized');
         }
 
-        throw new Error('Failed to sync calendar');
+        throw new Error(message);
       }
 
-      const data = await response.json();
+      // Parse number of successful syncs if present
+      const successful =
+        typeof rawData === 'object' &&
+        rawData !== null &&
+        typeof (rawData as any).results?.successful === 'number'
+          ? (rawData as any).results.successful
+          : 0;
+
       setMessage({
-        text: newEnabledState // Use new state for message
-          ? `Calendar sync enabled. Synced ${data.results?.successful || 0} vacations.`
+        text: newEnabledState
+          ? `Calendar sync enabled. Synced ${successful} vacations.`
           : 'Calendar sync disabled',
         type: 'success',
       });
 
-      onToggle(newEnabledState); // Call onToggle with the successfully processed state
+      onToggle(newEnabledState); // Reflect new state in the app
     } catch (error) {
       console.error('Sync error:', error);
       const errorMessage =
         error instanceof Error ? error.message : 'Failed to sync calendar';
 
-      if (errorMessage.includes('not authorized')) {
+      if (errorMessage.toLowerCase().includes('not authorized')) {
         setMessage({
           text: 'Google Calendar access not authorized. Please authorize access first.',
           type: 'error',

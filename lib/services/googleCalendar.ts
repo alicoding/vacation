@@ -1,7 +1,3 @@
-/**
- * Google Calendar API service using fetch API (Edge compatible)
- */
-
 interface CalendarEvent {
   summary: string;
   description?: string;
@@ -29,7 +25,9 @@ export class GoogleCalendarService {
     calendarId: string,
     event: CalendarEvent,
   ): Promise<{ id: string }> {
-    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`;
+    const url = `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(
+      calendarId,
+    )}/events`;
 
     const response = await fetch(url, {
       method: 'POST',
@@ -40,19 +38,32 @@ export class GoogleCalendarService {
       body: JSON.stringify(event),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `Google Calendar API error: ${errorData.error?.message || response.statusText}`,
-      );
+    const result: unknown = await response.json().catch(() => null);
+
+    if (
+      !response.ok ||
+      typeof result !== 'object' ||
+      result === null ||
+      !('id' in result) ||
+      typeof (result as { id: unknown }).id !== 'string'
+    ) {
+      const errorMessage =
+        typeof result === 'object' &&
+        result !== null &&
+        'error' in result &&
+        typeof (result as { error?: { message?: string } }).error?.message ===
+          'string'
+          ? (result as { error: { message: string } }).error.message
+          : response.statusText;
+
+      throw new Error(`Google Calendar API error: ${errorMessage}`);
     }
 
-    return response.json();
+    return { id: (result as { id: string }).id };
   }
 
   /**
    * Refresh an access token using a refresh token
-   * Note: This would typically be handled by a token management service
    */
   static async refreshAccessToken(
     clientId: string,
@@ -72,14 +83,27 @@ export class GoogleCalendarService {
       }),
     });
 
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(
-        `Token refresh error: ${errorData.error_description || response.statusText}`,
-      );
+    const result: unknown = await response.json().catch(() => null);
+
+    if (
+      !response.ok ||
+      typeof result !== 'object' ||
+      result === null ||
+      !('access_token' in result) ||
+      typeof (result as { access_token: unknown }).access_token !== 'string'
+    ) {
+      const errorMessage =
+        typeof result === 'object' &&
+        result !== null &&
+        'error_description' in result &&
+        typeof (result as { error_description?: string }).error_description ===
+          'string'
+          ? (result as { error_description: string }).error_description
+          : response.statusText;
+
+      throw new Error(`Token refresh error: ${errorMessage}`);
     }
 
-    const data = await response.json();
-    return data.access_token;
+    return (result as { access_token: string }).access_token;
   }
 }

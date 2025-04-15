@@ -8,6 +8,7 @@ import {
 import { createServerClient, type CookieOptions } from '@supabase/ssr'; // Import CookieOptions
 import { cookies } from 'next/headers'; // Import cookies
 import type { Database } from '@/types/supabase'; // Ensure Database type is imported if not already
+import type { VacationUpdateInput } from '@/services/vacation/vacationTypes';
 
 // Define an interface for the route context, reflecting params as a Promise
 interface RouteContext {
@@ -180,7 +181,7 @@ export async function PATCH(
 
   try {
     // Parse the request body
-    const updateData = await request.json();
+    const updateData: VacationUpdateInput = await request.json();
 
     // Validate required fields
     if (!updateData.start_date || !updateData.end_date) {

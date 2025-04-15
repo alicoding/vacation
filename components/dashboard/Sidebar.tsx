@@ -88,49 +88,76 @@ export default function DashboardSidebar() {
       if (!isAuthenticated || !user?.id) return;
 
       try {
-        // Fetch holidays
+        // --- Fetch holidays ---
         const holidaysResponse = await fetch('/api/holidays');
         if (holidaysResponse.ok) {
-          const holidaysData = await holidaysResponse.json();
-          // Map fetched data (assuming string dates) to HolidayWithTypeArray (with Date objects)
+          const rawHolidayData: unknown = await holidaysResponse.json();
+
+          if (!Array.isArray(rawHolidayData)) {
+            throw new Error('Invalid holidays data format');
+          }
+
           const holidaysWithDateObjects: HolidayWithTypeArray[] =
-            holidaysData.map((h: any) => ({
-              ...h,
-              date: DateTime.fromISO(String(h.date), {
-                zone: 'utc',
-              }).toJSDate(), // Convert string to Date
-              // Ensure 'type' is an array, handle potential string data from API
-              type:
+            rawHolidayData.map((h: any) => {
+              const date =
+                typeof h.date === 'string'
+                  ? DateTime.fromISO(h.date, { zone: 'utc' }).toJSDate()
+                  : new Date('Invalid Date');
+
+              const type =
                 typeof h.type === 'string'
                   ? [h.type]
                   : Array.isArray(h.type)
                     ? h.type
-                    : [],
-            }));
+                    : [];
+
+              return {
+                ...h,
+                date,
+                type,
+              };
+            });
+
           setHolidays(holidaysWithDateObjects);
         } else {
           console.error(
             'Failed to fetch holidays:',
             holidaysResponse.statusText,
           );
-          setHolidays([]); // Reset or handle error state
+          setHolidays([]);
         }
 
-        // Fetch vacation bookings
+        // --- Fetch vacations ---
         const vacationsResponse = await fetch('/api/vacations');
         if (vacationsResponse.ok) {
-          const vacationsData = await vacationsResponse.json();
-          setVacations(vacationsData);
+          const rawVacationData: unknown = await vacationsResponse.json();
+
+          if (!Array.isArray(rawVacationData)) {
+            throw new Error('Invalid vacations data format');
+          }
+
+          const vacations = rawVacationData.map((v: any) => {
+            if (
+              typeof v.id !== 'string' ||
+              typeof v.user_id !== 'string' ||
+              typeof v.start_date !== 'string' ||
+              typeof v.end_date !== 'string'
+            ) {
+              throw new Error('Invalid vacation record structure');
+            }
+            return v; // type-safe enough for now
+          });
+
+          setVacations(vacations);
         } else {
           console.error(
             'Failed to fetch vacations:',
             vacationsResponse.statusText,
           );
-          setVacations([]); // Reset or handle error state
+          setVacations([]);
         }
       } catch (error) {
         console.error('Error fetching sidebar data:', error);
-        // Optionally reset states on error
         setHolidays([]);
         setVacations([]);
       }

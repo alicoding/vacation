@@ -95,12 +95,20 @@ export default function VacationList({ vacations }: { vacations: Vacation[] }) {
     try {
       const response = await fetch(`/api/vacations/${vacationToDelete.id}`, {
         method: 'DELETE',
-        credentials: 'include', // Include credentials to send cookies with the request
+        credentials: 'include', // Include cookies for authentication
       });
 
+      const rawData: unknown = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to delete vacation');
+        const errorMessage =
+          typeof rawData === 'object' &&
+          rawData !== null &&
+          typeof (rawData as any).error === 'string'
+            ? (rawData as any).error
+            : 'Failed to delete vacation';
+
+        throw new Error(errorMessage);
       }
 
       // Close dialog and refresh data

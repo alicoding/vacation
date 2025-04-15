@@ -43,9 +43,27 @@ const HolidaySyncCard: React.FC<HolidaySyncCardProps> = ({
         body: JSON.stringify({ year }),
       });
 
+      const responseData: unknown = await response.json();
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to sync holidays');
+        const errorMessage =
+          typeof responseData === 'object' &&
+          responseData !== null &&
+          typeof (responseData as any).error === 'string'
+            ? (responseData as any).error
+            : 'Failed to sync holidays';
+
+        throw new Error(errorMessage);
+      }
+
+      // Runtime validation for success response
+      if (
+        typeof responseData !== 'object' ||
+        responseData === null ||
+        typeof (responseData as any).success !== 'boolean' ||
+        typeof (responseData as any).message !== 'string'
+      ) {
+        throw new Error('Invalid response format from holiday sync API');
       }
 
       setSuccess(true);

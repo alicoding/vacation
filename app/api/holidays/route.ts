@@ -210,7 +210,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Get year from request body
-    const { year } = await request.json();
+    const { year }: { year: number } = await request.json();
 
     if (!year) {
       return NextResponse.json({ error: 'Year is required' }, { status: 400 });
