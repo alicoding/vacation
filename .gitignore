@@ -61,3 +61,5 @@ logs
 # Cache directories
 .npm
 .eslintcache
+
+supabase-keepalive/

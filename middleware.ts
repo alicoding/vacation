@@ -8,7 +8,7 @@ export const config = {
     '/api/user/:path*',
     '/api/vacations/:path*',
     // Exclude auth routes and public resources
-    '/((?!_next/static|_next/image|favicon.ico|images|public|api/auth|auth).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|public|api/auth|auth|api/health).*)',
   ],
 };
 
